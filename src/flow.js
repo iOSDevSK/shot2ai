@@ -33,7 +33,7 @@ export async function showCard(tabId, id, capture, { text = '', autoSend = false
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -61,6 +61,29 @@ export async function cardSend(message) {
   const s = await settings();
   const blob = await encode(capture.png, s);
   return pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+}
+
+// Several destinations at once. html2wp goes through the bridge while the web
+// chats run one after another: each one's tab has to come to the front.
+export async function cardSendMany(message) {
+  const capture = await getCapture(message.id);
+  if (!capture?.png) return { failed: true, text: 'This screenshot is no longer available. Capture the area again.' };
+  const s = await settings();
+  if (message.acknowledge?.length) await update({ acknowledged: { ...s.acknowledged, ...Object.fromEntries(message.acknowledge.map((o) => [o, true])) } });
+  const list = (await destinations()).filter((d) => message.destinations.includes(d.id));
+  const app = list.find((d) => d.kind === 'html2wp');
+  const appResult = app ? sendToApp(message.text, capture.png) : null;
+  const results = [];
+  for (const d of list.filter((x) => x.kind === 'chat')) {
+    const blob = await encode(capture.png, s);
+    const r = await pasteIntoChat(d, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+    results.push({ id: d.id, name: d.name, ok: !!r.ok, text: r.ok ? (r.submitted ? 'Sent' : 'Pasted; press Enter there') : r.needsPermission ? 'Needs permission in Options' : 'Could not paste; it is on the clipboard' });
+  }
+  if (app) {
+    const outcome = await appResult;
+    results.unshift({ id: 'html2wp', name: 'html2wp', ok: !!outcome.ok, text: outcomeText(outcome) });
+  }
+  return { results };
 }
 
 export async function flagError() {

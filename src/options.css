@@ -60,3 +60,5 @@
 .prompt-row .moves .button{min-height:28px;padding:4px 10px;font-size:11.5px}
 .row-label.short{width:auto}
 select.field{height:36px}
+.multi{display:flex;flex-wrap:wrap;gap:8px 22px}
+.section-head p b{color:var(--ink);font-weight:600}

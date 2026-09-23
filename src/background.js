@@ -3,7 +3,7 @@
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
 import { deleteCapture, getCapture } from './captures.js';
 import { startCapture, cropSelection } from './capture.js';
-import { showCard, openEditor, cardSend, flagError } from './flow.js';
+import { showCard, openEditor, cardSend, cardSendMany, flagError } from './flow.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 
@@ -21,6 +21,7 @@ chrome.commands.onCommand.addListener((command, tab) => {
 const handlers = {
   capture: (m) => startCapture(m.tabId).then((id) => ({ ok: true, id }), (e) => ({ error: e.message })),
   'card-send': cardSend,
+  'card-send-many': cardSendMany,
   annotate: async (m, sender) => { await openEditor(m.id, sender.tab?.id, m.text); return { ok: true }; },
   save: async (m) => {
     const capture = await getCapture(m.id);

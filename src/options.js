@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT, prompts } from './settings.js';
+import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT, prompts, destinations } from './settings.js';
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
@@ -86,6 +86,29 @@ if (suggested) {
     else $('default').scrollIntoView({ block: 'start' });
   });
 }
+
+// ---- send to several ----------------------------------------------------
+
+async function renderMulti() {
+  const [list, s] = await Promise.all([destinations(), settings()]);
+  $('multi-list').replaceChildren(...list.map((d) => {
+    const label = document.createElement('label');
+    label.className = 'toggle';
+    label.innerHTML = '<input type="checkbox"><span></span>';
+    label.querySelector('span').textContent = d.kind === 'html2wp' ? 'html2wp (Mac app)' : d.name;
+    const box = label.querySelector('input');
+    box.checked = s.multiSend.includes(d.id);
+    box.addEventListener('change', async () => {
+      const current = (await settings()).multiSend.filter((x) => x !== d.id);
+      await update({ multiSend: box.checked ? [...current, d.id] : current });
+    });
+    return label;
+  }));
+}
+// Destinations change elsewhere too (the card's menu, the right-click menu).
+chrome.storage.onChanged.addListener((changes) => {
+  if (['multiSend', 'presets', 'customChats', 'defaultDestination'].some((k) => k in changes)) void renderMulti();
+});
 
 // ---- destinations -------------------------------------------------------
 
@@ -259,4 +282,4 @@ $('quality').addEventListener('change', async (e) => { await update({ imageQuali
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti()]);

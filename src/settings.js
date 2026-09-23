@@ -20,6 +20,8 @@ const DEFAULTS = {
   customChats: [],
   // The destination the card's main button uses.
   defaultDestination: 'chatgpt',
+  // Destinations ticked for "Send to all selected".
+  multiSend: [],
   // The prompt that fills the message of every new capture, or null.
   defaultPrompt: null,
   // Web chats the owner has been told receive the screenshot (by origin).

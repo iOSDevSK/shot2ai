@@ -37,6 +37,16 @@
     .menu button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 8px;border-radius:6px;text-align:left;font-size:12.5px}
     .menu button:hover{background:#f1f3ee}
     .menu small{color:#969f88;font-size:11px}
+    .menu .item{display:flex;align-items:center;gap:2px;border-radius:6px}
+    .menu .item:hover{background:#f1f3ee}
+    .menu .item input{flex:none;width:15px;height:15px;margin:0 2px 0 7px;accent-color:#2f3c30;cursor:pointer}
+    .menu .item button{flex:1;padding-left:5px}
+    .menu .item button:hover{background:none}
+    .menu .all{margin-top:4px;border-top:1px solid #eef0ea;border-radius:0;font-weight:600;color:#2f3c30}
+    .result ul{margin:0;padding:0;list-style:none}
+    .result li{display:flex;gap:6px;padding:2px 0}
+    .result li b{font-weight:650;white-space:nowrap}
+    .result li.fail{color:#6f3f33}
     .menu .options{border-top:1px solid #eef0ea;margin-top:4px;border-radius:0 0 6px 6px;color:#547254}
     .tools{display:flex;gap:4px;margin-top:8px}
     .tools button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:30px;border-radius:7px;color:#4d5a47;font-size:11.5px;font-weight:560}
@@ -171,6 +181,46 @@
       $('.saved').hidden = false;
     }
 
+    let selected = [...(o.multi || [])];
+    let renderAll = () => {};
+    async function sendToMany(confirmed = false) {
+      if (busy) return;
+      $('.menu').hidden = true;
+      const targets = o.destinations.filter((d) => selected.includes(d.id));
+      const chats = targets.filter((d) => d.kind === 'chat');
+      const unknown = chats.filter((d) => !o.acknowledged[d.origin]);
+      // One notice for every web chat in the set that has not been told yet.
+      if (!confirmed && unknown.length) {
+        const names = unknown.map((d) => d.name).join(', ');
+        const hosts = unknown.map((d) => d.host).join(', ');
+        show('warn', `${names} ${unknown.length > 1 ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac.`,
+          [['Continue', () => { for (const d of unknown) o.acknowledged[d.origin] = true; void sendToMany(true); }, true, 'send'], ['Cancel', () => show('', '')]]);
+        return;
+      }
+      const text = input.value.trim();
+      if (chats.length) await copy(true);
+      setBusy(true);
+      $('.send span').textContent = `Sending to ${targets.length}…`;
+      const r = await chrome.runtime.sendMessage({ type: 'card-send-many', id: o.id, destinations: targets.map((d) => d.id), text, acknowledge: unknown.map((d) => d.origin) });
+      setBusy(false);
+      const results = r?.results || [];
+      lastOk = results.length > 0 && results.every((x) => x.ok);
+      show(lastOk ? 'ok' : 'warn', '');
+      const box = $('.result');
+      const list = document.createElement('ul');
+      for (const x of results) {
+        const li = document.createElement('li');
+        li.className = x.ok ? 'ok' : 'fail';
+        li.innerHTML = '<b></b><span></span>';
+        li.querySelector('b').textContent = `${x.ok ? '✓' : '!'} ${x.name}`;
+        li.querySelector('span').textContent = x.text;
+        list.append(li);
+      }
+      box.replaceChildren(list);
+      box.hidden = false;
+      if (lastOk) { input.value = ''; input.blur(); scheduleHide(); }
+    }
+
     async function sendTo(destination, confirmed = false) {
       if (busy) return;
       $('.menu').hidden = true;
@@ -209,15 +259,32 @@
     $('.more').addEventListener('click', () => {
       const menu = $('.menu');
       menu.innerHTML = '<div class="head">Send to</div>';
+      // Tick several for "Send to all selected"; a name alone sends to that one.
       for (const d of o.destinations) {
-        const b = document.createElement('button');
-        b.setAttribute('role', 'menuitem');
-        b.innerHTML = '<span></span><small></small>';
+        const row = document.createElement('div');
+        row.className = 'item';
+        row.innerHTML = '<input type="checkbox"><button role="menuitem"><span></span><small></small></button>';
+        const tick = row.querySelector('input');
+        tick.checked = selected.includes(d.id);
+        tick.setAttribute('aria-label', `Select ${d.name}`);
+        tick.addEventListener('change', () => {
+          selected = tick.checked ? [...selected, d.id] : selected.filter((x) => x !== d.id);
+          chrome.storage.local.set({ multiSend: selected });
+          renderAll();
+        });
+        const b = row.querySelector('button');
         b.querySelector('span').textContent = d.name;
         b.querySelector('small').textContent = d.kind === 'html2wp' ? 'this Mac' : d.host;
         b.addEventListener('click', () => void sendTo(d));
-        menu.append(b);
+        menu.append(row);
       }
+      const all = document.createElement('button');
+      all.className = 'all';
+      all.setAttribute('role', 'menuitem');
+      all.addEventListener('click', () => void sendToMany());
+      menu.append(all);
+      renderAll = () => { all.textContent = `Send to all selected (${selected.length})`; all.hidden = selected.length < 2; };
+      renderAll();
       const add = document.createElement('button');
       add.className = 'options';
       add.textContent = 'Add a chat in Options…';

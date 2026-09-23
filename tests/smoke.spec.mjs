@@ -100,6 +100,14 @@ test.afterAll(async () => {
   await new Promise((r) => chatSite?.close(r));
 });
 
+// The card's menu opens upward over the page: take the page area around both.
+async function menuShot(card, name) {
+  const box = await card.boundingBox();
+  const menu = await card.locator('.menu').boundingBox();
+  const top = Math.min(box.y, menu.y) - 8;
+  await page.screenshot({ path: join(shots, name), clip: { x: box.x - 8, y: top, width: box.width + 16, height: box.y + box.height + 8 - top } });
+}
+
 const editors = () => context.pages().filter((p) => p.url().includes('/src/editor.html'));
 
 // Capture with the popup's Capture area button, then drag an area on the page.
@@ -498,7 +506,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
   await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/]);
-  await card.screenshot({ path: join(shots, 'card-menu.png') });
+  await menuShot(card, 'card-menu.png');
   await card.getByRole('button', { name: 'More destinations' }).click();
   await card.getByLabel('Message').fill('Please check this spacing.');
   await card.getByRole('button', { name: 'Send to Team chat' }).click();
@@ -521,6 +529,35 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await chat.screenshot({ path: join(shots, 'webchat-pasted.png') });
   await expect(card.locator('.result')).toHaveText('Pasted into Team chat. Press Enter there to send.');
   expect(bridge.state.messages).toHaveLength(3);
+
+  // Send to several at once: tick html2wp and Team chat in Options, then one click in the card.
+  await page.keyboard.press('Escape');
+  const multi = await context.newPage();
+  await multi.goto(`chrome-extension://${extensionId}/src/options.html`);
+  const several = multi.locator('#multi-list');
+  await expect(several.locator('label')).toHaveText(['ChatGPT', 'Claude', 'html2wp (Mac app)', 'Team chat']);
+  await several.getByLabel('html2wp (Mac app)').check();
+  await several.getByLabel('Team chat').check();
+  await multi.close();
+  const again = await capture([300, 120], [700, 380]);
+  await again.getByLabel('Message').fill('Both, please.');
+  await again.getByRole('button', { name: 'More destinations' }).click();
+  await expect(again.getByLabel('Select html2wp')).toBeChecked();
+  await expect(again.getByLabel('Select Team chat')).toBeChecked();
+  await expect(again.getByLabel('Select ChatGPT')).not.toBeChecked();
+  await menuShot(again, 'card-multi-menu.png');
+  await again.getByRole('menuitem', { name: 'Send to all selected (2)' }).click();
+  await expect(again.locator('.result li')).toHaveCount(2, { timeout: 15000 });
+  await expect(again.locator('.result li').nth(0)).toHaveText(`✓ html2wpSent to ${PROJECT.name}`);
+  await expect(again.locator('.result li').nth(1)).toHaveText('✓ Team chatPasted; press Enter there');
+  await again.screenshot({ path: join(shots, 'card-multi.png') });
+  // html2wp gets PNG even with JPEG chosen; the chat gets the JPEG, in its existing tab.
+  expect(bridge.state.messages).toHaveLength(4);
+  expect(bridge.state.messages[3].text).toBe('Both, please.');
+  expect(pngSize(bridge.state.messages[3].png)).toEqual({ width: 400 * dpr, height: 260 * dpr });
+  await chat.waitForFunction(() => window.received.files.length === 2);
+  expect((await chat.evaluate(() => window.received.files[1])).type).toBe('image/jpeg');
+  expect(context.pages().filter((p) => p.url().startsWith(chatBase))).toHaveLength(1);
 
   // Every request to the bridge came from the extension, never from a web page.
   expect(bridge.state.origins.every((o) => o === null || o.startsWith(`chrome-extension://${extensionId}`))).toBe(true);
