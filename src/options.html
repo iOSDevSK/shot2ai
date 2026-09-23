@@ -34,7 +34,7 @@
   </section>
 
   <section class="section" aria-labelledby="dest-title">
-    <div class="section-head"><div><h2 id="dest-title">Other destinations</h2><p>Send a screenshot into a web chat instead. The extension pastes it into the chat's message box; you press Enter there.</p></div></div>
+    <div class="section-head"><div><h2 id="dest-title">Other destinations</h2><p>Send a screenshot into a web chat instead. The extension pastes it into the chat's message box and you press Enter there, unless you turn on Send automatically.</p></div></div>
     <div id="presets" class="list"></div>
     <div id="custom" class="list"></div>
     <form id="add-chat" class="add">
@@ -42,7 +42,7 @@
       <input id="chat-url" placeholder="https://gemini.google.com/app" aria-label="Chat address" type="url" required>
       <button class="button" type="submit">Add chat</button>
     </form>
-    <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once.</p>
+    <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once. <b>Send automatically</b> (off by default) presses the chat's send button after pasting, so the message goes without you reviewing it; it is never used for html2wp. Send to all selected sends to every ticked site.</p>
     <p id="dest-error" class="notice err" role="alert" hidden></p>
   </section>
 

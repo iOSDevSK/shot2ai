@@ -6,8 +6,8 @@ export const SAVE_ONLY = { id: 'save', name: 'Save only', kind: 'save' };
 export const COPY_ONLY = { id: 'copy', name: 'Copy only', kind: 'copy' };
 // Web chats with a known composer. Any other chat uses the generic finder.
 export const PRESETS = [
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', selectors: ['#prompt-textarea'] },
-  { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', selectors: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'] },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', selectors: ['#prompt-textarea'], sendSelectors: ['button[data-testid="send-button"]', '#composer-submit-button'] },
+  { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', selectors: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'], sendSelectors: ['button[aria-label="Send message"]', 'button[aria-label="Send Message"]'] },
 ];
 const DEFAULTS = {
   saveCopy: false,
@@ -20,6 +20,8 @@ const DEFAULTS = {
   customChats: [],
   // The destination the card's main button uses.
   defaultDestination: 'chatgpt',
+  // Web chats whose send button Shot2AI presses after pasting (by id). Off unless turned on.
+  autoSubmit: {},
   // Destinations ticked for "Send to all selected".
   multiSend: [],
   // The prompt that fills the message of every new capture, or null.
@@ -33,6 +35,17 @@ export async function settings() {
 }
 export const update = (patch) => chrome.storage.local.set(patch);
 
+// What the card or the editor says after a web-chat send.
+export function chatResultText(name, r) {
+  if (r.submitted) return `Sent to ${name}.`;
+  if (r.autoSubmit) return `Pasted into ${name}. Its send button was not found; press Enter there.`;
+  return `Pasted into ${name}. Press Enter there to send.`;
+}
+// The first-use notice for a web chat.
+export function websiteNotice(names, hosts, many, auto) {
+  return `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${auto ? ', and will be sent automatically, without you reviewing it' : ''}.`;
+}
+
 export function origin(url) {
   try { return new URL(url).origin; } catch { return null; }
 }
@@ -42,7 +55,7 @@ export function sitePattern(url) {
   return `${u.protocol}//${u.hostname}/*`;
 }
 
-const chat = (c) => ({ ...c, kind: 'chat', selectors: c.selectors || [], origin: origin(c.url) });
+const chat = (c) => ({ ...c, kind: 'chat', selectors: c.selectors || [], sendSelectors: c.sendSelectors || [], origin: origin(c.url) });
 export const FIRST_DEFAULT = 'chatgpt';
 
 // Saved prompts. These four are there on first use; the owner may edit or delete them.

@@ -1,7 +1,7 @@
 // The preview card and what its buttons do.
 import { getCapture } from './captures.js';
 import { sendToApp, outcomeText } from './bridge.js';
-import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText } from './settings.js';
+import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatResultText } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { icons } from './icons.js';
@@ -23,7 +23,7 @@ export async function showCard(tabId, id, capture, { text = '', autoSend = false
   const chosen = await defaultDestination();
   let saved = null;
   if (s.saveCopy) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
-  const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null });
+  const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null, auto: !!s.autoSubmit[d.id] });
   const list = (await destinations()).map(brief);
   const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
   // What a send to a web chat or a save will weigh, in the chosen format.
@@ -60,7 +60,8 @@ export async function cardSend(message) {
   }
   const s = await settings();
   const blob = await encode(capture.png, s);
-  return pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+  const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+  return r.ok ? { ...r, text: chatResultText(destination.name, r) } : r;
 }
 
 // Several destinations at once. html2wp goes through the bridge while the web
@@ -77,7 +78,7 @@ export async function cardSendMany(message) {
   for (const d of list.filter((x) => x.kind === 'chat')) {
     const blob = await encode(capture.png, s);
     const r = await pasteIntoChat(d, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
-    results.push({ id: d.id, name: d.name, ok: !!r.ok, text: r.ok ? (r.submitted ? 'Sent' : 'Pasted; press Enter there') : r.needsPermission ? 'Needs permission in Options' : 'Could not paste; it is on the clipboard' });
+    results.push({ id: d.id, name: d.name, ok: !!r.ok, text: r.ok ? (r.submitted ? 'Sent' : r.autoSubmit ? 'Pasted; send button not found, press Enter there' : 'Pasted; press Enter there') : r.needsPermission ? 'Needs permission in Options' : 'Could not paste; it is on the clipboard' });
   }
   if (app) {
     const outcome = await appResult;

@@ -7,7 +7,7 @@
 import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
-import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText } from './settings.js';
+import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatResultText, websiteNotice } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { encode, EXTENSIONS } from './imaging.js';
@@ -353,7 +353,7 @@ async function submit(target = destination, confirmed = false) {
     if (!granted) { showResult('warn', `Chrome did not allow the extension to use ${new URL(target.url).host}. Send again and choose Allow.`); return; }
     const s = await settings();
     if (!confirmed && !s.acknowledged[target.origin]) {
-      showResult('warn', `${target.name} is a website. The screenshot and message will go to ${new URL(target.url).host}, not only to this Mac.`,
+      showResult('warn', websiteNotice(target.name, new URL(target.url).host, false, !!s.autoSubmit[target.id]),
         [['Continue', () => void submit(target, true), true], ['Cancel', () => showResult('', '')]]);
       return;
     }
@@ -367,7 +367,7 @@ async function submit(target = destination, confirmed = false) {
     const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]));
     sending = false;
     setSend(actionLabel(destination));
-    if (r.ok) { showResult('ok', `Pasted into ${target.name}. Press Enter there to send.`); return; }
+    if (r.ok) { showResult(r.submitted || !r.autoSubmit ? 'ok' : 'warn', chatResultText(target.name, r)); return; }
     showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`);
     return;
   }

@@ -97,6 +97,8 @@
     const png = new Blob([bytes], { type: 'image/png' });
     // The main button: the chosen default destination, or Copy.
     const main = o.main;
+    // The first-use notice for web chats (settings.js websiteNotice, rebuilt here).
+    o.notice = (names, hosts, many, auto) => `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${auto ? ', and will be sent automatically, without you reviewing it' : ''}.`;
     let busy = false;
     let lastOk = false;
     let hovered = false;
@@ -193,7 +195,7 @@
       if (!confirmed && unknown.length) {
         const names = unknown.map((d) => d.name).join(', ');
         const hosts = unknown.map((d) => d.host).join(', ');
-        show('warn', `${names} ${unknown.length > 1 ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac.`,
+        show('warn', o.notice(names, hosts, unknown.length > 1, unknown.some((d) => d.auto)),
           [['Continue', () => { for (const d of unknown) o.acknowledged[d.origin] = true; void sendToMany(true); }, true, 'send'], ['Cancel', () => show('', '')]]);
         return;
       }
@@ -230,7 +232,7 @@
       if (destination.kind === 'chat') {
         // A web chat is a website: say so once, before anything goes there.
         if (!confirmed && !o.acknowledged[destination.origin]) {
-          show('warn', `${destination.name} is a website. The screenshot and message will go to ${destination.host}, not only to this Mac.`,
+          show('warn', o.notice(destination.name, destination.host, false, destination.auto),
             [['Continue', () => { o.acknowledged[destination.origin] = true; void sendTo(destination, true); }, true, 'send'], ['Cancel', () => show('', '')]]);
           return;
         }
@@ -240,7 +242,7 @@
         const r = await chrome.runtime.sendMessage({ type: 'card-send', id: o.id, destination: destination.id, text, acknowledge: destination.origin });
         setBusy(false);
         lastOk = !!r?.ok;
-        if (r?.ok) { show('ok', `Pasted into ${destination.name}. Press Enter there to send.`); input.value = ''; input.blur(); scheduleHide(); return; }
+        if (r?.ok) { show(r.submitted || !r.autoSubmit ? 'ok' : 'warn', r.text); input.value = ''; input.blur(); scheduleHide(); return; }
         if (r?.needsPermission) { show('warn', `Allow the extension to use ${destination.host} in Options first.`, [['Open Options', () => chrome.runtime.sendMessage({ type: 'open-options' }), true]]); return; }
         show(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.`);
         return;

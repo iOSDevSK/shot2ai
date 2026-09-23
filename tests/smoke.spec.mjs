@@ -28,8 +28,9 @@ h1{font-size:46px;line-height:1.1;margin:0 0 18px}
 
 // A stand-in for any web chat: a message box that records what is pasted into it.
 const CHAT = `<!doctype html><html><head><title>Team chat</title></head><body style="font:15px sans-serif;padding:40px">
-<h1>Team chat</h1><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
-<script>window.received={files:[],text:null};
+<h1>Team chat</h1><form onsubmit="return false"><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
+<button id="send" type="submit" aria-label="Send message">Send</button></form>
+<script>window.received={files:[],text:null};window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});
 document.getElementById('composer').addEventListener('paste',async(e)=>{const files=[...e.clipboardData.files];window.received.text=e.clipboardData.getData('text/plain');e.preventDefault();
 for(const f of files){const b=await createImageBitmap(f);window.received.files.push({name:f.name,type:f.type,size:f.size,width:b.width,height:b.height})}window.received.done=true});</script></body></html>`;
 
@@ -558,6 +559,31 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await chat.waitForFunction(() => window.received.files.length === 2);
   expect((await chat.evaluate(() => window.received.files[1])).type).toBe('image/jpeg');
   expect(context.pages().filter((p) => p.url().startsWith(chatBase))).toHaveLength(1);
+  // Auto-submit is off unless turned on: nothing pressed the chat's send button so far.
+  expect(await chat.evaluate(() => window.sent)).toBe(0);
+  await page.keyboard.press('Escape');
+
+  // Auto-submit on for Team chat: after pasting, its send button is pressed.
+  const auto = await context.newPage();
+  await auto.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await auto.getByLabel('Send automatically to Team chat').check();
+  await expect(auto.getByLabel('Send automatically to ChatGPT')).not.toBeChecked();
+  await auto.locator('#dest-title').scrollIntoViewIfNeeded();
+  await auto.locator('section[aria-labelledby="dest-title"]').screenshot({ path: join(shots, 'options-destinations.png') });
+  await auto.close();
+  const third = await capture([300, 120], [700, 380]);
+  await third.getByLabel('Message').fill('Send it straight away.');
+  await third.getByRole('button', { name: 'Send to Team chat' }).click();
+  await expect(third.locator('.result')).toHaveText('Sent to Team chat.', { timeout: 15000 });
+  expect(await chat.evaluate(() => window.sent)).toBe(1);
+  await page.keyboard.press('Escape');
+  // No send button to be found: the card says so and leaves the text for Enter.
+  await chat.evaluate(() => document.getElementById('send').remove());
+  const fourth = await capture([300, 120], [700, 380]);
+  await fourth.getByRole('button', { name: 'Send to Team chat' }).click();
+  await expect(fourth.locator('.result')).toHaveText('Pasted into Team chat. Its send button was not found; press Enter there.', { timeout: 15000 });
+  await fourth.screenshot({ path: join(shots, 'card-autosubmit-missing.png') });
+  await page.keyboard.press('Escape');
 
   // Every request to the bridge came from the extension, never from a web page.
   expect(bridge.state.origins.every((o) => o === null || o.startsWith(`chrome-extension://${extensionId}`))).toBe(true);

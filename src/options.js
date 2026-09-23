@@ -119,13 +119,28 @@ async function allow(url) {
   if (!granted) fail(`Chrome did not allow the extension to use ${hostOf(url)}. Try again and choose Allow.`);
   return granted;
 }
-function row(name, url, control) {
+// Off by default: pressing the chat's send button means the message goes
+// without the owner reviewing it.
+function autoSubmitToggle(id, name, s) {
+  const label = document.createElement('label');
+  label.className = 'toggle auto';
+  label.innerHTML = '<input type="checkbox"><span>Send automatically</span>';
+  const box = label.querySelector('input');
+  box.checked = !!s.autoSubmit[id];
+  box.setAttribute('aria-label', `Send automatically to ${name}`);
+  box.addEventListener('change', async () => {
+    const current = (await settings()).autoSubmit;
+    await update({ autoSubmit: { ...current, [id]: box.checked } });
+  });
+  return label;
+}
+function row(name, url, ...controls) {
   const el = document.createElement('div');
   el.className = 'dest';
   el.innerHTML = '<div><strong></strong><br><small></small></div><span class="push"></span>';
   el.querySelector('strong').textContent = name;
   el.querySelector('small').textContent = hostOf(url);
-  el.append(control);
+  el.append(...controls);
   return el;
 }
 async function renderDestinations() {
@@ -145,7 +160,7 @@ async function renderDestinations() {
       const current = await settings();
       await update({ presets: { ...current.presets, [p.id]: box.checked } });
     });
-    return row(p.name, p.url, label);
+    return row(p.name, p.url, autoSubmitToggle(p.id, p.name, s), label);
   }));
   $('custom').replaceChildren(...s.customChats.map((c) => {
     const remove = document.createElement('button');
@@ -156,7 +171,7 @@ async function renderDestinations() {
       await update({ customChats: current.customChats.filter((x) => x.id !== c.id), ...(current.defaultDestination === c.id ? { defaultDestination: FIRST_DEFAULT } : {}) });
       await Promise.all([renderDefault(), renderDestinations()]);
     });
-    return row(c.name, c.url, remove);
+    return row(c.name, c.url, autoSubmitToggle(c.id, c.name, s), remove);
   }));
 }
 $('add-chat').addEventListener('submit', async (e) => {

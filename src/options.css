@@ -62,3 +62,6 @@
 select.field{height:36px}
 .multi{display:flex;flex-wrap:wrap;gap:8px 22px}
 .section-head p b{color:var(--ink);font-weight:600}
+.dest .auto{font-size:12px;color:var(--muted);margin-right:14px}
+.privacy-note b{font-weight:650}
+.dest>:last-child{min-width:78px;display:flex;justify-content:flex-end}
