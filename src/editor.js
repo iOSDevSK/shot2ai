@@ -7,7 +7,7 @@
 import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
-import { HTML2WP, destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac } from './settings.js';
+import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 
@@ -268,10 +268,11 @@ $('copy').addEventListener('click', async () => {
   if (!image) return;
   toast((await toClipboard(false)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.');
 });
-$('save').addEventListener('click', async () => {
+async function saveCopy() {
   if (!image) return;
   try { toast(savedText(await saveImage(await flattened(), source.url, { ask: true }))); } catch { toast('The screenshot could not be saved.'); }
-});
+}
+$('save').addEventListener('click', () => void saveCopy());
 
 // ---- sending ------------------------------------------------------------
 
@@ -303,20 +304,24 @@ function setSend(label, busy = false) {
   $('send-label').textContent = label;
   $('send').disabled = busy;
   $('more').disabled = busy;
-  const icon = label === 'Try again' ? 'retry' : label === 'Sent' ? 'check' : 'send';
+  const icon = { 'Try again': 'retry', Sent: 'check', Copy: 'copy', Save: 'download' }[label] || 'send';
   $('send').querySelector('svg').outerHTML = icons[icon];
 }
 
-let destination = HTML2WP;
+// The main button's destination: the owner's default, or Copy while none is chosen.
+let destination = COPY_ONLY;
 function choose(next) {
   destination = next;
-  setSend(`Send to ${next.name}`);
+  setSend(actionLabel(next));
   $('privacy').textContent = next.kind === 'chat'
     ? `${next.name} is a website: the screenshot and message go to ${new URL(next.url).host}. Nothing is submitted until you press Enter there.`
-    : 'The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).';
+    : next.kind === 'html2wp' ? 'The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).'
+      : 'Nothing leaves this computer. Choose where screenshots go in Options.';
   $('pair-form').hidden = true;
   if (!image) $('send').disabled = $('more').disabled = true;
   if (next.kind === 'chat') setTarget(next.name, new URL(next.url).host, 'Website', 'warn');
+  else if (next.kind === 'copy') setTarget('Clipboard', 'Paste it anywhere', 'Copy', 'ok');
+  else if (next.kind === 'save') setTarget('Save only', 'A copy on this computer', 'Save', 'ok');
   else void check();
 }
 
@@ -337,6 +342,8 @@ let sending = false;
 async function submit(target = destination, confirmed = false) {
   if (sending || !image) return;
   $('menu').hidden = true;
+  if (target.kind === 'copy') { toast((await toClipboard(true)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.'); return; }
+  if (target.kind === 'save') { await saveCopy(); return; }
   if (target !== destination) choose(target);
   const text = $('message').value.trim();
   if (target.kind === 'chat') {
@@ -357,8 +364,8 @@ async function submit(target = destination, confirmed = false) {
     const copied = await toClipboard(true);
     const r = await pasteIntoChat(target, png, text, fileName(s.filenamePattern, source.url));
     sending = false;
-    setSend(`Send to ${target.name}`);
-    if (r.ok) { await update({ lastDestination: target.id }); showResult('ok', `Pasted into ${target.name}. Press Enter there to send.`); return; }
+    setSend(actionLabel(destination));
+    if (r.ok) { showResult('ok', `Pasted into ${target.name}. Press Enter there to send.`); return; }
     showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`);
     return;
   }
@@ -368,7 +375,6 @@ async function submit(target = destination, confirmed = false) {
   const outcome = await sendToApp(text, await flattened());
   sending = false;
   if (outcome.ok) {
-    await update({ lastDestination: 'html2wp' });
     showResult('ok', outcomeText(outcome));
     setSend('Sent', true);
     if (captureId) await deleteCapture(captureId).catch(() => {});
@@ -466,7 +472,7 @@ async function start() {
     await load(capture.png, { title: capture.title, url: capture.url }, capture.scale);
   }
   if (params.get('text')) $('message').value = params.get('text');
-  choose(await defaultDestination());
+  choose((await defaultDestination()) || COPY_ONLY);
 }
 addEventListener('resize', fit);
 await start();

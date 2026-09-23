@@ -12,8 +12,14 @@
 <header class="topbar"><div class="brand"><span class="brand-symbol" data-icon="capture"></span><span>Shot<span class="two">2</span>AI</span></div><span class="crumb">Options</span></header>
 <main class="page">
 
+  <section class="section" id="default" aria-labelledby="default-title">
+    <div class="section-head"><div><h2 id="default-title">Default destination</h2><p>Where the card's main button sends a screenshot. The others you turn on stay in its menu.</p></div><span id="default-state" class="status"></span></div>
+    <div id="default-list" class="list" role="radiogroup" aria-labelledby="default-title"></div>
+    <p class="note">Until you choose, each capture is copied to the clipboard and saved to Downloads.</p>
+  </section>
+
   <section class="section" aria-labelledby="app-title">
-    <div class="section-head"><div><h2 id="app-title">html2wp app</h2><p>The default destination. Screenshots go only to the app on this computer (127.0.0.1).</p></div><span id="app-state" class="status">Checking</span></div>
+    <div class="section-head"><div><h2 id="app-title">html2wp app</h2><p>Screenshots sent to html2wp go only to the app on this computer (127.0.0.1). <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></p></div><span id="app-state" class="status">Checking</span></div>
     <div id="app-project" class="row" hidden><span class="row-label">Open project</span><strong id="app-project-name"></strong></div>
     <form id="pair-form" class="row" hidden>
       <label class="row-label" for="code">Pairing code</label>
@@ -51,6 +57,7 @@
     <div id="paste-zone" class="paste-zone" tabindex="0"><span data-icon="capture"></span><span id="paste-keys"></span></div>
   </section>
 </main>
+<footer class="foot">Shot2AI · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></footer>
 <script type="module" src="options.js"></script>
 </body>
 </html>

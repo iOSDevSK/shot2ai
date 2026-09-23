@@ -1,17 +1,19 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { isMac } from './settings.js';
+import { isMac, settings, update, defaultDestination, sitePattern, cleanSubfolder } from './settings.js';
 import { acceptPastedImages } from './paste.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
-const panels = ['checking', 'offline', 'pairing', 'ready'];
+const panels = ['onboarding', 'checking', 'offline', 'pairing', 'ready', 'other'];
 const show = (name) => panels.forEach((p) => { $(p).hidden = p !== name; });
-const setState = (text, tone = '') => { $('state').textContent = text; $('state').className = `status ${tone}`; };
+const setState = (text, tone = '') => { $('state').textContent = text; $('state').className = `status ${tone}`; $('state').hidden = !text; };
 // The page to capture: the active tab, or ?tabId= when this page runs in a tab of its own.
 const tabParam = Number(new URLSearchParams(location.search).get('tabId')) || null;
+const openOptions = (hash = '') => chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html${hash}`) });
 
-async function refresh() {
+// html2wp's own status, shown only when html2wp is the chosen destination.
+async function html2wpStatus() {
   show('checking');
   setState('Checking');
   const found = await connect();
@@ -29,6 +31,46 @@ async function refresh() {
   $('chat-reason').textContent = status.chat?.reason || '';
 }
 
+function other(name, host, state, tone, note = '') {
+  show('other');
+  setState('');
+  $('dest-name').textContent = name;
+  $('dest-host').textContent = host;
+  $('dest-state').textContent = state;
+  $('dest-state').className = `status ${tone}`;
+  $('dest-note').textContent = note;
+  $('dest-note').hidden = !note;
+}
+
+async function refresh() {
+  const destination = await defaultDestination();
+  $('change').hidden = !destination;
+  if (!destination) { show('onboarding'); setState('Not set up'); return; }
+  if (destination.kind === 'html2wp') { await html2wpStatus(); return; }
+  if (destination.kind === 'chat') {
+    const host = new URL(destination.url).host;
+    const granted = await chrome.permissions.contains({ origins: [sitePattern(destination.url)] });
+    other(destination.name, host, granted ? 'Site permission granted' : 'Needs permission', granted ? 'ok' : 'warn',
+      granted ? '' : `Allow Shot2AI to use ${host} in Options before sending there.`);
+    return;
+  }
+  const s = await settings();
+  if (destination.kind === 'save') other('Save only', `Downloads/${cleanSubfolder(s.saveSubfolder) || ''}`.replace(/\/$/, ''), 'Ready', 'ok');
+  else other('Copy only', 'The clipboard', 'Ready', 'ok');
+}
+
+// First run: html2wp, Save only and Copy only are set here; a chat needs its
+// site's permission, which Options asks for.
+for (const b of document.querySelectorAll('[data-choose]')) {
+  b.addEventListener('click', async () => {
+    const id = b.dataset.choose;
+    if (['html2wp', 'save', 'copy'].includes(id)) { await update({ defaultDestination: id }); await refresh(); return; }
+    await openOptions(`#default=${id}`);
+    if (!tabParam) window.close();
+  });
+}
+$('change').addEventListener('click', () => openOptions('#default'));
+$('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('recheck').addEventListener('click', refresh);
 $('code').addEventListener('input', (e) => {
   const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -59,7 +101,6 @@ $('capture').addEventListener('click', async () => {
   $('capture-error').textContent = result?.error || 'The page could not be captured.';
   $('capture-error').hidden = false;
 });
-$('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('paste-hint').innerHTML = `Or paste an image with <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> to annotate it`;
 acceptPastedImages(() => { if (!tabParam) window.close(); });
 chrome.commands.getAll().then((commands) => {

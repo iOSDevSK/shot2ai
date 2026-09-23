@@ -10,7 +10,15 @@ If the chat cannot take a message right now, for example while the assistant is 
 2. Choose **Load unpacked** and select this folder (the one with `manifest.json`).
 3. Pin **Shot2AI** to the toolbar if you like.
 
-## Pair with the app, once
+## Choose where screenshots go
+
+Shot2AI sends nowhere until you choose. On first use the popup asks **"Choose where your screenshots go"**: html2wp (the Mac app), ChatGPT, Claude, a custom chat, Save only or Copy only. You can change the choice any time in **Options → Default destination**. Nothing is preselected; html2wp is listed first.
+
+Until you choose, each capture is copied to the clipboard and saved to `Downloads/shot2ai/`, and the card's main button is **Copy**. Once you choose, the main button reads **Send to <destination>** (or **Save** / **Copy**). Other chats you turn on stay available in the card's menu.
+
+The popup shows the chosen destination and its state. For a web chat that is whether Chrome allowed the site. The html2wp status (running, pairing, open project, chat ready) appears only when html2wp is the chosen destination.
+
+## Pair with html2wp, once (only if you use html2wp)
 
 1. In html2wp, open **Settings → Chrome extension**. It shows a 6-digit pairing code.
 2. Click the Shot2AI toolbar icon and enter the code. You can also enter it in Shot2AI's Options.
@@ -21,14 +29,14 @@ Each code pairs one extension. After five wrong codes the code stops working; ch
 
 - Click the toolbar icon, then **Capture area**, or press **Alt+Shift+S** on any page. Drag over the area; **Esc** cancels.
 - A **preview card** appears in the corner of the page. The screenshot is already on the clipboard, so you can paste it anywhere with **⌘V** (**Ctrl+V** on Windows and Linux). From the card:
-  - **Send to html2wp**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. The card shows "Sent to <project>", or the app's own reason with **Try again**. It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, and never while it shows an error.
+  - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**; for a web chat it says the screenshot was pasted in and you press Enter there. It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, and never while it shows an error.
   - **Annotate** opens the full editor. **Copy** copies the screenshot again. **Save** saves a copy (see Saving). The **chevron** lists the other destinations.
 - In the editor: **A** arrow, **R** rectangle, **T** text, **H** highlight, **B** blur, **⌘Z** / **⇧⌘Z** undo and redo (Ctrl on Windows and Linux). Pick a colour and a stroke size in the toolbar. **Send** has the same destination menu as the card. **⌘Enter** sends.
 - **Paste as input**: press ⌘V (or Ctrl+V) in the editor, the popup or the options page to open a pasted image, such as a macOS ⌘⇧4 screenshot, in the editor.
 
 ## Destinations
 
-html2wp is always the first destination and the default. In **Options** you can also turn on **ChatGPT** and **Claude**, or add any other web chat by name and address (for example Gemini, or an internal chat). The destination you used last becomes the card's main button; html2wp stays first in the list.
+html2wp is listed first; the default is whatever you choose. In **Options** you can also turn on **ChatGPT** and **Claude**, or add any other web chat by name and address (for example Gemini, or an internal chat). The card's main button uses your chosen default destination; the menu lists html2wp first, then the chats you turned on.
 
 Sending to a web chat finds an open tab of that chat, or opens it. The extension then pastes the screenshot and your message into the chat's message box. **It never submits**: you check the message and press Enter in the chat yourself. If pasting does not work on that site, the screenshot and message are already on the clipboard; the card says "Copied. Paste with ⌘V in <chat>".
 
@@ -45,7 +53,7 @@ Options → **Saving**:
 
 ## Privacy
 
-- **html2wp** (the default): the screenshot and the message go **only to 127.0.0.1**, the html2wp app on this computer. The app listens on 127.0.0.1 only, on port 47811 (or the next free one up to 47815). It answers only the paired extension: every request needs the pairing token, and a request from a web page's origin is refused. Once it has the screenshot, html2wp handles it like any image you attach in its chat.
+- **html2wp**: the screenshot and the message go **only to 127.0.0.1**, the html2wp app on this computer. The app listens on 127.0.0.1 only, on port 47811 (or the next free one up to 47815). It answers only the paired extension: every request needs the pairing token, and a request from a web page's origin is refused. Once it has the screenshot, html2wp handles it like any image you attach in its chat.
 - **A web chat** (ChatGPT, Claude, or one you added) **is a website**. A screenshot you send there goes to that site and is handled under its terms. The card and the editor say this the first time you send to each chat, and the Options page says it next to the destinations.
 - Captures stay in the extension's own storage in this browser until you send, copy or save them. They are removed after sending to html2wp, or after a day.
 
@@ -58,7 +66,9 @@ npm test
 
 The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on 127.0.0.1:47811) and a mock web chat page on another port. They cover:
 
-- pairing
+- first run: the popup's "Choose where your screenshots go" list, no html2wp status, and a capture that is copied and saved, with **Copy** as the main button
+- choosing html2wp, then pairing
+- choosing ChatGPT, then a custom chat, as the default in Options: the popup shows the chat and its site permission, not html2wp's status
 - a one-click send from the preview card: the mock receives the PNG at the right size and the message, and no editor opens
 - the PNG on the clipboard after a capture
 - auto-hide, which waits while the card is hovered and never runs after an error
@@ -71,6 +81,10 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 Screenshots go to `screenshots/`.
 
 The test loads a copy of the extension with two changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's shadow root is opened so the test can reach inside it. The shipped files have neither change. Chrome's own "allow this site" prompt, and the folder picker, cannot be driven by Playwright and are not covered.
+
+To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
+
+html2wp converts any website to WordPress: https://html2wp.dev/
 
 ## Credits
 

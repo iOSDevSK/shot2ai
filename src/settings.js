@@ -1,6 +1,9 @@
 // Shot2AI settings: the owner's choices, kept in chrome.storage.local, and the destinations a
-// screenshot can go to. html2wp is always first and the default.
+// screenshot can go to. The owner picks the default destination; html2wp is
+// listed first but nothing is chosen until they choose.
 export const HTML2WP = { id: 'html2wp', name: 'html2wp', kind: 'html2wp' };
+export const SAVE_ONLY = { id: 'save', name: 'Save only', kind: 'save' };
+export const COPY_ONLY = { id: 'copy', name: 'Copy only', kind: 'copy' };
 // Web chats with a known composer. Any other chat uses the generic finder.
 export const PRESETS = [
   { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', selectors: ['#prompt-textarea'] },
@@ -12,7 +15,8 @@ const DEFAULTS = {
   filenamePattern: 'shot2ai-{host}-{date}-{time}',
   presets: {},
   customChats: [],
-  lastDestination: 'html2wp',
+  // The destination the card's main button uses; null until the owner chooses.
+  defaultDestination: null,
   // Web chats the owner has been told receive the screenshot (by origin).
   acknowledged: {},
 };
@@ -31,19 +35,29 @@ export function sitePattern(url) {
   return `${u.protocol}//${u.hostname}/*`;
 }
 
-// html2wp, then the enabled presets, then the owner's own chats.
+const chat = (c) => ({ ...c, kind: 'chat', selectors: c.selectors || [], origin: origin(c.url) });
+// Everything the owner can choose as the default, html2wp first.
+export async function choices() {
+  const s = await settings();
+  return [HTML2WP, ...PRESETS.map(chat), ...s.customChats.map(chat), SAVE_ONLY, COPY_ONLY];
+}
+// The send menu: html2wp, then the chats the owner turned on or chose.
 export async function destinations() {
   const s = await settings();
-  const chats = [
-    ...PRESETS.filter((p) => s.presets[p.id]).map((p) => ({ ...p, kind: 'chat' })),
-    ...s.customChats.map((c) => ({ ...c, kind: 'chat', selectors: [] })),
-  ];
-  return [HTML2WP, ...chats.map((c) => ({ ...c, origin: origin(c.url) }))];
+  const on = (p) => s.presets[p.id] || s.defaultDestination === p.id;
+  return [HTML2WP, ...PRESETS.filter(on).map(chat), ...s.customChats.map(chat)];
 }
-// The last destination used, while it still exists; otherwise html2wp.
+// The chosen default destination, or null while none is chosen.
 export async function defaultDestination() {
-  const [list, s] = await Promise.all([destinations(), settings()]);
-  return list.find((d) => d.id === s.lastDestination) || HTML2WP;
+  const s = await settings();
+  if (!s.defaultDestination) return null;
+  return (await choices()).find((d) => d.id === s.defaultDestination) || null;
+}
+// The main button's words: "Send to ChatGPT", "Save", or "Copy" when nothing is chosen.
+export function actionLabel(destination) {
+  if (!destination || destination.kind === 'copy') return 'Copy';
+  if (destination.kind === 'save') return 'Save';
+  return `Send to ${destination.name}`;
 }
 
 const pad = (n) => String(n).padStart(2, '0');

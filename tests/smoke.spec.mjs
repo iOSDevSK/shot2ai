@@ -57,8 +57,10 @@ test.beforeAll(async () => {
   // capture the page. Playwright cannot click the toolbar, so the copy loaded
   // here holds <all_urls> in place of that gesture, and opens the card's
   // shadow root so the test can reach it. The shipped files are unchanged.
+  // SHOT2AI_EXT points at another copy, e.g. the unzipped release ZIP.
+  const source = process.env.SHOT2AI_EXT || root;
   const extension = mkdtempSync(join(tmpdir(), 'h2wp-ext-src-'));
-  for (const part of ['manifest.json', 'src', 'icons', 'licenses']) cpSync(join(root, part), join(extension, part), { recursive: true });
+  for (const part of ['manifest.json', 'src', 'icons', 'licenses']) cpSync(join(source, part), join(extension, part), { recursive: true });
   const manifest = JSON.parse(readFileSync(join(extension, 'manifest.json'), 'utf8'));
   manifest.host_permissions.push('<all_urls>');
   writeFileSync(join(extension, 'manifest.json'), JSON.stringify(manifest));
@@ -108,10 +110,35 @@ async function capture(from = [440, 150], to = [760, 350]) {
   return card;
 }
 
-test('pair, capture, and send from the preview card in one click', async () => {
-  // Popup: not paired yet, then pair with the code from Settings.
+test('first run: nothing is chosen, a capture is copied and saved, html2wp status stays hidden', async () => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await expect(popup.getByRole('heading', { name: 'Choose where your screenshots go' })).toBeVisible();
+  await expect(popup.locator('.choice')).toHaveText([/^html2wp/, /^ChatGPT/, /^Claude/, /^Custom chat/, /^Save only/, /^Copy only/]);
+  await expect(popup.getByText('html2wp is not running')).toBeHidden();
+  await expect(popup.locator('#checking, #offline, #pairing, #ready')).toHaveCount(4);
+  for (const id of ['checking', 'offline', 'pairing', 'ready']) await expect(popup.locator(`#${id}`)).toBeHidden();
+  await expect(popup.getByRole('link', { name: 'html2wp.dev' })).toHaveAttribute('href', 'https://html2wp.dev/');
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-first-run.png') });
+  await popup.close();
+
+  // Without a destination the card's main button copies, and the capture is saved.
+  const card = await capture();
+  await expect(card.locator('.send')).toHaveText('Copy');
+  await expect(card.locator('.saved')).toHaveText(/^Saved to Downloads\/shot2ai\/shot2ai-127\.0\.0\.1-/);
+  await card.screenshot({ path: join(shots, 'card-first-run.png') });
+  await card.locator('.send').click();
+  await expect(card.locator('.chip')).toHaveText('Copied');
+  expect(bridge.state.messages).toHaveLength(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+});
+
+test('choose html2wp, pair, capture, and send from the preview card in one click', async () => {
+  // Choosing html2wp in the first-run list brings up its status: not paired yet.
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await popup.locator('[data-choose="html2wp"]').click();
   await expect(popup.getByRole('heading', { name: 'Pair with html2wp' })).toBeVisible();
   await popup.locator('.popup').screenshot({ path: join(shots, 'popup-pairing.png') });
   await popup.getByLabel('Pairing code').fill('000000');
@@ -305,11 +332,29 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
   await expect(options.locator('#app-state')).toHaveText('Paired');
+  await expect(options.getByRole('radio', { name: /^html2wp \(Mac app\)/ })).toBeChecked();
+  await expect(options.locator('.foot a')).toHaveAttribute('href', 'https://html2wp.dev/');
+
+  // ChatGPT as the default: the popup shows ChatGPT and its site permission, not html2wp's status.
+  await options.getByRole('radio', { name: /^ChatGPT/ }).check();
+  await expect(options.locator('#default-state')).toHaveText('ChatGPT');
+  await expect(options.getByLabel('Use ChatGPT')).toBeChecked();
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await expect(popup.locator('#dest-name')).toHaveText('ChatGPT');
+  await expect(popup.locator('#dest-state')).toHaveText('Site permission granted');
+  for (const id of ['checking', 'offline', 'pairing', 'ready', 'onboarding']) await expect(popup.locator(`#${id}`)).toBeHidden();
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-chatgpt.png') });
+  await popup.close();
   await options.getByLabel('Chat name').fill('Team chat');
   await options.getByLabel('Chat address').fill(`${chatBase}/chat`);
   await options.getByRole('button', { name: 'Add chat' }).click();
   await expect(options.locator('#custom .dest')).toContainText('Team chat');
+  // The custom chat becomes the default.
+  await options.getByRole('radio', { name: /^Team chat/ }).check();
+  await expect(options.locator('#default-state')).toHaveText('Team chat');
   await options.getByLabel('Save a copy of every capture').check();
+  await options.locator('#default').scrollIntoViewIfNeeded();
   await expect(options.locator('#example')).toHaveText(/^shot2ai-example\.com-\d{4}-\d\d-\d\d-\d{6}\.png$/);
   await options.screenshot({ path: join(shots, 'options.png'), fullPage: true });
   await options.close();
@@ -331,12 +376,13 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   expect(existsSync(download.filename)).toBe(true);
   expect(readFileSync(download.filename).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
 
-  // The destination menu lists html2wp first, then the custom chat.
+  // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
-  await expect(card.getByRole('menuitem')).toHaveText([/^html2wp/, /^Team chat/]);
+  await expect(card.getByRole('menuitem')).toHaveText([/^html2wp/, /^ChatGPT/, /^Team chat/]);
   await card.screenshot({ path: join(shots, 'card-menu.png') });
+  await card.getByRole('button', { name: 'More destinations' }).click();
   await card.getByLabel('Message').fill('Please check this spacing.');
-  await card.getByRole('menuitem', { name: /Team chat/ }).click();
+  await card.getByRole('button', { name: 'Send to Team chat' }).click();
   // First use: the card says the screenshot goes to that website.
   await expect(card.locator('.result')).toContainText('Team chat is a website');
   await card.screenshot({ path: join(shots, 'card-webchat-notice.png') });

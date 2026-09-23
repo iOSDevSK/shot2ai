@@ -4,7 +4,7 @@
 // run here, since a content script cannot reach 127.0.0.1 or other tabs.
 import { putCapture, getCapture, updateCapture, deleteCapture } from './captures.js';
 import { sendToApp, outcomeText } from './bridge.js';
-import { destinations, defaultDestination, settings, update, fileName } from './settings.js';
+import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { icons } from './icons.js';
@@ -65,16 +65,19 @@ async function base64(blob) {
 // The quick preview card, in the page the area came from.
 async function showCard(tabId, id, capture) {
   const s = await settings();
+  const chosen = await defaultDestination();
+  // Until a destination is chosen, every capture is copied and saved.
   let saved = null;
-  if (s.saveCopy) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
-  const list = (await destinations()).map((d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null }));
-  const current = (await defaultDestination()).id;
+  if (s.saveCopy || !chosen) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
+  const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null });
+  const list = (await destinations()).map(brief);
+  const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
   const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry'];
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, current, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -93,7 +96,6 @@ async function cardSend(message) {
   if (!destination) return { failed: true, text: 'This destination is no longer set up.' };
   if (destination.kind === 'html2wp') {
     const outcome = await sendToApp(message.text, capture.png);
-    if (outcome.ok) await update({ lastDestination: 'html2wp' });
     return { ...outcome, text: outcomeText(outcome) };
   }
   if (message.acknowledge) {
@@ -101,9 +103,7 @@ async function cardSend(message) {
     await update({ acknowledged: { ...acknowledged, [message.acknowledge]: true } });
   }
   const s = await settings();
-  const result = await pasteIntoChat(destination, capture.png, message.text, fileName(s.filenamePattern, capture.url));
-  if (result.ok) await update({ lastDestination: destination.id });
-  return result;
+  return pasteIntoChat(destination, capture.png, message.text, fileName(s.filenamePattern, capture.url));
 }
 
 async function flagError() {

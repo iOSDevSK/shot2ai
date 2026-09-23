@@ -34,3 +34,14 @@
 .paste-zone:focus{outline:2px solid rgba(84,114,84,.28);border-color:var(--green)}
 .paste-zone svg{width:20px;height:20px;color:var(--green)}
 .paste-zone kbd{font:600 11px/1 var(--mono);padding:3px 6px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;background:#fff;color:var(--green)}
+.section-head p a,.foot a{color:var(--green);text-decoration:none}
+.section-head p a:hover,.foot a:hover{text-decoration:underline}
+.foot{width:calc(100% - 48px);max-width:712px;margin:0 auto;padding:18px 0 40px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.pick{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;cursor:pointer;transition:border-color .12s,background .12s}
+.pick:hover{border-color:var(--line-strong)}
+.pick input{width:16px;height:16px;margin:0;accent-color:var(--green-dark)}
+.pick strong{font-size:13px;font-weight:600}
+.pick small{color:var(--faint);font-size:11.5px}
+.pick:has(input:checked){border-color:var(--green);background:#f5f8f1}
+.pick.suggested{border-color:var(--green);box-shadow:0 0 0 3px rgba(84,114,84,.16)}
+#default-list{gap:6px}

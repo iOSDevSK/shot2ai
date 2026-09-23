@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac } from './settings.js';
+import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices } from './settings.js';
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
@@ -43,6 +43,46 @@ $('pair-form').addEventListener('submit', async (e) => {
   $('app-note').textContent = result === 'offline' ? 'html2wp stopped answering. Open the app and try again.' : 'That code did not match. Check Settings in html2wp; after five wrong codes, choose New code there.';
 });
 
+// ---- default destination ------------------------------------------------
+
+// Options opened from the popup's first-run list: #default=chatgpt.
+const suggested = (location.hash.match(/^#default=([\w-]+)/) || [])[1] || null;
+const describe = (d) => d.kind === 'html2wp' ? 'The html2wp app on this Mac' : d.kind === 'chat' ? hostOf(d.url)
+  : d.kind === 'save' ? 'Save a copy on this computer; nothing is sent' : 'Copy to the clipboard; paste it anywhere';
+async function renderDefault() {
+  const s = await settings();
+  const list = await choices();
+  const chosen = list.find((d) => d.id === s.defaultDestination);
+  $('default-state').textContent = chosen ? chosen.name : 'Not chosen';
+  $('default-state').className = `status ${chosen ? 'ok' : 'warn'}`;
+  $('default-list').replaceChildren(...list.map((d) => {
+    const row = document.createElement('label');
+    row.className = `pick${d.id === suggested && !chosen ? ' suggested' : ''}`;
+    row.innerHTML = '<input type="radio" name="default"><div><strong></strong><br><small></small></div>';
+    const radio = row.querySelector('input');
+    radio.value = d.id;
+    radio.checked = d.id === s.defaultDestination;
+    row.querySelector('strong').textContent = d.kind === 'html2wp' ? 'html2wp (Mac app)' : d.name;
+    row.querySelector('small').textContent = describe(d);
+    radio.addEventListener('change', async () => {
+      fail('');
+      // A web chat needs its site's permission first; asked during this click.
+      if (d.kind === 'chat' && !(await allow(d.url))) { await renderDefault(); return; }
+      const current = await settings();
+      const presets = PRESETS.some((p) => p.id === d.id) ? { ...current.presets, [d.id]: true } : current.presets;
+      await update({ defaultDestination: d.id, presets });
+      await Promise.all([renderDefault(), renderDestinations()]);
+    });
+    return row;
+  }));
+}
+if (suggested) {
+  requestAnimationFrame(() => {
+    if (suggested === 'custom') { $('add-chat').scrollIntoView({ block: 'center' }); $('chat-name').focus(); }
+    else $('default').scrollIntoView({ block: 'start' });
+  });
+}
+
 // ---- destinations -------------------------------------------------------
 
 function fail(text) { $('dest-error').textContent = text; $('dest-error').hidden = !text; }
@@ -68,7 +108,9 @@ async function renderDestinations() {
     label.className = 'toggle';
     label.innerHTML = '<input type="checkbox"><span>Use</span>';
     const box = label.querySelector('input');
-    box.checked = !!s.presets[p.id];
+    box.checked = !!s.presets[p.id] || s.defaultDestination === p.id;
+    // The default destination stays on; choose another default to turn it off.
+    box.disabled = s.defaultDestination === p.id;
     box.setAttribute('aria-label', `Use ${p.name}`);
     box.addEventListener('change', async () => {
       fail('');
@@ -84,8 +126,8 @@ async function renderDestinations() {
     remove.textContent = 'Remove';
     remove.addEventListener('click', async () => {
       const current = await settings();
-      await update({ customChats: current.customChats.filter((x) => x.id !== c.id) });
-      await renderDestinations();
+      await update({ customChats: current.customChats.filter((x) => x.id !== c.id), ...(current.defaultDestination === c.id ? { defaultDestination: null } : {}) });
+      await Promise.all([renderDefault(), renderDestinations()]);
     });
     return row(c.name, c.url, remove);
   }));
@@ -102,7 +144,7 @@ $('add-chat').addEventListener('submit', async (e) => {
   await update({ customChats: [...s.customChats, { id: `chat-${crypto.randomUUID().slice(0, 8)}`, name, url: url.href }] });
   $('chat-name').value = '';
   $('chat-url').value = '';
-  await renderDestinations();
+  await Promise.all([renderDefault(), renderDestinations()]);
 });
 
 // ---- saving -------------------------------------------------------------
@@ -145,4 +187,4 @@ $('forget-folder').addEventListener('click', async () => { await deleteHandle(FO
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([refreshApp(), renderDestinations(), renderSaving()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving()]);

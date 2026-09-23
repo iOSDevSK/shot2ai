@@ -66,7 +66,7 @@
         <button class="close" aria-label="Dismiss" title="Dismiss (Esc)">${i.close}</button>
         <span class="chip" hidden>${i.check}<span></span></span></div>
       <input class="message" placeholder="Add a message (optional)" aria-label="Message" maxlength="2000">
-      <div class="split"><button class="send">${i.send}<span></span></button><button class="more" aria-label="More destinations" aria-haspopup="menu" title="More destinations">${i.chevron}</button>
+      <div class="split"><button class="send">${{ copy: i.copy, save: i.download }[o.main.kind] || i.send}<span></span></button><button class="more" aria-label="More destinations" aria-haspopup="menu" title="More destinations">${i.chevron}</button>
         <div class="menu" role="menu" hidden></div></div>
       <div class="tools">
         <button class="annotate" title="Open in the editor to draw arrows, boxes and text">${i.annotate}Annotate</button>
@@ -81,7 +81,8 @@
     const input = $('.message');
     const bytes = Uint8Array.from(atob(o.png), (c) => c.charCodeAt(0));
     const png = new Blob([bytes], { type: 'image/png' });
-    let current = o.destinations.find((d) => d.id === o.current) || o.destinations[0];
+    // The main button: the chosen default destination, or Copy.
+    const main = o.main;
     let busy = false;
     let lastOk = false;
     let hovered = false;
@@ -98,7 +99,7 @@
     });
 
     const chip = (text) => { $('.chip span').textContent = text; $('.chip').hidden = !text; };
-    const label = () => { $('.send span').textContent = `Send to ${current.name}`; };
+    const label = () => { $('.send span').textContent = main.label; };
     label();
     if (o.saved) { $('.saved').textContent = $('.saved').title = o.saved; $('.saved').hidden = false; }
 
@@ -122,7 +123,7 @@
     // Keys typed in the card stay in the card.
     card.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter' && e.target === input) { e.preventDefault(); void sendTo(current); }
+      if (e.key === 'Enter' && e.target === input) { e.preventDefault(); void sendTo(main); }
     });
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
@@ -158,11 +159,17 @@
       try { await navigator.clipboard.write([new ClipboardItem(items)]); return true; } catch { return false; }
     }
 
+    async function save() {
+      const r = await chrome.runtime.sendMessage({ type: 'save', id: o.id });
+      $('.saved').textContent = $('.saved').title = r?.text || 'The screenshot could not be saved.';
+      $('.saved').hidden = false;
+    }
+
     async function sendTo(destination, confirmed = false) {
       if (busy) return;
       $('.menu').hidden = true;
-      current = destination;
-      label();
+      if (destination.kind === 'copy') { chip((await copy(true)) ? 'Copied' : ''); return; }
+      if (destination.kind === 'save') { await save(); return; }
       const text = input.value.trim();
       if (destination.kind === 'chat') {
         // A web chat is a website: say so once, before anything goes there.
@@ -192,7 +199,7 @@
       else show(r?.reason !== undefined ? 'warn' : 'err', r?.text || 'html2wp did not answer.', [retry]);
     }
 
-    $('.send').addEventListener('click', () => void sendTo(current));
+    $('.send').addEventListener('click', () => void sendTo(main));
     $('.more').addEventListener('click', () => {
       const menu = $('.menu');
       menu.innerHTML = '<div class="head">Send to</div>';
@@ -215,11 +222,7 @@
     $('.close').addEventListener('click', dismiss);
     $('.annotate').addEventListener('click', () => { chrome.runtime.sendMessage({ type: 'annotate', id: o.id, text: input.value.trim() }); dismiss(); });
     $('.copy').addEventListener('click', async () => chip((await copy(false)) ? 'Copied' : ''));
-    $('.save').addEventListener('click', async () => {
-      const r = await chrome.runtime.sendMessage({ type: 'save', id: o.id });
-      $('.saved').textContent = $('.saved').title = r?.text || 'The screenshot could not be saved.';
-      $('.saved').hidden = false;
-    });
+    $('.save').addEventListener('click', () => void save());
 
     document.documentElement.appendChild(host);
     // Every capture is on the clipboard too, ready for ⌘V / Ctrl+V anywhere.
