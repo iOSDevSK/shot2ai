@@ -1,6 +1,6 @@
-# html2wp Screenshot (Chrome extension)
+# Shot2AI: AI screenshot extension for ChatGPT, Claude & html2wp
 
-Report a problem in a conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also paste the screenshot into a web chat such as ChatGPT or Claude, or save a copy.
+Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also paste the screenshot into a web chat such as ChatGPT or Claude, or save a copy.
 
 If the chat cannot take a message right now, for example while the assistant is still working, the extension shows the app's own reason and keeps your annotation. Choose **Try again** when the app is ready.
 
@@ -8,12 +8,12 @@ If the chat cannot take a message right now, for example while the assistant is 
 
 1. Open `chrome://extensions` and switch on **Developer mode**.
 2. Choose **Load unpacked** and select this folder (the one with `manifest.json`).
-3. Pin **html2wp Screenshot** to the toolbar if you like.
+3. Pin **Shot2AI** to the toolbar if you like.
 
 ## Pair with the app, once
 
 1. In html2wp, open **Settings → Chrome extension**. It shows a 6-digit pairing code.
-2. Click the extension's toolbar icon and enter the code.
+2. Click the Shot2AI toolbar icon and enter the code. You can also enter it in Shot2AI's Options.
 
 Each code pairs one extension. After five wrong codes the code stops working; choose **New code** in Settings. **Unpair** in Settings revokes the extension.
 
@@ -40,8 +40,8 @@ Options → **Saving**:
 
 - **Save a copy of every capture**: every capture is saved as soon as you select the area. The **Save** buttons in the card and the editor work whether or not this is on.
 - **Folder**: choose any folder on your computer. If Chrome's access to it lapses, choose **Allow again**. Until you do, copies go to Downloads.
-- **Downloads subfolder** (default `html2wp-shots/`): used when no folder is chosen, or when access to the chosen folder has lapsed.
-- **File name**: a pattern with `{host}`, `{date}` and `{time}`. The default gives names like `html2wp-example.com-2026-09-23-114512.png`.
+- **Downloads subfolder** (default `Shot2AI/`): used when no folder is chosen, or when access to the chosen folder has lapsed.
+- **File name**: a pattern with `{host}`, `{date}` and `{time}`. The default gives names like `shot2ai-example.com-2026-09-23-114512.png`.
 
 ## Privacy
 

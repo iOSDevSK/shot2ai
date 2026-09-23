@@ -2,10 +2,10 @@
 // rectangle, Esc cancels. Only the rectangle goes back to the extension; the
 // page itself was already captured before this overlay appeared.
 (() => {
-  window.__html2wpSelectArea = (captureId) => {
-    document.getElementById('html2wp-area-select')?.remove();
+  window.__shot2aiSelectArea = (captureId) => {
+    document.getElementById('shot2ai-area-select')?.remove();
     const host = document.createElement('div');
-    host.id = 'html2wp-area-select';
+    host.id = 'shot2ai-area-select';
     host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;';
     const root = host.attachShadow({ mode: 'closed' });
     // A constructed stylesheet: a page's style-src policy does not apply to it.
@@ -23,7 +23,7 @@
     `);
     root.adoptedStyleSheets = [sheet];
     root.innerHTML = `<div class="layer" part="layer"></div><div class="box"></div><div class="size"></div>
-    <div class="hint"><b>html2wp</b><span>Drag to select an area</span><kbd>Esc</kbd><span>cancels</span></div>`;
+    <div class="hint"><b>Shot2AI</b><span>Drag to select an area</span><kbd>Esc</kbd><span>cancels</span></div>`;
     const layer = root.querySelector('.layer');
     const box = root.querySelector('.box');
     const size = root.querySelector('.size');

@@ -1,4 +1,4 @@
-// The owner's choices, kept in chrome.storage.local, and the destinations a
+// Shot2AI settings: the owner's choices, kept in chrome.storage.local, and the destinations a
 // screenshot can go to. html2wp is always first and the default.
 export const HTML2WP = { id: 'html2wp', name: 'html2wp', kind: 'html2wp' };
 // Web chats with a known composer. Any other chat uses the generic finder.
@@ -8,8 +8,8 @@ export const PRESETS = [
 ];
 const DEFAULTS = {
   saveCopy: false,
-  saveSubfolder: 'html2wp-shots',
-  filenamePattern: 'html2wp-{host}-{date}-{time}',
+  saveSubfolder: 'Shot2AI',
+  filenamePattern: 'shot2ai-{host}-{date}-{time}',
   presets: {},
   customChats: [],
   lastDestination: 'html2wp',

@@ -94,16 +94,16 @@ async function capture(from = [440, 150], to = [760, 350]) {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
   await popup.getByRole('button', { name: 'Capture area' }).click();
-  await page.locator('#html2wp-area-select').waitFor({ state: 'attached' });
+  await page.locator('#shot2ai-area-select').waitFor({ state: 'attached' });
   await popup.close();
   await page.bringToFront();
-  await page.locator('#html2wp-area-select').waitFor({ state: 'attached' });
+  await page.locator('#shot2ai-area-select').waitFor({ state: 'attached' });
   await page.mouse.move(...from);
   await page.mouse.down();
   await page.mouse.move((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, { steps: 4 });
   await page.mouse.move(...to, { steps: 4 });
   await page.mouse.up();
-  const card = page.locator('#html2wp-preview-card .card');
+  const card = page.locator('#shot2ai-preview-card .card');
   await card.waitFor();
   return card;
 }
@@ -130,7 +130,7 @@ test('pair, capture, and send from the preview card in one click', async () => {
 
   // The popup's Capture area button starts the same flow on the page.
   await popup.getByRole('button', { name: 'Capture area' }).click();
-  await page.locator('#html2wp-area-select').waitFor({ state: 'attached' });
+  await page.locator('#shot2ai-area-select').waitFor({ state: 'attached' });
   await page.bringToFront();
   await page.mouse.move(440, 150);
   await page.mouse.down();
@@ -139,7 +139,7 @@ test('pair, capture, and send from the preview card in one click', async () => {
   await page.mouse.move(760, 350, { steps: 4 });
   await page.mouse.up();
   await popup.close();
-  const card = page.locator('#html2wp-preview-card .card');
+  const card = page.locator('#shot2ai-preview-card .card');
   await card.waitFor();
   const dpr = await page.evaluate(() => devicePixelRatio);
 
@@ -170,7 +170,7 @@ test('pair, capture, and send from the preview card in one click', async () => {
   await page.waitForTimeout(6500);
   await expect(card).toBeVisible();
   await page.mouse.move(40, 800);
-  await expect(page.locator('#html2wp-preview-card')).toHaveCount(0, { timeout: 9000 });
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0, { timeout: 9000 });
 });
 
 test('a busy chat shows the app reason in the card; Annotate opens the editor', async () => {
@@ -247,7 +247,7 @@ test('a busy chat shows the app reason in the card; Annotate opens the editor', 
   // Esc dismisses the card that still shows the earlier error.
   await page.bringToFront();
   await page.keyboard.press('Escape');
-  await expect(page.locator('#html2wp-preview-card')).toHaveCount(0);
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
 });
 
 test('the editor draws and its screenshot looks right', async () => {
@@ -310,13 +310,13 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await options.getByRole('button', { name: 'Add chat' }).click();
   await expect(options.locator('#custom .dest')).toContainText('Team chat');
   await options.getByLabel('Save a copy of every capture').check();
-  await expect(options.locator('#example')).toHaveText(/^html2wp-example\.com-\d{4}-\d\d-\d\d-\d{6}\.png$/);
+  await expect(options.locator('#example')).toHaveText(/^shot2ai-example\.com-\d{4}-\d\d-\d\d-\d{6}\.png$/);
   await options.screenshot({ path: join(shots, 'options.png'), fullPage: true });
   await options.close();
 
   const card = await capture([300, 120], [700, 380]);
   const saved = card.locator('.saved');
-  await expect(saved).toHaveText(/^Saved to Downloads\/html2wp-shots\/html2wp-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.png$/);
+  await expect(saved).toHaveText(/^Saved to Downloads\/Shot2AI\/shot2ai-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.png$/);
   const worker = context.serviceWorkers()[0];
   const download = await worker.evaluate(async () => {
     for (let i = 0; i < 50; i++) {

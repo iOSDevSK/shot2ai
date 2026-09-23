@@ -432,7 +432,7 @@ async function load(png, meta, pixelScale) {
   source = meta;
   $('page-title').textContent = meta.title || 'Screenshot';
   $('page-url').textContent = meta.url || '';
-  document.title = `Screenshot · ${meta.title || 'html2wp'}`;
+  document.title = `${meta.title || 'Screenshot'} · Shot2AI`;
   $('missing').hidden = true;
   $('frame').hidden = false;
   $('send').disabled = $('more').disabled = false;

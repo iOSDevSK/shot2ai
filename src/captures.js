@@ -2,7 +2,7 @@
 // preview card and the editor tab. They leave this browser only when the
 // owner sends, copies or saves them. The chosen save folder's handle is kept
 // here too.
-const DB = 'html2wp-captures';
+const DB = 'shot2ai-captures';
 const STORE = 'captures';
 const HANDLES = 'handles';
 // Captures older than this are removed the next time one is saved.

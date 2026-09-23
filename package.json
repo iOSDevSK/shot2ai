@@ -1,9 +1,9 @@
 {
-  "name": "html2wp-chrome-extension",
+  "name": "shot2ai",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Chrome extension: send an annotated screenshot to the html2wp app's chat",
+  "description": "Shot2AI: send an annotated screenshot to html2wp, ChatGPT, Claude or any AI chat",
   "scripts": {
     "test": "playwright test"
   },

@@ -50,10 +50,10 @@
     [hidden]{display:none!important}
   `;
 
-  window.__html2wpShowCard = (o) => {
-    document.getElementById('html2wp-preview-card')?.remove();
+  window.__shot2aiShowCard = (o) => {
+    document.getElementById('shot2ai-preview-card')?.remove();
     const host = document.createElement('div');
-    host.id = 'html2wp-preview-card';
+    host.id = 'shot2ai-preview-card';
     host.style.cssText = 'all:initial;position:fixed;z-index:2147483647;';
     const root = host.attachShadow({ mode: 'closed' });
     // A constructed stylesheet: a page's style-src policy does not apply to it.
@@ -61,7 +61,7 @@
     sheet.replaceSync(CSS);
     root.adoptedStyleSheets = [sheet];
     const i = o.icons;
-    root.innerHTML = `<div class="card" role="dialog" aria-label="Screenshot preview">
+    root.innerHTML = `<div class="card" role="dialog" aria-label="Shot2AI screenshot preview">
       <div class="shot"><canvas aria-label="Captured area"></canvas>
         <button class="close" aria-label="Dismiss" title="Dismiss (Esc)">${i.close}</button>
         <span class="chip" hidden>${i.check}<span></span></span></div>

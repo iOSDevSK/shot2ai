@@ -29,7 +29,7 @@ async function startCapture(tabId) {
   await putCapture(id, { shot: await (await fetch(shot)).blob(), url: tab.url || '', title: tab.title || '', tabId: tab.id, tabIndex: tab.index });
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/overlay.js'] });
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: (captureId) => window.__html2wpSelectArea(captureId), args: [id] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: (captureId) => window.__shot2aiSelectArea(captureId), args: [id] });
   } catch {
     await deleteCapture(id);
     throw new Error('Chrome does not allow selecting an area on this page. Open the page you want to report and try again.');
@@ -73,7 +73,7 @@ async function showCard(tabId, id, capture) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
-    func: (o) => window.__html2wpShowCard(o),
+    func: (o) => window.__shot2aiShowCard(o),
     args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, current, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }

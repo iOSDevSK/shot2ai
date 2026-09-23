@@ -125,10 +125,10 @@ async function renderSaving() {
 $('save-copy').addEventListener('change', (e) => update({ saveCopy: e.target.checked }));
 $('subfolder').addEventListener('change', async (e) => { await update({ saveSubfolder: cleanSubfolder(e.target.value) }); await renderSaving(); });
 $('pattern').addEventListener('input', (e) => { $('example').textContent = fileName(e.target.value, 'https://example.com/pricing'); });
-$('pattern').addEventListener('change', (e) => update({ filenamePattern: e.target.value.trim() || 'html2wp-{host}-{date}-{time}' }));
+$('pattern').addEventListener('change', (e) => update({ filenamePattern: e.target.value.trim() || 'shot2ai-{host}-{date}-{time}' }));
 $('choose-folder').addEventListener('click', async () => {
   try {
-    const handle = await window.showDirectoryPicker({ id: 'html2wp-shots', mode: 'readwrite' });
+    const handle = await window.showDirectoryPicker({ id: 'shot2ai', mode: 'readwrite' });
     await putHandle(FOLDER, handle);
   } catch { /* the owner closed the picker */ }
   await renderSaving();
