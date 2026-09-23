@@ -65,7 +65,7 @@ footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:v
 <main>
 <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#16964c"/><path d="M8 13V9.5A1.5 1.5 0 0 1 9.5 8H13M19 8h3.5A1.5 1.5 0 0 1 24 9.5V13M24 19v3.5a1.5 1.5 0 0 1-1.5 1.5H19M13 24H9.5A1.5 1.5 0 0 1 8 22.5V19" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><rect x="13" y="13" width="6" height="6" rx="1.2" fill="#c8f578"/></svg>Shot2AI</div>
 {body}
-<footer>Shot2AI is a Chrome extension by Filip Dvoran · <a href="https://html2wp.dev/">html2wp.dev</a></footer>
+<footer>Shot2AI is a Chrome extension by BELNEM s.r.o. · <a href="https://html2wp.dev/">html2wp.dev</a></footer>
 </main>
 </body>
 </html>

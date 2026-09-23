@@ -1,6 +1,6 @@
 {
   "name": "shot2ai",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "type": "module",
   "description": "Shot2AI: capture, annotate and send screenshots to an AI chat or the html2wp app",

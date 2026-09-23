@@ -1,5 +1,9 @@
 # Chrome Web Store listing: Shot2AI
 
+## Developer / publisher
+
+BELNEM s.r.o., Beckovska 5, Bratislava, Slovakia (IČO 53713486), hello@html2wp.dev
+
 ## Name
 
 Shot2AI — Screenshot, Annotate & Send to AI
