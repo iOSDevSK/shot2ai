@@ -51,6 +51,13 @@
         "mac": "Alt+Shift+S"
       },
       "description": "Capture an area of the page"
+    },
+    "capture-saved": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Capture the saved region of this site"
     }
   }
 }

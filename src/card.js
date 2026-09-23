@@ -7,7 +7,7 @@
   const CSS = `
     :host{all:initial}
     *{box-sizing:border-box}
-    .card{position:fixed;right:20px;bottom:20px;width:264px;padding:10px;border:1px solid #e3e6dd;border-radius:14px;background:#fafaf8;color:#232a23;box-shadow:0 1px 2px rgba(35,42,35,.08),0 14px 40px rgba(35,42,35,.22);font:13px/1.4 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;animation:in .18s ease-out}
+    .card{position:fixed;right:20px;bottom:20px;width:280px;padding:10px;border:1px solid #e3e6dd;border-radius:14px;background:#fafaf8;color:#232a23;box-shadow:0 1px 2px rgba(35,42,35,.08),0 14px 40px rgba(35,42,35,.22);font:13px/1.4 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;animation:in .18s ease-out}
     @keyframes in{from{opacity:0;transform:translateY(10px) scale(.98)}}
     .card.out{opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}
     button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
@@ -51,7 +51,12 @@
     .tools{display:flex;gap:4px;margin-top:8px}
     .tools button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:30px;border-radius:7px;color:#4d5a47;font-size:11.5px;font-weight:560}
     .tools button:hover{background:#eef0ea}
-    .tools svg{width:14px;height:14px}
+    .tools svg{flex:none;width:14px;height:14px}
+    .tools{gap:2px}
+    .tools button{min-width:0;padding:0 3px;gap:4px;font-size:11px;white-space:nowrap}
+    .region-menu{margin-top:4px;padding:4px;border:1px solid #e3e6dd;border-radius:9px;background:#fff}
+    .region-menu button{display:block;width:100%;padding:7px 8px;border-radius:6px;text-align:left;font-size:12px}
+    .region-menu button:hover:not(:disabled){background:#f1f3ee}
     .result{margin-top:8px;padding:8px 10px;border:1px solid #e3e6dd;border-radius:8px;background:#fff;font-size:12px;line-height:1.45}
     .result.ok{border-color:#d5e3c8;background:#edf3e7;color:#34502a}
     .result.warn{border-color:#efe2c2;background:#faf3e3;color:#5f4a1f}
@@ -86,6 +91,11 @@
         <button class="annotate" title="Open in the editor to draw arrows, boxes and text">${i.annotate}Annotate</button>
         <button class="copy" title="Copy to the clipboard">${i.copy}Copy</button>
         <button class="save" title="Save a copy">${i.download}Save</button>
+        <button class="region" title="Remember this region, or capture the saved one" aria-haspopup="menu">${i.region}Region</button>
+      </div>
+      <div class="region-menu" role="menu" hidden>
+        <button class="remember" role="menuitem">Remember this region</button>
+        <button class="capture-saved" role="menuitem">Capture saved region</button>
       </div>
       <div class="result" role="status" hidden></div>
       <div class="saved" hidden></div>
@@ -106,7 +116,7 @@
 
     createImageBitmap(png).then((bitmap) => {
       const canvas = $('canvas');
-      const room = Math.min(244 / bitmap.width, 132 / bitmap.height, 1);
+      const room = Math.min(260 / bitmap.width, 132 / bitmap.height, 1);
       canvas.width = Math.round(bitmap.width * room * 2);
       canvas.height = Math.round(bitmap.height * room * 2);
       canvas.style.width = `${canvas.width / 2}px`;
@@ -298,6 +308,17 @@
     $('.annotate').addEventListener('click', () => { chrome.runtime.sendMessage({ type: 'annotate', id: o.id, text: input.value.trim() }); dismiss(); });
     $('.copy').addEventListener('click', async () => chip((await copy(false)) ? 'Copied' : ''));
     $('.save').addEventListener('click', () => void save());
+    // A remembered region is per site; Alt+Shift+R and the right-click menu capture it too.
+    const regionMenu = $('.region-menu');
+    $('.remember').hidden = !o.region?.canRemember;
+    $('.capture-saved').disabled = !o.region?.hasSaved;
+    $('.region').addEventListener('click', () => { regionMenu.hidden = !regionMenu.hidden; });
+    $('.remember').addEventListener('click', async () => {
+      const r = await chrome.runtime.sendMessage({ type: 'remember-region', id: o.id });
+      regionMenu.hidden = true;
+      if (r?.ok) { o.region.hasSaved = true; $('.capture-saved').disabled = false; chip('Region remembered'); }
+    });
+    $('.capture-saved').addEventListener('click', () => { dismiss(); chrome.runtime.sendMessage({ type: 'capture-saved' }); });
 
     if (o.text) input.value = o.text;
     // A saved prompt fills the message; it can still be edited.

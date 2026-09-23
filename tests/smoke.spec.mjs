@@ -165,7 +165,7 @@ test('right-click menu: its items, Capture visible page, selection text, and Sen
   const worker = context.serviceWorkers()[0];
   const menu = () => worker.evaluate(() => [...self.__menu.values()].map((m) => ({ id: m.id, title: m.title, parentId: m.parentId, type: m.type, checked: m.checked, contexts: m.contexts })));
   await expect.poll(async () => (await menu()).map((m) => m.title || m.type)).toEqual([
-    'Shot2AI', 'Capture area…', 'Capture visible page', 'separator', 'Send to', 'ChatGPT', 'html2wp',
+    'Shot2AI', 'Capture area…', 'Capture visible page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
     'Capture and send to ChatGPT', 'Send with prompt', 'Fix this bug', 'Explain this', 'Match this design', "What's wrong here?",
     'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
   const items = await menu();
@@ -587,4 +587,44 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   // Every request to the bridge came from the extension, never from a web page.
   expect(bridge.state.origins.every((o) => o === null || o.startsWith(`chrome-extension://${extensionId}`))).toBe(true);
+});
+
+test('saved region: remembered per site, captured again from the menu, clamped to the viewport', async () => {
+  const worker = context.serviceWorkers()[0];
+  const card = await capture([300, 120], [620, 320]);
+  await card.getByRole('button', { name: 'Region' }).click();
+  await expect(card.getByRole('menuitem', { name: 'Capture saved region' })).toBeDisabled();
+  await card.screenshot({ path: join(shots, 'card-region.png') });
+  await card.getByRole('menuitem', { name: 'Remember this region' }).click();
+  await expect(card.locator('.chip')).toHaveText('Region remembered');
+  await page.keyboard.press('Escape');
+  const saved = await worker.evaluate(async () => (await chrome.storage.local.get('regions')).regions);
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));
+  expect(saved[base]).toEqual({ x: 300 / viewport.width, y: 120 / viewport.height, w: 320 / viewport.width, h: 200 / viewport.height });
+
+  // Size of the next capture, read in the editor after Annotate.
+  const capturedSize = async () => {
+    const next = page.locator('#shot2ai-preview-card .card');
+    await next.waitFor();
+    const opened = context.waitForEvent('page', (p) => p.url().includes('/src/editor.html'));
+    await next.getByRole('button', { name: 'Annotate' }).click();
+    const editor = await opened;
+    await editor.locator('#frame').waitFor();
+    const size = await editor.evaluate(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+    await editor.close();
+    await page.bringToFront();
+    return size;
+  };
+  const menuClick = (menuItemId) => worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
+  await menuClick('capture-saved');
+  const [w, h] = await capturedSize();
+  expect(Math.abs(w - 320 * viewport.dpr)).toBeLessThanOrEqual(2);
+  expect(Math.abs(h - 200 * viewport.dpr)).toBeLessThanOrEqual(2);
+
+  // A region reaching past the viewport is cut at its edge.
+  await worker.evaluate((site) => chrome.storage.local.set({ regions: { [site]: { x: 0.9, y: 0.8, w: 0.5, h: 0.5 } } }), base);
+  await menuClick('capture-saved');
+  const [cw, ch] = await capturedSize();
+  expect(Math.abs(cw - 0.1 * viewport.width * viewport.dpr)).toBeLessThanOrEqual(2);
+  expect(Math.abs(ch - 0.2 * viewport.height * viewport.dpr)).toBeLessThanOrEqual(2);
 });

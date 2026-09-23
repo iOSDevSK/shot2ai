@@ -42,8 +42,35 @@ export async function cropSelection(id, rect, viewport) {
   canvas.getContext('2d').drawImage(bitmap, x, y, width, height, 0, 0, width, height);
   bitmap.close();
   const png = await canvas.convertToBlob({ type: 'image/png' });
-  await updateCapture(id, { shot: null, png, width, height, scale });
-  return { ...capture, png, scale };
+  // The area as fractions of the viewport, for "Remember this region".
+  const region = { x: rect.x / viewport.width, y: rect.y / viewport.height, w: rect.width / viewport.width, h: rect.height / viewport.height };
+  await updateCapture(id, { shot: null, png, width, height, scale, region });
+  return { ...capture, png, scale, region };
+}
+
+// The site's remembered region, cut out of a capture of the visible page and
+// clamped to the viewport as it is now. Without one, the owner drags an area.
+export async function captureSavedRegion(tab) {
+  const { regions = {} } = await chrome.storage.local.get('regions');
+  let site = null;
+  try { site = new URL(tab.url).origin; } catch { /* no page address */ }
+  const saved = site && regions[site];
+  if (!saved) { await startCapture(tab.id); return null; }
+  const whole = await captureVisible(tab);
+  const bitmap = await createImageBitmap(whole.capture.png);
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  const [x0, y0] = [clamp(saved.x), clamp(saved.y)];
+  const [x1, y1] = [clamp(saved.x + saved.w), clamp(saved.y + saved.h)];
+  const x = Math.round(x0 * bitmap.width);
+  const y = Math.round(y0 * bitmap.height);
+  const width = Math.max(1, Math.round(x1 * bitmap.width) - x);
+  const height = Math.max(1, Math.round(y1 * bitmap.height) - y);
+  const canvas = new OffscreenCanvas(width, height);
+  canvas.getContext('2d').drawImage(bitmap, x, y, width, height, 0, 0, width, height);
+  bitmap.close();
+  const png = await canvas.convertToBlob({ type: 'image/png' });
+  await updateCapture(whole.id, { png, width, height });
+  return { id: whole.id, capture: { ...whole.capture, png, width, height } };
 }
 
 // The whole visible part of the page, as a capture of its own.

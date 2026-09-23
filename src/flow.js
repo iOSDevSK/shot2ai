@@ -28,12 +28,15 @@ export async function showCard(tabId, id, capture, { text = '', autoSend = false
   const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
   // What a send to a web chat or a save will weigh, in the chosen format.
   const meta = describe(await encode(capture.png, s), s);
-  const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry'];
+  const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry', 'region'];
+  let site = null;
+  try { site = new URL(capture.url).origin; } catch { /* a pasted image */ }
+  const region = { canRemember: !!(capture.region && site), hasSaved: !!(site && s.regions[site]) };
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, region, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -62,6 +65,17 @@ export async function cardSend(message) {
   const blob = await encode(capture.png, s);
   const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
   return r.ok ? { ...r, text: chatResultText(destination.name, r) } : r;
+}
+
+// "Remember this region": the area capture's region, kept for its site.
+export async function rememberRegion(message) {
+  const capture = await getCapture(message.id);
+  let site = null;
+  try { site = new URL(capture?.url).origin; } catch { /* no page address */ }
+  if (!capture?.region || !site) return { failed: true };
+  const { regions } = await settings();
+  await update({ regions: { ...regions, [site]: capture.region } });
+  return { ok: true };
 }
 
 // Several destinations at once. html2wp goes through the bridge while the web

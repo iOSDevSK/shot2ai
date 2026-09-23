@@ -1,6 +1,6 @@
 // The right-click menu.
 import { destinations, defaultDestination, update, prompts } from './settings.js';
-import { startCapture, captureVisible, captureImage } from './capture.js';
+import { startCapture, captureVisible, captureImage, captureSavedRegion } from './capture.js';
 import { showCard } from './flow.js';
 
 const CONTEXTS = ['page', 'selection', 'image', 'link'];
@@ -13,6 +13,7 @@ export async function menuItems() {
     { id: 'shot2ai', title: 'Shot2AI', contexts: CONTEXTS },
     item('capture-area', 'Capture area…'),
     item('capture-visible', 'Capture visible page'),
+    item('capture-saved', 'Capture saved region'),
     item('sep-1', '', { type: 'separator' }),
     item('send-to', 'Send to'),
     ...list.map((d) => ({ id: `dest:${d.id}`, parentId: 'send-to', title: d.name, type: 'radio', checked: d.id === chosen.id, contexts: CONTEXTS })),
@@ -40,6 +41,11 @@ export async function onMenuClick(info, tab) {
   if (id.startsWith('dest:')) { await update({ defaultDestination: id.slice(5) }); return; }
   if (!tab?.id) return;
   if (id === 'capture-area') { await startCapture(tab.id); return; }
+  if (id === 'capture-saved') {
+    const result = await captureSavedRegion(tab);
+    if (result) await showCard(tab.id, result.id, result.capture);
+    return;
+  }
   if (id === 'send-image' && info.srcUrl) {
     const { id: captureId, capture } = await captureImage(info.srcUrl, tab);
     await showCard(tab.id, captureId, capture);

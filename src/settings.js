@@ -22,6 +22,8 @@ const DEFAULTS = {
   defaultDestination: 'chatgpt',
   // Web chats whose send button Shot2AI presses after pasting (by id). Off unless turned on.
   autoSubmit: {},
+  // Remembered capture regions by site origin, as fractions of the viewport.
+  regions: {},
   // Destinations ticked for "Send to all selected".
   multiSend: [],
   // The prompt that fills the message of every new capture, or null.

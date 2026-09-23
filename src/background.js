@@ -2,8 +2,8 @@
 // and the preview card's requests all arrive here. The card's actions run
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
 import { deleteCapture, getCapture } from './captures.js';
-import { startCapture, cropSelection } from './capture.js';
-import { showCard, openEditor, cardSend, cardSendMany, flagError } from './flow.js';
+import { startCapture, cropSelection, captureSavedRegion } from './capture.js';
+import { showCard, openEditor, cardSend, cardSendMany, rememberRegion, flagError } from './flow.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 
@@ -16,9 +16,17 @@ chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab
 
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === 'capture-area') startCapture(tab?.id).catch(flagError);
+  if (command === 'capture-saved' && tab) savedRegionCard(tab).catch(flagError);
 });
 
+async function savedRegionCard(tab) {
+  const result = await captureSavedRegion(tab);
+  if (result) await showCard(tab.id, result.id, result.capture);
+}
+
 const handlers = {
+  'remember-region': rememberRegion,
+  'capture-saved': async (m, sender) => { await savedRegionCard(sender.tab); return { ok: true }; },
   capture: (m) => startCapture(m.tabId).then((id) => ({ ok: true, id }), (e) => ({ error: e.message })),
   'card-send': cardSend,
   'card-send-many': cardSendMany,
