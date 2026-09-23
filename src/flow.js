@@ -118,7 +118,7 @@ export async function sendCaptures(message) {
   for (const c of captures) blobs.push(await encode(c.png, s));
   const names = captures.map((c, i) => fileName(s.filenamePattern, c.url, new Date(Date.now() + i * 1000), EXTENSIONS[blobs[i].type]));
   const r = await pasteIntoChat(destination, blobs, message.text, names);
-  if (!r.ok) return { ok: false, sentIds: [], text: r.needsPermission ? `Allow the extension to use ${new URL(destination.url).host} in Options first.` : `The screenshots could not be pasted into ${destination.name}.` };
+  if (!r.ok) return { ok: false, sentIds: [], text: r.needsPermission ? `Allow the extension to use ${new URL(destination.url).host} in Options first.` : r.notAttached ? `${destination.name} did not take the images, so nothing was sent.` : `The screenshots could not be pasted into ${destination.name}.` };
   const text = r.submitted ? `Sent ${captures.length} screenshots to ${destination.name}.` : `Pasted ${captures.length} screenshots into ${destination.name}. ${r.autoSubmit ? 'Its send button was not found; press Enter there.' : 'Press Enter there to send.'}`;
   return { ok: true, sentIds: captures.map((c) => c.id), text };
 }
@@ -193,7 +193,7 @@ export async function cardSendMany(message) {
   for (const d of list.filter((x) => x.kind === 'chat')) {
     const blob = await encode(capture.png, s);
     const r = await pasteIntoChat(d, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
-    results.push({ id: d.id, name: d.name, ok: !!r.ok, text: r.ok ? (r.submitted ? 'Sent' : r.autoSubmit ? 'Pasted; send button not found, press Enter there' : 'Pasted; press Enter there') : r.needsPermission ? 'Needs permission in Options' : 'Could not paste; it is on the clipboard' });
+    results.push({ id: d.id, name: d.name, ok: !!r.ok, text: r.ok ? (r.submitted ? 'Sent' : r.autoSubmit ? 'Pasted; send button not found, press Enter there' : 'Pasted; press Enter there') : r.needsPermission ? 'Needs permission in Options' : r.notAttached ? 'The image did not attach; nothing sent, it is on the clipboard' : 'Could not paste; it is on the clipboard' });
   }
   if (app) {
     const outcome = await appResult;

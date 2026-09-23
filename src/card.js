@@ -424,6 +424,7 @@
         setBusy(false);
         if (r?.ok) { markSent(entry, { tone: r.submitted || !r.autoSubmit ? 'ok' : 'warn', text: r.text }); return; }
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
+        if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.` }); return; }
         setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.` });
         return;
       }

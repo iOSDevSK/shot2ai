@@ -369,6 +369,7 @@ async function submit(target = destination, confirmed = false) {
     sending = false;
     setSend(actionLabel(destination));
     if (r.ok) { showResult(r.submitted || !r.autoSubmit ? 'ok' : 'warn', chatResultText(target.name, r)); return; }
+    if (r.notAttached) { showResult('warn', copied ? `${target.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${modKey}V.` : `${target.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`); return; }
     showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`);
     return;
   }

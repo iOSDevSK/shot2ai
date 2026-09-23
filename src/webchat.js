@@ -1,6 +1,7 @@
 // Sending to a web chat (ChatGPT, Claude, or any chat the owner adds): find
-// or open its tab, then paste the screenshot and the message into its
-// composer. Nothing is submitted; the owner presses Enter in that chat.
+// or open its tab, attach the screenshot and put the message into its
+// composer, and check the image really arrived. Nothing is submitted unless
+// the owner switched on Send automatically for that chat.
 import { sitePattern, settings } from './settings.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,14 +32,42 @@ async function pasteInPage(files, text, selectors, submit) {
   for (let i = 0; i < 40 && !composer; i++) { composer = find(); if (!composer) await new Promise((r) => setTimeout(r, 250)); }
   if (!composer) return { ok: false };
   composer.focus();
-  // All the screenshots in one paste, so they land in one message.
-  const data = new DataTransfer();
-  for (const f of files) data.items.add(new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
-  if (text) data.setData('text/plain', text);
-  composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
-  // A synthetic paste inserts nothing by itself: the chat takes the file,
-  // and the message goes in as typed text unless the chat already added it.
-  await new Promise((r) => setTimeout(r, 400));
+  const makeFiles = () => files.map((f) => new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
+  // The attachment area: the composer's form, or its nearest ancestor that
+  // holds a file input. Attached images show up there as previews.
+  const area = () => composer.closest('form') || (() => { let n = composer; for (let i = 0; i < 8 && n.parentElement; i++) { n = n.parentElement; if (n.querySelector('input[type=file]')) return n; } return composer.parentElement || document.body; })();
+  const previews = () => area().querySelectorAll('img, [style*="background-image"], [data-testid*="attachment" i], [data-testid*="file" i], [aria-label*="remove" i]').length;
+  const before = previews();
+  const attached = async () => { for (let i = 0; i < 24; i++) { if (previews() > before) return true; await new Promise((r) => setTimeout(r, 250)); } return false; };
+  // 1. The chat's own file input: what its attach button uses, so it takes
+  //    the image like a picked file. A synthetic paste is ignored by some
+  //    chats (ChatGPT took only the text).
+  let ok = false;
+  const input = [...area().querySelectorAll('input[type=file]'), ...document.querySelectorAll('input[type=file]')].find((i) => !i.disabled && (!i.accept || /image|\*/.test(i.accept)));
+  if (input) {
+    const data = new DataTransfer();
+    for (const f of makeFiles()) data.items.add(f);
+    input.files = data.files;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    ok = await attached();
+  }
+  // 2. A paste of the files. 3. A drop on the composer.
+  if (!ok) {
+    const data = new DataTransfer();
+    for (const f of makeFiles()) data.items.add(f);
+    composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    ok = await attached();
+  }
+  if (!ok) {
+    const data = new DataTransfer();
+    for (const f of makeFiles()) data.items.add(f);
+    for (const type of ['dragenter', 'dragover', 'drop']) composer.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true }));
+    ok = await attached();
+  }
+  // Without the image nothing is typed or sent: the owner pastes it (it is
+  // on the clipboard) and nothing half-done reaches the chat.
+  if (!ok) return { ok: false, notAttached: true };
   const current = () => (composer.value ?? composer.innerText ?? '');
   if (text && !current().includes(text)) {
     composer.focus();
@@ -67,9 +96,16 @@ async function pasteInPage(files, text, selectors, submit) {
     }
     return null;
   };
-  // The chat enables its button once it has taken the image; give it a moment.
+  // The chat enables its button once the image has uploaded: wait up to 15 s
+  // while a send button is there but disabled, and 3 s when there is none.
+  const anySend = () => submit.selectors.some((s) => document.querySelector(s))
+    || [...(composer.closest('form') || document).querySelectorAll('button')].some((b) => visible(b) && sendLike(b));
   let button = null;
-  for (let i = 0; i < 12 && !button; i++) { await new Promise((r) => setTimeout(r, 250)); button = findSend(); }
+  for (let i = 0; i < 60 && !button; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    button = findSend();
+    if (!button && i >= 11 && !anySend()) break;
+  }
   if (!button) return { ok: true, submitted: false };
   button.click();
   return { ok: true, submitted: true };
@@ -103,6 +139,7 @@ export async function pasteIntoChat(destination, blob, text, name) {
     const autoSubmit = !!(await settings()).autoSubmit?.[destination.id];
     const submit = { on: autoSubmit, selectors: destination.sendSelectors || [] };
     const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pasteInPage, args: [files, text, destination.selectors || [], submit] });
+    if (result?.notAttached) return { failed: true, notAttached: true };
     return result?.ok ? { ok: true, submitted: !!result.submitted, autoSubmit } : { failed: true };
   } catch {
     return { failed: true };

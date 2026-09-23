@@ -42,13 +42,19 @@ const FEED = `<!doctype html><html><head><title>Feed</title></head><body style="
 <script>let n=0;const add=()=>{const d=document.createElement('div');d.style.cssText='height:1500px;background:'+(n++%2?'#eee':'#ddd');document.body.append(d)};add();add();
 let loading=false;addEventListener('scroll',()=>{if(!loading&&innerHeight+scrollY>=document.documentElement.scrollHeight-200){loading=true;setTimeout(()=>{add();loading=false},600)}});</script></body></html>`;
 
-// A stand-in for any web chat: a message box that records what is pasted into it.
+// A stand-in for any web chat, built like ChatGPT's: a message box, a hidden
+// file input its attach button would use, and a preview for each image it
+// takes, whether picked or pasted.
 const CHAT = `<!doctype html><html><head><title>Team chat</title></head><body style="font:15px sans-serif;padding:40px">
-<h1>Team chat</h1><form onsubmit="return false"><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
+<h1>Team chat</h1><form onsubmit="return false"><div id="previews"></div><input type="file" id="upload" accept="image/*" multiple hidden><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
 <button id="send" type="submit" aria-label="Send message">Send</button></form>
 <script>window.received={files:[],text:null};window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});
-document.getElementById('composer').addEventListener('paste',async(e)=>{const files=[...e.clipboardData.files];window.received.text=e.clipboardData.getData('text/plain');e.preventDefault();
-for(const f of files){const b=await createImageBitmap(f);window.received.files.push({name:f.name,type:f.type,size:f.size,width:b.width,height:b.height})}window.received.done=true});</script></body></html>`;
+async function take(files){for(const f of files){const b=await createImageBitmap(f);window.received.files.push({name:f.name,type:f.type,size:f.size,width:b.width,height:b.height});const img=document.createElement('img');img.src=URL.createObjectURL(f);img.style.height='48px';document.getElementById('previews').append(img)}window.received.done=true}
+document.getElementById('upload').addEventListener('change',(e)=>take([...e.target.files]));
+document.getElementById('composer').addEventListener('paste',async(e)=>{const files=[...e.clipboardData.files];if(!files.length)return;window.received.text=e.clipboardData.getData('text/plain');e.preventDefault();take(files)});</script></body></html>`;
+// A chat that takes no image at all: Shot2AI must say so and send nothing.
+const DEAF_CHAT = `<!doctype html><html><head><title>Deaf chat</title></head><body><form onsubmit="return false"><div id="composer" contenteditable="true" style="width:640px;min-height:90px;border:1px solid #ccc"></div><button id="send" type="submit" aria-label="Send message">Send</button></form>
+<script>window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});document.getElementById('composer').addEventListener('paste',(e)=>e.preventDefault());</script></body></html>`;
 
 let bridge;
 let site;
@@ -70,7 +76,7 @@ test.beforeAll(async () => {
   await new Promise((r) => site.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${site.address().port}`;
   // The chat is another site: its own origin.
-  chatSite = http.createServer((_, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(CHAT); });
+  chatSite = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(req.url.startsWith('/deaf') ? DEAF_CHAT : CHAT); });
   await new Promise((r) => chatSite.listen(0, '127.0.0.1', r));
   chatBase = `http://127.0.0.1:${chatSite.address().port}`;
   // A toolbar click or the shortcut grants activeTab, which lets the extension
@@ -705,7 +711,6 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   expect(received.files).toHaveLength(1);
   expect(received.files[0]).toMatchObject({ type: 'image/jpeg', width: 400 * dpr, height: 260 * dpr });
   expect(received.files[0].name).toMatch(/\.jpg$/);
-  expect(received.text).toBe('Please check this spacing.');
   expect(received.composer).toContain('Please check this spacing.');
   await chat.screenshot({ path: join(shots, 'webchat-pasted.png') });
   await expect(card.locator('.result')).toHaveText('Pasted into Team chat. Press Enter there to send.');
@@ -1130,4 +1135,24 @@ test('privacy: Clear all captures and settings empties storage and captures', as
   }));
   expect(counts).toEqual([0, 0]);
   await options.close();
+});
+
+test('web chat: a chat that takes no image gets nothing, and the card says why', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await options.getByLabel('Chat name').fill('Deaf chat');
+  // Its own site (localhost, not 127.0.0.1): a chat on the same site would reuse Team chat's tab.
+  await options.getByLabel('Chat address').fill(`${chatBase.replace('127.0.0.1', 'localhost')}/deaf`);
+  await options.getByRole('button', { name: 'Add chat' }).click();
+  await options.getByRole('radio', { name: /^Deaf chat/ }).check();
+  await expect(options.locator('#default-state')).toHaveText('Deaf chat');
+  await options.close();
+  const card = await capture([300, 120], [600, 320]);
+  await card.getByLabel('Message').fill('Nothing should arrive.');
+  await card.getByRole('button', { name: 'Send to Deaf chat' }).click();
+  const notice = card.getByRole('button', { name: 'Continue' });
+  if (await notice.isVisible().catch(() => false)) await notice.click();
+  await expect(card.locator('.result')).toContainText('Deaf chat did not take the image, so nothing was sent.', { timeout: 20000 });
+  const deaf = context.pages().find((p) => p.url().startsWith(`${chatBase.replace('127.0.0.1', 'localhost')}/deaf`));
+  expect(await deaf.evaluate(() => ({ sent: window.sent, text: document.getElementById('composer').innerText.trim() }))).toEqual({ sent: 0, text: '' });
 });
