@@ -84,6 +84,12 @@ $('pair-form').addEventListener('submit', async (e) => {
     : 'That code did not match. Check Settings in html2wp; after five wrong codes, choose New code there.';
   $('pair-error').hidden = false;
 });
+$('capture-full').addEventListener('click', async () => {
+  let tabId = tabParam;
+  if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const result = await chrome.runtime.sendMessage({ type: 'full-page', tabId });
+  if (result?.ok && !tabParam) window.close();
+});
 $('capture').addEventListener('click', async () => {
   $('capture').disabled = true;
   $('capture-error').hidden = true;

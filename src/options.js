@@ -313,6 +313,17 @@ for (const r of document.querySelectorAll('input[name="format"]')) r.addEventLis
 $('quality').addEventListener('input', (e) => { $('quality-value').textContent = `${e.target.value} %`; });
 $('quality').addEventListener('change', async (e) => { await update({ imageQuality: Number(e.target.value) }); await renderFormat(); });
 
+// ---- full page ----------------------------------------------------------
+
+async function renderFullPage() {
+  const s = await settings();
+  const height = Math.min(50000, Math.max(5000, Number(s.fullPageMaxHeight) || 20000));
+  $('max-height').value = height;
+  $('max-height-value').textContent = `${height.toLocaleString('en-US')} px`;
+}
+$('max-height').addEventListener('input', (e) => { $('max-height-value').textContent = `${Number(e.target.value).toLocaleString('en-US')} px`; });
+$('max-height').addEventListener('change', async (e) => { await update({ fullPageMaxHeight: Number(e.target.value) }); await renderFullPage(); });
+
 // ---- floating toolbar ---------------------------------------------------
 
 async function renderToolbar() {
@@ -375,4 +386,4 @@ $('whats-new').href = `https://github.com/iOSDevSK/shot2ai/releases/tag/v${versi
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti(), renderToolbar()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti(), renderToolbar(), renderFullPage()]);

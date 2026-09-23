@@ -28,6 +28,8 @@ const DEFAULTS = {
   toolbar: { enabled: false, collapsed: false },
   toolbarHidden: {},
   toolbarPos: {},
+  // Full-page capture stops at this height (CSS px), 5,000–50,000.
+  fullPageMaxHeight: 20000,
   // Remembered capture regions by site origin, as fractions of the viewport.
   regions: {},
   // Destinations ticked for "Send to all selected".

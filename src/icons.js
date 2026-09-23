@@ -16,6 +16,7 @@ export const icons = {
   retry: svg('<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/>'),
   check: svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
   region: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" stroke-dasharray="2.5 2.5"/><circle cx="12" cy="12" r="2.5"/>'),
+  fullpage: svg('<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>'),
   close: svg('<path d="M6 6l12 12M18 6 6 18" stroke-width="2.4"/>'),
   chevron: svg('<path d="m7 14.5 5-5 5 5" stroke-width="2"/>'),
   annotate: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),

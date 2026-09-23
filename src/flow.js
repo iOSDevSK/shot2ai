@@ -6,6 +6,7 @@ import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { icons } from './icons.js';
 import { encode, describe, EXTENSIONS } from './imaging.js';
+import { captureFullPage, DEFAULT_MAX_HEIGHT } from './fullpage.js';
 
 const isMac = async () => (await chrome.runtime.getPlatformInfo()).os === 'mac';
 
@@ -18,7 +19,7 @@ async function base64(blob) {
 
 // The quick preview card, in the page the area came from. `text` fills the
 // message; `autoSend` sends at once, and the card only shows the result.
-export async function showCard(tabId, id, capture, { text = '', autoSend = false } = {}) {
+export async function showCard(tabId, id, capture, { text = '', autoSend = false, note = '' } = {}) {
   const s = await settings();
   const chosen = await defaultDestination();
   let saved = null;
@@ -36,7 +37,7 @@ export async function showCard(tabId, id, capture, { text = '', autoSend = false
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, region, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, region, note, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -65,6 +66,24 @@ export async function cardSend(message) {
   const blob = await encode(capture.png, s);
   const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
   return r.ok ? { ...r, text: chatResultText(destination.name, r) } : r;
+}
+
+// A full page, with its progress on the page; the result opens in the card.
+export async function fullPageCard(tab) {
+  const s = await settings();
+  const maxHeight = Math.min(50000, Math.max(5000, Number(s.fullPageMaxHeight) || DEFAULT_MAX_HEIGHT));
+  await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/progress.js'] });
+  const say = (text) => chrome.scripting.executeScript({ target: { tabId: tab.id }, func: (t) => window.__shot2aiProgress(t), args: [text] }).catch(() => {});
+  await say('Preparing…');
+  try {
+    const result = await captureFullPage(tab, { maxHeight, progress: (done, total) => void say(`Capturing ${done}/${total}…`) });
+    if (result.cancelled) return null;
+    await say('Joining…');
+    for (const part of result.parts) await showCard(tab.id, part.id, part.capture, { note: result.note });
+    return result;
+  } finally {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => window.__shot2aiProgressDone?.() }).catch(() => {});
+  }
 }
 
 // "Remember this region": the area capture's region, kept for its site.

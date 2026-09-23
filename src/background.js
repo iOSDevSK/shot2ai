@@ -4,7 +4,8 @@
 import { deleteCapture, getCapture } from './captures.js';
 import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
 import { syncToolbar } from './toolbar-setup.js';
-import { showCard, openEditor, cardSend, cardSendMany, rememberRegion, flagError } from './flow.js';
+import { showCard, openEditor, cardSend, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
+import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 
@@ -20,6 +21,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === 'capture-area') startCapture(tab?.id).catch(flagError);
   if (command === 'capture-saved' && tab) savedRegionCard(tab).catch(flagError);
+  if (command === 'capture-full' && tab) fullPageCard(tab).catch(flagError);
 });
 
 async function savedRegionCard(tab) {
@@ -29,6 +31,14 @@ async function savedRegionCard(tab) {
 
 const handlers = {
   'remember-region': rememberRegion,
+  'full-page': async (m, sender) => {
+    const tab = m.tabId ? await chrome.tabs.get(m.tabId) : sender.tab;
+    if (!tab) return { failed: true };
+    // Started from the popup: answer at once so it can close; the capture goes on.
+    fullPageCard(tab).catch(flagError);
+    return { ok: true };
+  },
+  'cancel-full-page': async (m, sender) => { if (sender.tab) cancelFullPage(sender.tab.id); return { ok: true }; },
   // The floating toolbar's buttons. It has all-site access, which is what lets it capture.
   toolbar: async (m, sender) => {
     const tab = sender.tab;
@@ -36,6 +46,7 @@ const handlers = {
     if (m.action === 'area') await startCapture(tab.id);
     if (m.action === 'visible') { const { id, capture } = await captureVisible(tab); await showCard(tab.id, id, capture); }
     if (m.action === 'saved') await savedRegionCard(tab);
+    if (m.action === 'full') await fullPageCard(tab);
     return { ok: true };
   },
   'capture-saved': async (m, sender) => { await savedRegionCard(sender.tab); return { ok: true }; },

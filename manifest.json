@@ -59,6 +59,13 @@
         "mac": "Alt+Shift+R"
       },
       "description": "Capture the saved region of this site"
+    },
+    "capture-full": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Capture the full page"
     }
   }
 }

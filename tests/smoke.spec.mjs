@@ -27,6 +27,19 @@ h1{font-size:46px;line-height:1.1;margin:0 0 18px}
 </style></head><body><header><strong>Northwind Studio</strong><nav><a href="#">Work</a><a href="#">About</a><a href="#">Contact</a></nav></header>
 <section class="hero"><div><h1>Interiors with a quiet, lasting warmth.</h1><p>We design homes and small workplaces around light, material and the way you live.</p><a class="cta" href="#">Book a consultation</a></div><div class="card"></div></section></body></html>`;
 
+// Full-page test pages: a 6,000 px page with a sticky green header and
+// markers at known heights; a 9,000 px page (past the canvas limit at 2x);
+// and an infinite feed that grows whenever it is scrolled to the bottom.
+const LONG = (height) => `<!doctype html><html><head><title>Long page</title><style>
+body{margin:0;height:${height}px;position:relative;background:#fff;font:16px sans-serif}
+header{position:sticky;top:0;height:60px;background:#00a000;z-index:2}
+#m{position:absolute;top:4200px;left:0;width:100%;height:100px;background:#ff00ff}
+#end{position:absolute;top:${height - 100}px;left:0;width:100%;height:100px;background:#0000ff}
+</style></head><body><header></header><div id="m"></div><div id="end"></div></body></html>`;
+const FEED = `<!doctype html><html><head><title>Feed</title></head><body style="margin:0">
+<script>let n=0;const add=()=>{const d=document.createElement('div');d.style.cssText='height:1500px;background:'+(n++%2?'#eee':'#ddd');document.body.append(d)};add();add();
+let loading=false;addEventListener('scroll',()=>{if(!loading&&innerHeight+scrollY>=document.documentElement.scrollHeight-200){loading=true;setTimeout(()=>{add();loading=false},600)}});</script></body></html>`;
+
 // A stand-in for any web chat: a message box that records what is pasted into it.
 const CHAT = `<!doctype html><html><head><title>Team chat</title></head><body style="font:15px sans-serif;padding:40px">
 <h1>Team chat</h1><form onsubmit="return false"><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
@@ -48,7 +61,10 @@ let tabId;
 test.beforeAll(async () => {
   mkdirSync(shots, { recursive: true });
   bridge = await startMockBridge();
-  site = http.createServer((_, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE); });
+  site = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(req.url === '/long' ? LONG(6000) : req.url === '/tall' ? LONG(9000) : req.url === '/feed' ? FEED : PAGE);
+  });
   await new Promise((r) => site.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${site.address().port}`;
   // The chat is another site: its own origin.
@@ -68,6 +84,8 @@ test.beforeAll(async () => {
   writeFileSync(join(extension, 'manifest.json'), JSON.stringify(manifest));
   const card = join(extension, 'src', 'card.js');
   writeFileSync(card, readFileSync(card, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
+  const progressJs = join(extension, 'src', 'progress.js');
+  writeFileSync(progressJs, readFileSync(progressJs, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
   const toolbar = join(extension, 'src', 'toolbar.js');
   writeFileSync(toolbar, readFileSync(toolbar, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
   // Playwright cannot open Chrome's context menu: the copy records the items
@@ -173,7 +191,7 @@ test('right-click menu: its items, Capture visible page, selection text, and Sen
   const worker = context.serviceWorkers()[0];
   const menu = () => worker.evaluate(() => [...self.__menu.values()].map((m) => ({ id: m.id, title: m.title, parentId: m.parentId, type: m.type, checked: m.checked, contexts: m.contexts })));
   await expect.poll(async () => (await menu()).map((m) => m.title || m.type)).toEqual([
-    'Shot2AI', `Shot2AI v${manifestVersion}`, 'Capture area…', 'Capture visible page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
+    'Shot2AI', `Shot2AI v${manifestVersion}`, 'Capture area…', 'Capture visible page', 'Capture full page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
     'Capture and send to ChatGPT', 'Send with prompt', 'Fix this bug', 'Explain this', 'Match this design', "What's wrong here?",
     'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
   const items = await menu();
@@ -514,7 +532,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
-  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/]);
+  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/, 'Capture full page']);
   await menuShot(card, 'card-menu.png');
   await card.getByRole('button', { name: 'More destinations' }).click();
   await card.getByLabel('Message').fill('Please check this spacing.');
@@ -746,6 +764,102 @@ test('floating toolbar: off by default, on with all-site access, draggable, coll
   expect(await worker.evaluate(async () => (await chrome.storage.local.get('toolbar')).toolbar.enabled)).toBe(false);
   expect(await registered()).toEqual([]);
   await revoked.close();
+});
+
+test('full page: stitched to the page height, sticky header once, capped feeds, the canvas limit, and Esc cancels', async () => {
+  test.setTimeout(180000);
+  const worker = context.serviceWorkers()[0];
+  const menuClick = (menuItemId) => worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
+  // The capture opens in the card; Annotate opens it in the editor, where its pixels can be read.
+  const inEditor = async () => {
+    const card = page.locator('#shot2ai-preview-card .card');
+    await card.waitFor();
+    const opened = context.waitForEvent('page', (p) => p.url().includes('/src/editor.html'));
+    await card.getByRole('button', { name: 'Annotate' }).click();
+    const editor = await opened;
+    await editor.locator('#frame').waitFor();
+    return editor;
+  };
+  const pixel = (editor, x, y) => editor.evaluate(([x, y]) => [...document.getElementById('canvas').getContext('2d').getImageData(x, y, 1, 1).data].slice(0, 3), [x, y]);
+
+  await page.goto(`${base}/long`);
+  await page.bringToFront();
+  const dpr = await page.evaluate(() => devicePixelRatio);
+  await page.evaluate(() => scrollTo(0, 300));
+  await menuClick('capture-full');
+  const card = page.locator('#shot2ai-preview-card .card');
+  await card.waitFor();
+  await expect(card.locator('.note')).toBeHidden();
+  await card.screenshot({ path: join(shots, 'card-fullpage.png') });
+  expect(await page.evaluate(() => scrollY)).toBe(300);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('header')).visibility)).toBe('visible');
+  let editor = await inEditor();
+  const [w, h] = await editor.evaluate(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+  expect(Math.abs(h - 6000 * dpr)).toBeLessThanOrEqual(dpr);
+  expect(w).toBe(await page.evaluate(() => innerWidth * devicePixelRatio));
+  // The markers sit at their own heights; the green header only at the very top.
+  expect(await pixel(editor, 10, 30 * dpr)).toEqual([0, 160, 0]);
+  expect(await pixel(editor, 10, 4250 * dpr)).toEqual([255, 0, 255]);
+  expect(await pixel(editor, 10, 5950 * dpr)).toEqual([0, 0, 255]);
+  const greenBelowTop = await editor.evaluate((dpr) => {
+    const ctx = document.getElementById('canvas').getContext('2d');
+    const rows = [];
+    for (let y = 100; y < 5800; y += 20) { const [r, g, b] = ctx.getImageData(10, y * dpr, 1, 1).data; if (r < 40 && g > 120 && b < 40) rows.push(y); }
+    return rows;
+  }, dpr);
+  expect(greenBelowTop).toEqual([]);
+  await editor.close();
+  await page.bringToFront();
+  await page.keyboard.press('Escape');
+
+  // Past the browser's canvas limit (9,000 px at 2x is 18,000): scaled down, and said so.
+  await page.goto(`${base}/tall`);
+  await page.bringToFront();
+  await menuClick('capture-full');
+  await expect(card.locator('.note')).toHaveText(/^Scaled to \d+ % to stay within the browser's 16,384 px image limit$/);
+  editor = await inEditor();
+  const tallHeight = await editor.evaluate(() => document.getElementById('canvas').height);
+  expect(tallHeight).toBeLessThanOrEqual(16384);
+  expect(tallHeight).toBeGreaterThan(16000);
+  await editor.close();
+  await page.bringToFront();
+  await page.keyboard.press('Escape');
+
+  // A long page past the height limit set in Options stops there, and says so.
+  await worker.evaluate(() => chrome.storage.local.set({ fullPageMaxHeight: 5000 }));
+  await menuClick('capture-full');
+  await expect(card.locator('.note')).toHaveText("Stopped at 5,000 px, the limit set in Options (the page is longer)");
+  editor = await inEditor();
+  expect(Math.abs((await editor.evaluate(() => document.getElementById('canvas').height)) - 5000 * dpr)).toBeLessThanOrEqual(dpr);
+  await editor.close();
+  await page.bringToFront();
+  await page.keyboard.press('Escape');
+  await worker.evaluate(() => chrome.storage.local.set({ fullPageMaxHeight: 20000 }));
+
+  // An infinite feed stops, and says why.
+  await page.goto(`${base}/feed`);
+  await page.bringToFront();
+  await menuClick('capture-full');
+  await expect(card.locator('.note')).toHaveText(/^Stopped at [\d,]+ px \(the page keeps loading more\)$/);
+  await card.screenshot({ path: join(shots, 'card-fullpage-capped.png') });
+  await page.keyboard.press('Escape');
+
+  // Esc during the capture cancels it: no card, and the page is back where it was.
+  await page.goto(`${base}/long`);
+  await page.bringToFront();
+  await page.evaluate(() => scrollTo(0, 500));
+  await worker.evaluate((id) => { chrome.tabs.get(id).then((t) => self.__shot2ai.onMenuClick({ menuItemId: 'capture-full' }, t)); }, tabId);
+  const progress = page.locator('#shot2ai-progress .pill');
+  await expect(progress).toContainText(/Capturing \d+\/\d+…/);
+  const vp = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  await expect(progress).toBeVisible();
+  await page.screenshot({ path: join(shots, 'fullpage-progress.png'), clip: { x: vp.width - 320, y: vp.height - 80, width: 320, height: 80 } });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#shot2ai-progress')).toHaveCount(0, { timeout: 10000 });
+  await page.waitForTimeout(1000);
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+  expect(await page.evaluate(() => scrollY)).toBe(500);
+  await page.goto(`${base}/`);
 });
 
 test('legal: manifest name and description fit, the disclaimer shows, the version is the manifest\'s', async () => {

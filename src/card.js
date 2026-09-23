@@ -65,6 +65,7 @@
     .result .actions button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:1px solid #dfe2d9;border-radius:6px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600}
     .result .actions button.primary{border-color:#2f3c30;background:#2f3c30;color:#fff}
     .result .actions svg{width:13px;height:13px}
+    .note{margin-top:8px;padding:7px 10px;border:1px solid #efe2c2;border-radius:8px;background:#faf3e3;color:#5f4a1f;font-size:11.5px;line-height:1.45}
     .saved{margin-top:6px;font-size:10.5px;color:#969f88;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     [hidden]{display:none!important}
   `;
@@ -97,6 +98,7 @@
         <button class="remember" role="menuitem">Remember this region</button>
         <button class="capture-saved" role="menuitem">Capture saved region</button>
       </div>
+      <div class="note" role="note" hidden></div>
       <div class="result" role="status" hidden></div>
       <div class="saved" hidden></div>
     </div>`;
@@ -124,6 +126,8 @@
       canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     });
 
+    $('.note').textContent = o.note || '';
+    $('.note').hidden = !o.note;
     $('.meta').textContent = o.meta || '';
     $('.meta').hidden = !o.meta;
     const chip = (text) => { $('.chip span').textContent = text; $('.chip').hidden = !text; };
@@ -297,6 +301,12 @@
       menu.append(all);
       renderAll = () => { all.textContent = `Send to all selected (${selected.length})`; all.hidden = selected.length < 2; };
       renderAll();
+      const full = document.createElement('button');
+      full.className = 'options';
+      full.setAttribute('role', 'menuitem');
+      full.textContent = 'Capture full page';
+      full.addEventListener('click', () => { dismiss(); chrome.runtime.sendMessage({ type: 'full-page' }); });
+      menu.append(full);
       const add = document.createElement('button');
       add.className = 'options';
       add.textContent = 'Add a chat in Options…';

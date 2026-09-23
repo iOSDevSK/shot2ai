@@ -77,6 +77,11 @@
     <div class="row"><label class="row-label" for="quality">Quality</label><input id="quality" type="range" min="50" max="100" step="5"><output id="quality-value" for="quality"></output></div>
   </section>
 
+  <section class="section" aria-labelledby="fullpage-title">
+    <div class="section-head"><div><h2 id="fullpage-title">Full-page capture</h2><p>Scrolls the page and joins the screens into one image. Pages that keep loading more (infinite feeds) stop at this height, or after 30 screens.</p></div></div>
+    <div class="row"><label class="row-label" for="max-height">Stop at</label><input id="max-height" type="range" min="5000" max="50000" step="5000"><output id="max-height-value" for="max-height"></output></div>
+  </section>
+
   <section class="section" aria-labelledby="toolbar-title">
     <div class="section-head"><div><h2 id="toolbar-title">Floating toolbar</h2><p>A small Shot2AI bar on every page with Area, Visible, Region and your destination. Drag it by its grip, collapse it to a dot, or hide it on a site from its ⋯ menu.</p></div><span id="toolbar-state" class="status"></span></div>
     <label class="toggle row"><input id="toolbar-on" type="checkbox"><span>Show the toolbar on every page</span></label>

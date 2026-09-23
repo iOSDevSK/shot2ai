@@ -1,7 +1,7 @@
 // The right-click menu.
 import { destinations, defaultDestination, update, prompts } from './settings.js';
 import { startCapture, captureVisible, captureImage, captureSavedRegion } from './capture.js';
-import { showCard } from './flow.js';
+import { showCard, fullPageCard } from './flow.js';
 
 const CONTEXTS = ['page', 'selection', 'image', 'link'];
 export async function menuItems() {
@@ -14,6 +14,7 @@ export async function menuItems() {
     item('version', `Shot2AI v${chrome.runtime.getManifest().version}`, { enabled: false }),
     item('capture-area', 'Capture area…'),
     item('capture-visible', 'Capture visible page'),
+    item('capture-full', 'Capture full page'),
     item('capture-saved', 'Capture saved region'),
     item('sep-1', '', { type: 'separator' }),
     item('send-to', 'Send to'),
@@ -42,6 +43,7 @@ export async function onMenuClick(info, tab) {
   if (id.startsWith('dest:')) { await update({ defaultDestination: id.slice(5) }); return; }
   if (!tab?.id) return;
   if (id === 'capture-area') { await startCapture(tab.id); return; }
+  if (id === 'capture-full') { await fullPageCard(tab); return; }
   if (id === 'capture-saved') {
     const result = await captureSavedRegion(tab);
     if (result) await showCard(tab.id, result.id, result.capture);

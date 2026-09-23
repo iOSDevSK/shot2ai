@@ -11,6 +11,7 @@
     area: svg('<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><rect x="8.5" y="8.5" width="7" height="7" rx="1"/>'),
     visible: svg('<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9h17"/>'),
     region: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" stroke-dasharray="2.5 2.5"/><circle cx="12" cy="12" r="2.5"/>'),
+    full: svg('<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>'),
     grip: svg('<circle cx="9" cy="7" r=".6"/><circle cx="15" cy="7" r=".6"/><circle cx="9" cy="12" r=".6"/><circle cx="15" cy="12" r=".6"/><circle cx="9" cy="17" r=".6"/><circle cx="15" cy="17" r=".6"/>'),
     collapse: svg('<path d="M6 12h12"/>'),
     more: svg('<circle cx="6" cy="12" r=".8"/><circle cx="12" cy="12" r=".8"/><circle cx="18" cy="12" r=".8"/>'),
@@ -46,6 +47,7 @@
       <span class="grip" title="Drag to move">${ICON.grip}</span>
       <button class="act" data-action="area" title="Capture an area">${ICON.area}Area</button>
       <button class="act" data-action="visible" title="Capture the visible page">${ICON.visible}Visible</button>
+      <button class="act" data-action="full" title="Capture the full page">${ICON.full}Full</button>
       <button class="act" data-action="saved" title="Capture this site's saved region">${ICON.region}Region</button>
       <button class="dest" title="Default destination: change it in Options"></button>
       <button class="icon collapse" aria-label="Collapse the toolbar" title="Collapse">${ICON.collapse}</button>
