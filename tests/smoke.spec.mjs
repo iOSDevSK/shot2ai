@@ -202,8 +202,12 @@ test('out of the box ChatGPT is the default; html2wp status stays hidden', async
 test('right-click menu: its items, Capture visible page, selection text, and Send to ▸ Claude', async () => {
   const worker = context.serviceWorkers()[0];
   const menu = () => worker.evaluate(() => [...self.__menu.values()].map((m) => ({ id: m.id, title: m.title, parentId: m.parentId, type: m.type, checked: m.checked, contexts: m.contexts })));
+  // The keys Chrome has for the capture commands go in the titles, as "Capture area…  (⌥⇧S)".
+  const keys = Object.fromEntries((await worker.evaluate(() => chrome.commands.getAll())).map((c) => [c.name, c.shortcut]));
+  const withKey = (title, command) => (keys[command] ? `${title}  (${keys[command]})` : title);
   await expect.poll(async () => (await menu()).map((m) => m.title || m.type)).toEqual([
-    'Shot2AI', `Shot2AI v${manifestVersion}`, 'Capture area…', 'Capture visible page', 'Capture full page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
+    'Shot2AI', `Shot2AI v${manifestVersion}`, withKey('Capture area…', 'capture-area'), withKey('Capture visible page', 'capture-visible'),
+    withKey('Capture full page', 'capture-full'), withKey('Capture saved region', 'capture-saved'), 'separator', 'Send to', 'ChatGPT', 'html2wp',
     'Capture and send to ChatGPT', 'Send with prompt', 'Fix this bug', 'Explain this', 'Match this design', "What's wrong here?",
     'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
   const items = await menu();
@@ -682,7 +686,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
-  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/, 'Capture full page', 'Add a chat in Options…']);
+  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/, /^Capture full page/, 'Add a chat in Options…']);
   await menuShot(card, 'card-menu.png');
   await card.getByRole('button', { name: 'More destinations' }).click();
   await card.getByLabel('Message').fill('Please check this spacing.');
@@ -1044,6 +1048,53 @@ test('legal: manifest name and description fit, the disclaimer shows, the versio
   await editor.goto(`chrome-extension://${extensionId}/src/editor.html`);
   await expect(editor.locator('#version')).toHaveText(`v${manifest.version}`);
   await editor.close();
+});
+
+test('keyboard shortcuts: listed live in Options, Not set shown, Change shortcuts opens Chrome\'s page, keys in the popup', async () => {
+  const worker = context.serviceWorkers()[0];
+  // Chrome's own bindings, as they are in this browser.
+  const real = Object.fromEntries((await worker.evaluate(() => chrome.commands.getAll())).map((c) => [c.name, c.shortcut]));
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html#shortcuts`);
+  const list = options.locator('#shortcut-list');
+  for (const command of ['capture-area', 'capture-visible', 'capture-full', 'capture-saved', 'show-stack']) {
+    await expect(list.locator(`[data-command="${command}"]`)).toHaveText(real[command] || 'Not set');
+  }
+  await options.locator('#shortcuts').screenshot({ path: join(shots, 'options-shortcuts.png') });
+  // Change shortcuts opens chrome://extensions/shortcuts; extensions cannot set keys themselves.
+  const opened = context.waitForEvent('page', { timeout: 10000 });
+  await options.getByRole('button', { name: 'Change shortcuts' }).click();
+  const chromePage = await opened;
+  await expect.poll(() => chromePage.url()).toBe('chrome://extensions/shortcuts');
+  await chromePage.close();
+  await options.close();
+
+  // With the keys changed or removed in Chrome (stubbed here), the list follows.
+  const stubbed = await context.newPage();
+  await stubbed.addInitScript(() => {
+    chrome.commands.getAll = async () => [
+      { name: 'capture-area', shortcut: '⌥⇧A', description: 'Capture area' },
+      { name: 'capture-visible', shortcut: '', description: 'Capture visible page' },
+      { name: 'capture-full', shortcut: '⌥⇧F', description: 'Capture full page' },
+      { name: 'capture-saved', shortcut: '', description: 'Capture saved region' },
+      { name: 'show-stack', shortcut: '⌥⇧C', description: "Show this tab's captures" },
+    ];
+  });
+  await stubbed.goto(`chrome-extension://${extensionId}/src/options.html#shortcuts`);
+  const keysShown = stubbed.locator('#shortcut-list [data-command]');
+  await expect(keysShown).toHaveText(['⌥⇧A', 'Not set', '⌥⇧F', 'Not set', '⌥⇧C']);
+  await expect(stubbed.locator('#shortcut-list .key-row > span:first-child')).toHaveText(['Capture area', 'Capture visible page', 'Capture full page', 'Capture saved region', "Show this tab's captures"]);
+  await stubbed.locator('#shortcuts').screenshot({ path: join(shots, 'options-shortcuts-unset.png') });
+  await stubbed.close();
+
+  // The popup shows the keys on its capture buttons.
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  if (real['capture-area']) await expect(popup.locator('#key-area')).toHaveText(real['capture-area']);
+  if (real['capture-full']) await expect(popup.locator('#key-full')).toHaveText(real['capture-full']);
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-shortcuts.png') });
+  await popup.close();
+  console.log('SHORTCUTS', JSON.stringify(real));
 });
 
 test('privacy: Clear all captures and settings empties storage and captures', async () => {

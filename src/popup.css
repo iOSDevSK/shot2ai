@@ -30,3 +30,5 @@ body{width:340px;background:var(--canvas)}
 .links .meta-links{margin-left:auto;color:var(--faint)}
 .links a{margin-left:0}
 .version{color:var(--faint)}
+.popup-foot .button .key{margin-left:6px;padding:1px 5px;border-radius:4px;font:600 10.5px/1.4 var(--mono);opacity:.75;border:1px solid currentColor}
+.popup-foot .button.primary .key{border-color:rgba(255,255,255,.45)}

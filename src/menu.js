@@ -1,21 +1,24 @@
 // The right-click menu.
 import { destinations, defaultDestination, update, prompts } from './settings.js';
+import { shortcuts } from './shortcuts.js';
 import { startCapture, captureVisible, captureImage, captureSavedRegion } from './capture.js';
 import { showCard, fullPageCard } from './flow.js';
 
 const CONTEXTS = ['page', 'selection', 'image', 'link'];
 export async function menuItems() {
-  const [list, chosen, saved] = await Promise.all([destinations(), defaultDestination(), prompts()]);
+  const [list, chosen, saved, keys] = await Promise.all([destinations(), defaultDestination(), prompts(), shortcuts()]);
+  // A context menu shows no accelerators: the key goes in the title.
+  const withKey = (title, command) => (keys[command] ? `${title}  (${keys[command]})` : title);
   const to = { copy: ['Capture and copy', 'Copy this image'], save: ['Capture and save', 'Save this image'] }[chosen.kind]
     || [`Capture and send to ${chosen.name}`, `Send this image to ${chosen.name}`];
   const item = (id, title, extra = {}) => ({ id, parentId: 'shot2ai', contexts: CONTEXTS, ...(title ? { title } : {}), ...extra });
   return [
     { id: 'shot2ai', title: 'Shot2AI', contexts: CONTEXTS },
     item('version', `Shot2AI v${chrome.runtime.getManifest().version}`, { enabled: false }),
-    item('capture-area', 'Capture area…'),
-    item('capture-visible', 'Capture visible page'),
-    item('capture-full', 'Capture full page'),
-    item('capture-saved', 'Capture saved region'),
+    item('capture-area', withKey('Capture area…', 'capture-area')),
+    item('capture-visible', withKey('Capture visible page', 'capture-visible')),
+    item('capture-full', withKey('Capture full page', 'capture-full')),
+    item('capture-saved', withKey('Capture saved region', 'capture-saved')),
     item('sep-1', '', { type: 'separator' }),
     item('send-to', 'Send to'),
     ...list.map((d) => ({ id: `dest:${d.id}`, parentId: 'send-to', title: d.name, type: 'radio', checked: d.id === chosen.id, contexts: CONTEXTS })),

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Shot2AI — Screenshot, Annotate & Send to AI",
   "short_name": "Shot2AI",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Capture any part of a page, mark it up and send it in one click to your AI chat (ChatGPT, Claude, …) or the html2wp app.",
   "minimum_chrome_version": "116",
   "permissions": [
@@ -51,21 +51,31 @@
         "default": "Alt+Shift+S",
         "mac": "Alt+Shift+S"
       },
-      "description": "Capture an area of the page"
+      "description": "Capture area"
     },
-    "capture-saved": {
+    "capture-visible": {
       "suggested_key": {
-        "default": "Alt+Shift+R",
-        "mac": "Alt+Shift+R"
+        "default": "Alt+Shift+V",
+        "mac": "Alt+Shift+V"
       },
-      "description": "Capture the saved region of this site"
+      "description": "Capture visible page"
     },
     "capture-full": {
       "suggested_key": {
         "default": "Alt+Shift+F",
         "mac": "Alt+Shift+F"
       },
-      "description": "Capture the full page"
+      "description": "Capture full page"
+    },
+    "capture-saved": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Capture saved region"
+    },
+    "show-stack": {
+      "description": "Show this tab's captures"
     }
   }
 }

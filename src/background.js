@@ -17,12 +17,16 @@ chrome.permissions.onRemoved.addListener(() => { syncToolbar().catch(() => {}); 
 chrome.storage.onChanged.addListener((changes) => {
   if (['defaultDestination', 'presets', 'customChats', 'prompts'].some((k) => k in changes)) rebuildMenu();
 });
+// Keys changed at chrome://extensions/shortcuts: the menu titles follow.
+chrome.commands.onChanged?.addListener(() => rebuildMenu());
 chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab).catch(flagError); });
 
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === 'capture-area') startCapture(tab?.id).catch(flagError);
   if (command === 'capture-saved' && tab) savedRegionCard(tab).catch(flagError);
   if (command === 'capture-full' && tab) fullPageCard(tab).catch(flagError);
+  if (command === 'capture-visible' && tab) captureVisible(tab).then(({ id, capture }) => showCard(tab.id, id, capture)).catch(flagError);
+  if (command === 'show-stack' && tab) showStack(tab.id).catch(flagError);
 });
 
 async function savedRegionCard(tab) {
@@ -72,6 +76,7 @@ const handlers = {
     try { await showCard(tab.id, id, capture); return { ok: true }; } catch { await deleteCapture(id); return { ok: false }; }
   },
   'remember-region': rememberRegion,
+  'rebuild-menu': async () => { await rebuildMenu(); return { ok: true }; },
   'full-page': async (m, sender) => {
     const tab = m.tabId ? await chrome.tabs.get(m.tabId) : sender.tab;
     if (!tab) return { failed: true };

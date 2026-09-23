@@ -6,6 +6,7 @@ import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
 import { syncToolbar, ALL_SITES } from './toolbar-setup.js';
 import { formatOf } from './imaging.js';
+import { ACTIONS, SHORTCUTS_PAGE, shortcuts } from './shortcuts.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -375,6 +376,32 @@ $('clear-yes').addEventListener('click', async () => {
   location.reload();
 });
 
+// ---- keyboard shortcuts --------------------------------------------------
+
+async function renderShortcuts() {
+  const keys = await shortcuts();
+  const rows = ACTIONS.map(({ command, label }) => {
+    const row = document.createElement('div');
+    row.className = 'key-row';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const key = document.createElement(keys[command] ? 'kbd' : 'span');
+    key.className = keys[command] ? '' : 'unset';
+    key.textContent = keys[command] || 'Not set';
+    key.dataset.command = command;
+    row.append(name, key);
+    return row;
+  });
+  $('shortcut-list').replaceChildren(...rows);
+  // The right-click menu shows the keys in its titles: bring them up to date.
+  chrome.runtime.sendMessage({ type: 'rebuild-menu' }).catch(() => {});
+}
+// Extensions cannot set keys themselves; Chrome's own page does.
+$('change-shortcuts').addEventListener('click', () => chrome.tabs.create({ url: SHORTCUTS_PAGE }));
+// Back from chrome://extensions/shortcuts: show what changed.
+addEventListener('focus', () => void renderShortcuts());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void renderShortcuts(); });
+
 // ---- version ------------------------------------------------------------
 
 const { version } = chrome.runtime.getManifest();
@@ -386,4 +413,4 @@ $('whats-new').href = `https://github.com/iOSDevSK/shot2ai/releases/tag/v${versi
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti(), renderToolbar(), renderFullPage()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti(), renderToolbar(), renderFullPage(), renderShortcuts()]);

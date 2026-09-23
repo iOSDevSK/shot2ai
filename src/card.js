@@ -58,6 +58,7 @@
     .menu button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 8px;border-radius:6px;text-align:left;font-size:12.5px}
     .menu button:hover{background:#f1f3ee}
     .menu small{color:#969f88;font-size:11px}
+    .menu .key{font-variant-numeric:tabular-nums;letter-spacing:.02em}
     .menu .item{display:flex;align-items:center;gap:2px;border-radius:6px}
     .menu .item:hover{background:#f1f3ee}
     .menu .item input{flex:none;width:15px;height:15px;margin:0 2px 0 7px;accent-color:#2f3c30;cursor:pointer}
@@ -540,7 +541,13 @@
         add(selecting ? 'Done selecting' : 'Select captures', () => { selecting = !selecting; menu.hidden = true; render(); }, '');
         add('Clear all', () => { menu.hidden = true; ask({ type: 'stack-clear' }); entries = []; leave(); }, '');
       }
-      add('Capture full page', () => { dismiss(); ask({ type: 'full-page' }); }, 'options');
+      const full = add('Capture full page', () => { dismiss(); ask({ type: 'full-page' }); }, 'options');
+      if (o.keys?.['capture-full']) {
+        const key = document.createElement('small');
+        key.className = 'key';
+        key.textContent = o.keys['capture-full'];
+        full.append(key);
+      }
       add('Add a chat in Options…', () => ask({ type: 'open-options' }), 'options');
       menu.hidden = false;
     }

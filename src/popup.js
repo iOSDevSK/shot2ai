@@ -2,6 +2,7 @@ import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
 import { isMac, settings, defaultDestination, sitePattern, cleanSubfolder } from './settings.js';
 import { acceptPastedImages } from './paste.js';
+import { shortcuts } from './shortcuts.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -118,9 +119,13 @@ $('paste-hint').innerHTML = `Or paste an image with <kbd>${isMac ? '⌘V' : 'Ctr
   if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });
   acceptPastedImages(() => { if (!tabParam) window.close(); }, tabId);
 })();
-chrome.commands.getAll().then((commands) => {
-  const key = commands.find((c) => c.name === 'capture-area')?.shortcut;
-  $('shortcut').innerHTML = key ? `<kbd>${key.replace(/</g, '')}</kbd> captures from any page` : '';
+// The keys Chrome has for these actions now (the owner may have changed them).
+shortcuts().then((keys) => {
+  for (const [id, command] of [['key-area', 'capture-area'], ['key-full', 'capture-full']]) {
+    $(id).textContent = keys[command] || '';
+    $(id).hidden = !keys[command];
+    $(id).title = 'Keyboard shortcut';
+  }
 });
 // Read from the manifest, so the popup always names the build that is loaded.
 $('version').textContent = `Shot2AI v${chrome.runtime.getManifest().version}`;

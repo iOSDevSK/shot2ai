@@ -8,6 +8,7 @@ import { pasteIntoChat } from './webchat.js';
 import { icons } from './icons.js';
 import { encode, describe, EXTENSIONS } from './imaging.js';
 import { captureFullPage, DEFAULT_MAX_HEIGHT } from './fullpage.js';
+import { shortcuts } from './shortcuts.js';
 
 const isMac = async () => (await chrome.runtime.getPlatformInfo()).os === 'mac';
 
@@ -89,7 +90,7 @@ export async function showStack(tabId, { currentId = null, fresh = null, autoSen
       destinations: destinationsNow, multi: s.multiSend.filter((d) => destinationsNow.some((x) => x.id === d)),
       main: { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) },
       prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })),
-      acknowledged: s.acknowledged, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])),
+      acknowledged: s.acknowledged, keys: await shortcuts(), mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])),
     }],
   });
   return true;

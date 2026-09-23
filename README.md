@@ -41,7 +41,7 @@ Each code pairs one extension. After five wrong codes the code stops working; ch
 
 ## Use it
 
-- Click the toolbar icon, then **Capture area**, or press **Alt+Shift+S** on any page. Drag over the area; **Esc** cancels.
+- Click the toolbar icon, then **Capture area**, or press **Alt+Shift+S** (⌥⇧S) on any page; see Keyboard shortcuts. Drag over the area; **Esc** cancels.
 - A **preview card** appears in the corner of the page. The screenshot is already on the clipboard, so you can paste it anywhere with **⌘V** (**Ctrl+V** on Windows and Linux). From the card:
   - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**; for a web chat it says the screenshot was pasted in and you press Enter there. It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, and never while it shows an error.
   - **Annotate** opens the full editor. **Copy** copies the screenshot again. **Save** saves a copy (see Saving). The **chevron** lists the other destinations.
@@ -144,6 +144,7 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - auto-submit: off never presses the chat's send button, on presses it once, and a missing button is reported
 - prompts: add, reorder, delete and a default prompt in Options; the picker in the card and the editor; Send with prompt from the right-click menu
 - saved region: remembered per site, captured again at the same size, and clamped to the window
+- keyboard shortcuts: the Options list from Chrome's bindings (and from a stubbed list with keys removed: **Not set**), **Change shortcuts** opening `chrome://extensions/shortcuts`, the keys in the popup and in the right-click menu titles. Real key presses cannot be automated, so the shortcuts themselves are not tested
 - floating toolbar: off by default, registered when switched on, the Visible button, dragging (the place is kept after a reload), collapsing, hiding per site and showing again, and switching off
 
 Screenshots go to `screenshots/`.
@@ -153,6 +154,18 @@ The test loads a copy of the extension with a few changes. Its manifest also hol
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 
 html2wp converts any website to WordPress: https://html2wp.dev/
+
+## Keyboard shortcuts
+
+| Action | Default key |
+|---|---|
+| Capture area | Alt+Shift+S (⌥⇧S on a Mac) |
+| Capture visible page | Alt+Shift+V (⌥⇧V) |
+| Capture full page | Alt+Shift+F (⌥⇧F) |
+| Capture saved region | Alt+Shift+R (⌥⇧R) |
+| Show this tab's captures | none; set one if you like |
+
+Chrome manages the keys. **Options → Keyboard shortcuts** lists the current ones (a key another extension already uses stays **Not set**), and **Change shortcuts** opens `chrome://extensions/shortcuts`, where you set them: an extension cannot set keys itself. The popup, the card's menu and the right-click menu show the current keys next to their actions. The right-click menu puts the key in the title, for example "Capture area…  (⌥⇧S)", because Chrome's context menus show no shortcuts of their own.
 
 ## Version
 

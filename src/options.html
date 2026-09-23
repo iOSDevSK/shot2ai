@@ -82,6 +82,11 @@
     <div class="row"><label class="row-label" for="max-height">Stop at</label><input id="max-height" type="range" min="5000" max="50000" step="5000"><output id="max-height-value" for="max-height"></output></div>
   </section>
 
+  <section class="section" id="shortcuts" aria-labelledby="shortcuts-title">
+    <div class="section-head"><div><h2 id="shortcuts-title">Keyboard shortcuts</h2><p>Chrome manages the keys; if another extension already uses one, Chrome leaves it unset.</p></div><button id="change-shortcuts" class="button" type="button">Change shortcuts</button></div>
+    <div id="shortcut-list" class="keys"></div>
+  </section>
+
   <section class="section" aria-labelledby="toolbar-title">
     <div class="section-head"><div><h2 id="toolbar-title">Floating toolbar</h2><p>A small Shot2AI bar on every page with Area, Visible, Region and your destination. Drag it by its grip, collapse it to a dot, or hide it on a site from its ⋯ menu.</p></div><span id="toolbar-state" class="status"></span></div>
     <label class="toggle row"><input id="toolbar-on" type="checkbox"><span>Show the toolbar on every page</span></label>
