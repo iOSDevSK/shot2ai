@@ -10,7 +10,7 @@
 <main class="popup">
   <header class="popup-head">
     <div class="brand"><span class="brand-symbol" data-icon="code"></span><span>html<span class="two">2</span>wp</span></div>
-    <span id="state" class="status">Checking</span>
+    <div class="head-right"><span id="state" class="status">Checking</span><button id="options" class="icon-button" data-icon="gear" aria-label="Options" title="Options"></button></div>
   </header>
 
   <section id="checking" class="panel center"><span class="spinner spin" data-icon="spinner"></span><p>Looking for html2wp on this Mac…</p></section>
@@ -40,7 +40,7 @@
   <footer class="popup-foot">
     <button id="capture" class="button primary wide" data-icon="capture">Capture area</button>
     <p id="capture-error" class="notice err" role="alert" hidden></p>
-    <div class="hint"><span id="shortcut"></span><span>Screenshots go only to 127.0.0.1</span></div>
+    <div class="hint"><span id="shortcut"></span><span id="paste-hint"></span></div>
   </footer>
 </main>
 <script type="module" src="popup.js"></script>

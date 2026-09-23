@@ -8,7 +8,9 @@
     host.id = 'html2wp-area-select';
     host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;';
     const root = host.attachShadow({ mode: 'closed' });
-    root.innerHTML = `<style>
+    // A constructed stylesheet: a page's style-src policy does not apply to it.
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(`
       :host{all:initial}
       .layer{position:fixed;inset:0;cursor:crosshair;background:rgba(24,31,24,.42);user-select:none;-webkit-user-select:none}
       .layer.selecting{background:transparent}
@@ -18,8 +20,9 @@
       .hint b{font-weight:650}
       .hint kbd{font:600 10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 6px;border:1px solid #dfe2d9;border-bottom-width:2px;border-radius:5px;background:#fff;color:#547254}
       .layer.selecting~.hint{opacity:0}
-    </style>
-    <div class="layer" part="layer"></div><div class="box"></div><div class="size"></div>
+    `);
+    root.adoptedStyleSheets = [sheet];
+    root.innerHTML = `<div class="layer" part="layer"></div><div class="box"></div><div class="size"></div>
     <div class="hint"><b>html2wp</b><span>Drag to select an area</span><kbd>Esc</kbd><span>cancels</span></div>`;
     const layer = root.querySelector('.layer');
     const box = root.querySelector('.box');

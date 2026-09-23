@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>html2wp Screenshot · Options</title>
+<link rel="icon" href="../icons/icon-32.png">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<header class="topbar"><div class="brand"><span class="brand-symbol" data-icon="code"></span><span>html<span class="two">2</span>wp</span></div><span class="crumb">Screenshot options</span></header>
+<main class="page">
+
+  <section class="section" aria-labelledby="app-title">
+    <div class="section-head"><div><h2 id="app-title">html2wp app</h2><p>The default destination. Screenshots go only to the app on this computer (127.0.0.1).</p></div><span id="app-state" class="status">Checking</span></div>
+    <div id="app-project" class="row" hidden><span class="row-label">Open project</span><strong id="app-project-name"></strong></div>
+    <form id="pair-form" class="row" hidden>
+      <label class="row-label" for="code">Pairing code</label>
+      <input id="code" class="code-input small" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000">
+      <button id="pair" class="button primary" type="submit">Pair</button>
+    </form>
+    <p id="app-note" class="note"></p>
+  </section>
+
+  <section class="section" aria-labelledby="dest-title">
+    <div class="section-head"><div><h2 id="dest-title">Other destinations</h2><p>Send a screenshot into a web chat instead. The extension pastes it into the chat's message box; you press Enter there.</p></div></div>
+    <div id="presets" class="list"></div>
+    <div id="custom" class="list"></div>
+    <form id="add-chat" class="add">
+      <input id="chat-name" placeholder="Name, e.g. Gemini" aria-label="Chat name" maxlength="40" required>
+      <input id="chat-url" placeholder="https://gemini.google.com/app" aria-label="Chat address" type="url" required>
+      <button class="button" type="submit">Add chat</button>
+    </form>
+    <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once.</p>
+    <p id="dest-error" class="notice err" role="alert" hidden></p>
+  </section>
+
+  <section class="section" aria-labelledby="save-title">
+    <div class="section-head"><div><h2 id="save-title">Saving</h2><p>Keep a copy of your screenshots on this computer.</p></div></div>
+    <label class="toggle row"><input id="save-copy" type="checkbox"><span>Save a copy of every capture</span></label>
+    <div class="row"><span class="row-label">Folder</span><span id="folder-name" class="value">Downloads</span><span id="folder-state" class="status" hidden></span>
+      <span class="push"></span><button id="choose-folder" class="button" type="button">Choose folder…</button><button id="allow-folder" class="button" type="button" hidden>Allow again</button><button id="forget-folder" class="button text" type="button" hidden>Use Downloads</button></div>
+    <div class="row"><label class="row-label" for="subfolder">Downloads subfolder</label><input id="subfolder" class="field" placeholder="html2wp-shots"><span class="hint">Used when no folder is chosen or its access has lapsed.</span></div>
+    <div class="row"><label class="row-label" for="pattern">File name</label><input id="pattern" class="field wide" placeholder="html2wp-{host}-{date}-{time}"><span class="hint">{host}, {date}, {time}</span></div>
+    <p class="note">Example: <code id="example"></code></p>
+  </section>
+
+  <section class="section" aria-labelledby="paste-title">
+    <div class="section-head"><div><h2 id="paste-title">Paste a screenshot</h2><p>Took a screenshot some other way? Paste it here to annotate and send it.</p></div></div>
+    <div id="paste-zone" class="paste-zone" tabindex="0"><span data-icon="capture"></span><span id="paste-keys"></span></div>
+  </section>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

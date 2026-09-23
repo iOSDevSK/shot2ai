@@ -4,9 +4,12 @@
 // Tools, colours, stroke sizes and the arrow's geometry follow better-shot
 // (https://github.com/iOSDevSK/better-shot, BSD-3-Clause, see
 // licenses/better-shot-LICENSE), adapted from SwiftUI to a 2D canvas.
-import { connect, pair, send } from './bridge.js';
+import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
+import { HTML2WP, destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac } from './settings.js';
+import { saveImage, savedText } from './save.js';
+import { pasteIntoChat } from './webchat.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -253,38 +256,42 @@ function toast(text) {
   $('toast').textContent = text;
   $('toast').hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 1600);
+  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2200);
+}
+async function toClipboard(withText) {
+  const items = { 'image/png': flattened() };
+  const text = $('message').value.trim();
+  if (withText && text) items['text/plain'] = new Blob([text], { type: 'text/plain' });
+  try { await navigator.clipboard.write([new ClipboardItem(items)]); return true; } catch { return false; }
 }
 $('copy').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': flattened() })]);
-    toast('Copied to clipboard');
-  } catch {
-    toast('Chrome did not allow copying. Use Download instead.');
-  }
+  if (!image) return;
+  toast((await toClipboard(false)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.');
 });
-$('download').addEventListener('click', async () => {
-  const blob = await flattened();
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-  const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `html2wp-screenshot-${stamp}.png` });
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  toast('Saved to Downloads');
+$('save').addEventListener('click', async () => {
+  if (!image) return;
+  try { toast(savedText(await saveImage(await flattened(), source.url, { ask: true }))); } catch { toast('The screenshot could not be saved.'); }
 });
-
-async function base64(blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let text = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  return btoa(text);
-}
 
 // ---- sending ------------------------------------------------------------
 
-function showResult(tone, text) {
-  $('result').className = `notice ${tone}`;
-  $('result').textContent = text;
-  $('result').hidden = !text;
+function showResult(tone, text, actions = []) {
+  const box = $('result');
+  box.className = `notice ${tone}`;
+  box.textContent = text;
+  if (actions.length) {
+    const row = document.createElement('div');
+    row.className = 'actions';
+    for (const [name, run, primary] of actions) {
+      const b = document.createElement('button');
+      b.className = `button${primary ? ' primary' : ''}`;
+      b.textContent = name;
+      b.addEventListener('click', run);
+      row.append(b);
+    }
+    box.append(row);
+  }
+  box.hidden = !text;
 }
 function setTarget(name, note, state, tone = '') {
   $('target-name').textContent = name;
@@ -295,63 +302,102 @@ function setTarget(name, note, state, tone = '') {
 function setSend(label, busy = false) {
   $('send-label').textContent = label;
   $('send').disabled = busy;
+  $('more').disabled = busy;
   const icon = label === 'Try again' ? 'retry' : label === 'Sent' ? 'check' : 'send';
   $('send').querySelector('svg').outerHTML = icons[icon];
 }
 
+let destination = HTML2WP;
+function choose(next) {
+  destination = next;
+  setSend(`Send to ${next.name}`);
+  $('privacy').textContent = next.kind === 'chat'
+    ? `${next.name} is a website: the screenshot and message go to ${new URL(next.url).host}. Nothing is submitted until you press Enter there.`
+    : 'The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).';
+  $('pair-form').hidden = true;
+  if (!image) $('send').disabled = $('more').disabled = true;
+  if (next.kind === 'chat') setTarget(next.name, new URL(next.url).host, 'Website', 'warn');
+  else void check();
+}
+
 // Ask the app where the message would go and whether its chat is open now.
 async function check() {
-  target = null;
   const found = await connect();
+  if (destination.kind !== 'html2wp') return;
   $('pair-form').hidden = true;
-  if (!found) {
-    setTarget('html2wp', 'The app is not running', 'Offline', 'err');
-    return { problem: 'html2wp is not running. Open the app on this Mac, then try again.' };
-  }
+  if (!found) { setTarget('html2wp', 'The app is not running', 'Offline', 'err'); return; }
   const { status } = found;
-  if (!status.paired) {
-    setTarget('html2wp', 'Not paired with this browser', 'Not paired', 'warn');
-    $('pair-form').hidden = false;
-    return { problem: 'Pair with html2wp first.' };
-  }
+  if (!status.paired) { setTarget('html2wp', 'Not paired with this browser', 'Not paired', 'warn'); $('pair-form').hidden = false; return; }
   const name = status.project?.name || 'No project open';
-  if (!status.chat?.available) {
-    setTarget(name, status.project ? 'Open project' : 'html2wp', 'Busy', 'warn');
-    return { reason: status.chat?.reason || '' };
-  }
-  setTarget(name, 'Open project', 'Chat ready', 'ok');
-  target = { port: found.port, project: status.project };
-  return {};
+  if (!status.chat?.available) setTarget(name, status.project ? 'Open project' : 'html2wp', 'Busy', 'warn');
+  else setTarget(name, 'Open project', 'Chat ready', 'ok');
 }
 
 let sending = false;
-async function submit() {
+async function submit(target = destination, confirmed = false) {
   if (sending || !image) return;
+  $('menu').hidden = true;
+  if (target !== destination) choose(target);
+  const text = $('message').value.trim();
+  if (target.kind === 'chat') {
+    // Asked during the click: Chrome shows its own prompt the first time.
+    const granted = await chrome.permissions.request({ origins: [sitePattern(target.url)] }).catch(() => false);
+    if (!granted) { showResult('warn', `Chrome did not allow the extension to use ${new URL(target.url).host}. Send again and choose Allow.`); return; }
+    const s = await settings();
+    if (!confirmed && !s.acknowledged[target.origin]) {
+      showResult('warn', `${target.name} is a website. The screenshot and message will go to ${new URL(target.url).host}, not only to this Mac.`,
+        [['Continue', () => void submit(target, true), true], ['Cancel', () => showResult('', '')]]);
+      return;
+    }
+    await update({ acknowledged: { ...s.acknowledged, [target.origin]: true } });
+    sending = true;
+    setSend('Sending…', true);
+    const png = await flattened();
+    // Copied first, while this page has focus: the fallback if pasting fails.
+    const copied = await toClipboard(true);
+    const r = await pasteIntoChat(target, png, text, fileName(s.filenamePattern, source.url));
+    sending = false;
+    setSend(`Send to ${target.name}`);
+    if (r.ok) { await update({ lastDestination: target.id }); showResult('ok', `Pasted into ${target.name}. Press Enter there to send.`); return; }
+    showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`);
+    return;
+  }
   sending = true;
   setSend('Sending…', true);
   showResult('', '');
-  const state = await check();
-  if (state.problem) { showResult(state.problem.startsWith('Pair') ? 'warn' : 'err', state.problem); setSend('Try again'); sending = false; return; }
-  // The app's own reason, shown as it is; the annotation stays.
-  if (state.reason !== undefined) { showResult('warn', state.reason); setSend('Try again'); sending = false; return; }
-  const png = await flattened();
-  const outcome = await send(target.port, target.project.id, $('message').value.trim(), await base64(png));
+  const outcome = await sendToApp(text, await flattened());
   sending = false;
   if (outcome.ok) {
-    showResult('ok', `Sent to ${target.project.name}`);
+    await update({ lastDestination: 'html2wp' });
+    showResult('ok', outcomeText(outcome));
     setSend('Sent', true);
-    $('send').disabled = true;
-    await deleteCapture(captureId).catch(() => {});
+    if (captureId) await deleteCapture(captureId).catch(() => {});
     setTimeout(() => window.close(), 1800);
     return;
   }
-  if (outcome.reason) showResult('warn', outcome.reason);
-  else if (outcome.unpaired) { showResult('warn', 'html2wp no longer knows this browser. Pair again with a new code.'); await check(); }
-  else if (outcome.tooLarge) showResult('err', 'The screenshot is larger than 10 MB. Capture a smaller area.');
-  else showResult('err', 'html2wp stopped answering. Check that the app is open, then try again.');
+  // The app's own reason, shown as it is; the annotation stays.
+  showResult(outcome.reason !== undefined ? 'warn' : outcome.unpaired ? 'warn' : 'err', outcomeText(outcome));
   setSend('Try again');
+  await check();
 }
 $('send').addEventListener('click', () => void submit());
+$('more').addEventListener('click', async () => {
+  const menu = $('menu');
+  if (!menu.hidden) { menu.hidden = true; return; }
+  menu.innerHTML = '<div class="head">Send to</div>';
+  for (const d of await destinations()) {
+    const b = document.createElement('button');
+    b.setAttribute('role', 'menuitem');
+    b.innerHTML = '<span></span><small></small>';
+    b.querySelector('span').textContent = d.name;
+    b.querySelector('small').textContent = d.kind === 'html2wp' ? 'this Mac' : new URL(d.url).host;
+    b.addEventListener('click', () => void submit(d));
+    menu.append(b);
+  }
+  menu.insertAdjacentHTML('beforeend', '<a href="options.html" target="_blank">Add a chat in Options…</a>');
+  menu.hidden = false;
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('.split')) $('menu').hidden = true; });
 
 $('code').addEventListener('input', (e) => {
   const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -372,23 +418,55 @@ $('pair-form').addEventListener('submit', async (e) => {
 
 // ---- start --------------------------------------------------------------
 
-const captureId = new URLSearchParams(location.search).get('id');
-async function load() {
-  const capture = captureId ? await getCapture(captureId).catch(() => null) : null;
-  if (!capture?.png) { $('missing').hidden = false; $('send').disabled = true; return; }
-  image = await createImageBitmap(capture.png);
-  scale = capture.scale || 1;
+const params = new URLSearchParams(location.search);
+const captureId = params.get('id');
+let source = { url: '', title: '' };
+
+async function load(png, meta, pixelScale) {
+  image = await createImageBitmap(png);
+  scale = pixelScale || 1;
+  items = [];
+  undone = [];
   canvas.width = image.width;
   canvas.height = image.height;
-  $('page-title').textContent = capture.title || 'Screenshot';
-  $('page-url').textContent = capture.url || '';
-  document.title = `Screenshot · ${capture.title || 'html2wp'}`;
+  source = meta;
+  $('page-title').textContent = meta.title || 'Screenshot';
+  $('page-url').textContent = meta.url || '';
+  document.title = `Screenshot · ${meta.title || 'html2wp'}`;
+  $('missing').hidden = true;
   $('frame').hidden = false;
-  selectTool('arrow');
+  $('send').disabled = $('more').disabled = false;
   fit();
   render();
   $('message').focus();
 }
+
+// A pasted image (a ⌘⇧4 screenshot, say) replaces the one being edited.
+document.addEventListener('paste', (e) => {
+  const file = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith('image/'));
+  if (!file) return;
+  e.preventDefault();
+  finishText(false);
+  void load(file, { title: 'Pasted image', url: '' }, devicePixelRatio);
+  showResult('', '');
+});
+
+async function start() {
+  selectTool('arrow');
+  const capture = captureId ? await getCapture(captureId).catch(() => null) : null;
+  const keys = isMac ? '<kbd>⌘V</kbd>' : '<kbd>Ctrl+V</kbd>';
+  if (!capture?.png) {
+    if (captureId) $('missing-title').textContent = 'This screenshot is no longer available';
+    $('missing-text').innerHTML = captureId
+      ? `Capture the area again, or paste an image with ${keys}.`
+      : `Press ${keys} to paste an image${isMac ? ', for example a screenshot taken with <kbd>⌘⇧4</kbd>' : ''}.`;
+    $('missing').hidden = false;
+    $('send').disabled = $('more').disabled = true;
+  } else {
+    await load(capture.png, { title: capture.title, url: capture.url }, capture.scale);
+  }
+  if (params.get('text')) $('message').value = params.get('text');
+  choose(await defaultDestination());
+}
 addEventListener('resize', fit);
-await load();
-await check();
+await start();

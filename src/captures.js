@@ -1,26 +1,30 @@
 // Captures live in the extension's own IndexedDB between the capture, the
-// area selection and the editor tab. They never leave this browser except
-// through the html2wp bridge on 127.0.0.1.
+// preview card and the editor tab. They leave this browser only when the
+// owner sends, copies or saves them. The chosen save folder's handle is kept
+// here too.
 const DB = 'html2wp-captures';
 const STORE = 'captures';
+const HANDLES = 'handles';
 // Captures older than this are removed the next time one is saved.
 const KEEP_MS = 24 * 60 * 60 * 1000;
 
 function open() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    const req = indexedDB.open(DB, 2);
+    req.onupgradeneeded = () => {
+      for (const name of [STORE, HANDLES]) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function run(mode, action) {
+async function run(mode, action, store = STORE) {
   const db = await open();
   try {
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, mode);
-      const req = action(tx.objectStore(STORE));
+      const tx = db.transaction(store, mode);
+      const req = action(tx.objectStore(store));
       tx.oncomplete = () => resolve(req?.result);
       tx.onerror = () => reject(tx.error);
     });
@@ -44,3 +48,6 @@ export const updateCapture = async (id, patch) => {
   if (item) await run('readwrite', (s) => s.put({ ...item, ...patch }, id));
 };
 export const deleteCapture = (id) => run('readwrite', (s) => s.delete(id));
+export const getHandle = (key) => run('readonly', (s) => s.get(key), HANDLES);
+export const putHandle = (key, handle) => run('readwrite', (s) => s.put(handle, key), HANDLES);
+export const deleteHandle = (key) => run('readwrite', (s) => s.delete(key), HANDLES);

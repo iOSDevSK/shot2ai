@@ -14,7 +14,8 @@
   <div class="source"><strong id="page-title">Screenshot</strong><span id="page-url"></span></div>
   <div class="top-actions">
     <button id="copy" class="button" data-icon="copy" title="Copy the annotated image">Copy</button>
-    <button id="download" class="button" data-icon="download" title="Save the annotated image as PNG">Download</button>
+    <button id="save" class="button" data-icon="download" title="Save the annotated image">Save</button>
+    <a class="button icon-only" href="options.html" target="_blank" data-icon="gear" title="Options" aria-label="Options"></a>
   </div>
 </header>
 
@@ -44,15 +45,15 @@
         <div id="text-input" class="text-input" contenteditable="plaintext-only" spellcheck="false" hidden></div>
       </div>
       <div id="missing" class="missing" hidden>
-        <h1>This screenshot is no longer available</h1>
-        <p>Capture the area again from the page you want to report.</p>
+        <h1 id="missing-title">Paste a screenshot to annotate it</h1>
+        <p id="missing-text"></p>
       </div>
     </div>
     <div id="toast" class="toast" role="status" hidden></div>
   </main>
 
   <aside class="send-panel" aria-label="Send to html2wp">
-    <div class="label">Send to</div>
+    <div class="label" id="target-label">Send to</div>
     <div class="target">
       <div class="target-name"><strong id="target-name">html2wp</strong><small id="target-note">Checking the app…</small></div>
       <span id="target-state" class="status">Checking</span>
@@ -70,8 +71,12 @@
     <textarea id="message" rows="7" placeholder="Describe what is wrong or what should change…"></textarea>
 
     <div id="result" class="notice" role="status" hidden></div>
-    <button id="send" class="button primary wide" data-icon="send"><span id="send-label">Send to html2wp</span></button>
-    <p class="privacy">The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).</p>
+    <div class="split">
+      <button id="send" class="button primary" data-icon="send"><span id="send-label">Send to html2wp</span></button>
+      <button id="more" class="button primary more" data-icon="chevron" aria-label="More destinations" aria-haspopup="menu" title="More destinations"></button>
+      <div id="menu" class="menu" role="menu" hidden></div>
+    </div>
+    <p id="privacy" class="privacy">The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).</p>
   </aside>
 </div>
 <script type="module" src="editor.js"></script>

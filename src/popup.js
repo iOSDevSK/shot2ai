@@ -1,5 +1,7 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
+import { isMac } from './settings.js';
+import { acceptPastedImages } from './paste.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -57,6 +59,9 @@ $('capture').addEventListener('click', async () => {
   $('capture-error').textContent = result?.error || 'The page could not be captured.';
   $('capture-error').hidden = false;
 });
+$('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
+$('paste-hint').innerHTML = `Or paste an image with <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> to annotate it`;
+acceptPastedImages(() => { if (!tabParam) window.close(); });
 chrome.commands.getAll().then((commands) => {
   const key = commands.find((c) => c.name === 'capture-area')?.shortcut;
   $('shortcut').innerHTML = key ? `<kbd>${key.replace(/</g, '')}</kbd> captures from any page` : '';

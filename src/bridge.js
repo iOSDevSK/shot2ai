@@ -77,3 +77,31 @@ export async function send(port, projectId, text, pngBase64) {
   if (status === 413) return { tooLarge: true };
   return { offline: true };
 }
+
+export async function blobToBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+
+// The whole html2wp send: find the app, check its chat, send.
+// Returns { ok, project } | { reason } | { unpaired } | { tooLarge } | { offline }.
+export async function sendToApp(text, png) {
+  const found = await connect();
+  if (!found) return { offline: true };
+  const { status } = found;
+  if (!status.paired) return { unpaired: true };
+  if (!status.chat?.available) return { reason: status.chat?.reason || '' };
+  const outcome = await send(found.port, status.project.id, text, await blobToBase64(png));
+  return { ...outcome, project: status.project };
+}
+
+// What to tell the owner. A reason from the app is shown as it is.
+export function outcomeText(outcome) {
+  if (outcome.ok) return `Sent to ${outcome.project?.name || 'html2wp'}`;
+  if (outcome.reason !== undefined) return outcome.reason;
+  if (outcome.unpaired) return 'Pair with html2wp first: enter the code from html2wp Settings in the extension.';
+  if (outcome.tooLarge) return 'The screenshot is larger than 10 MB. Capture a smaller area.';
+  return 'html2wp is not running. Open the app on this Mac, then try again.';
+}

@@ -31,3 +31,4 @@ button:disabled{cursor:default}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 [hidden]{display:none!important}
+a.button{color:inherit;text-decoration:none}
