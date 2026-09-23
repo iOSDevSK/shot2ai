@@ -4,7 +4,7 @@ Last updated: 23 September 2026
 
 This policy is published at https://html2wp.dev/shot2ai/privacy.
 
-Shot2AI is a Chrome extension by BELNEM s.r.o. that captures part of a web page, lets you mark it up and sends it where you choose. This policy explains what it handles and where that goes.
+Shot2AI is a Chrome extension that captures part of a web page, lets you mark it up and sends it where you choose. This policy explains what it handles and where that goes.
 
 ## What Shot2AI captures
 
@@ -55,6 +55,6 @@ The use of information received from Chrome APIs will adhere to the Chrome Web S
 
 ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.
 
-## Who is responsible, and contact
+## Contact
 
-Shot2AI is made and published by BELNEM s.r.o., Beckovska 5, Bratislava, Slovakia (IČO 53713486), which is responsible for this policy. Contact: hello@html2wp.dev
+Filip Dvoran, hello@html2wp.dev

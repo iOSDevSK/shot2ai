@@ -1033,7 +1033,6 @@ test('legal: manifest name and description fit, the disclaimer shows, the versio
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
   await expect(options.locator('#disclaimer')).toHaveText('ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.');
   await expect(options.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
-  await expect(options.locator('#publisher')).toContainText('BELNEM s.r.o.');
   await expect(options.getByRole('link', { name: "What's new" })).toHaveAttribute('href', `https://github.com/iOSDevSK/shot2ai/releases/tag/v${manifest.version}`);
   await expect(options.locator('#privacy-link')).toHaveAttribute('href', 'https://html2wp.dev/shot2ai/privacy');
   await expect(options.locator('.foot').getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', 'https://html2wp.dev/shot2ai/privacy');
@@ -1044,8 +1043,6 @@ test('legal: manifest name and description fit, the disclaimer shows, the versio
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
   await expect(popup.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
-  await expect(popup.locator('.publisher')).toHaveText('Shot2AI by BELNEM s.r.o.');
-  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-publisher.png') });
   await popup.close();
   const editor = await context.newPage();
   await editor.goto(`chrome-extension://${extensionId}/src/editor.html`);
