@@ -2,13 +2,16 @@
 // and the preview card's requests all arrive here. The card's actions run
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
 import { deleteCapture, getCapture } from './captures.js';
-import { startCapture, cropSelection, captureSavedRegion } from './capture.js';
+import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
+import { syncToolbar } from './toolbar-setup.js';
 import { showCard, openEditor, cardSend, cardSendMany, rememberRegion, flagError } from './flow.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 
-chrome.runtime.onInstalled.addListener(rebuildMenu);
-chrome.runtime.onStartup.addListener(rebuildMenu);
+chrome.runtime.onInstalled.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
+chrome.runtime.onStartup.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
+// All-site access taken away in Chrome's settings: the toolbar goes too.
+chrome.permissions.onRemoved.addListener(() => { syncToolbar().catch(() => {}); });
 chrome.storage.onChanged.addListener((changes) => {
   if (['defaultDestination', 'presets', 'customChats', 'prompts'].some((k) => k in changes)) rebuildMenu();
 });
@@ -26,6 +29,15 @@ async function savedRegionCard(tab) {
 
 const handlers = {
   'remember-region': rememberRegion,
+  // The floating toolbar's buttons. It has all-site access, which is what lets it capture.
+  toolbar: async (m, sender) => {
+    const tab = sender.tab;
+    if (!tab) return { failed: true };
+    if (m.action === 'area') await startCapture(tab.id);
+    if (m.action === 'visible') { const { id, capture } = await captureVisible(tab); await showCard(tab.id, id, capture); }
+    if (m.action === 'saved') await savedRegionCard(tab);
+    return { ok: true };
+  },
   'capture-saved': async (m, sender) => { await savedRegionCard(sender.tab); return { ok: true }; },
   capture: (m) => startCapture(m.tabId).then((id) => ({ ok: true, id }), (e) => ({ error: e.message })),
   'card-send': cardSend,

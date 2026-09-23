@@ -67,6 +67,8 @@ test.beforeAll(async () => {
   writeFileSync(join(extension, 'manifest.json'), JSON.stringify(manifest));
   const card = join(extension, 'src', 'card.js');
   writeFileSync(card, readFileSync(card, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
+  const toolbar = join(extension, 'src', 'toolbar.js');
+  writeFileSync(toolbar, readFileSync(toolbar, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
   // Playwright cannot open Chrome's context menu: the copy records the items
   // it creates and exposes the click handler, which the tests call directly.
   const background = join(extension, 'src', 'background.js');
@@ -586,7 +588,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await page.keyboard.press('Escape');
 
   // Every request to the bridge came from the extension, never from a web page.
-  expect(bridge.state.origins.every((o) => o === null || o.startsWith(`chrome-extension://${extensionId}`))).toBe(true);
+  expect(bridge.state.origins.filter((o) => o !== null && !o.startsWith(`chrome-extension://${extensionId}`))).toEqual([]);
 });
 
 test('saved region: remembered per site, captured again from the menu, clamped to the viewport', async () => {
@@ -627,4 +629,83 @@ test('saved region: remembered per site, captured again from the menu, clamped t
   const [cw, ch] = await capturedSize();
   expect(Math.abs(cw - 0.1 * viewport.width * viewport.dpr)).toBeLessThanOrEqual(2);
   expect(Math.abs(ch - 0.2 * viewport.height * viewport.dpr)).toBeLessThanOrEqual(2);
+});
+
+test('floating toolbar: off by default, on with all-site access, draggable, collapsible, hidden per site', async () => {
+  const worker = context.serviceWorkers()[0];
+  const registered = () => worker.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((c) => c.id));
+  const bar = page.locator('#shot2ai-toolbar .bar');
+  await page.reload();
+  await expect(page.locator('#shot2ai-toolbar')).toHaveCount(0);
+  expect(await registered()).toEqual([]);
+
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await expect(options.locator('#toolbar-state')).toHaveText('Off');
+  await options.getByLabel('Show the toolbar on every page').check();
+  await expect(options.locator('#toolbar-state')).toHaveText('On');
+  expect(await registered()).toEqual(['shot2ai-toolbar']);
+  await options.locator('section[aria-labelledby="toolbar-title"]').screenshot({ path: join(shots, 'options-toolbar.png') });
+
+  await page.bringToFront();
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect(bar.locator('.dest')).toHaveText('→ Team chat');
+  const start = await bar.boundingBox();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  expect(start.x).toBeLessThan(40);
+  expect(start.y + start.height).toBeGreaterThan(viewport.height - 40);
+  await page.screenshot({ path: join(shots, 'toolbar-page.png'), clip: { x: 0, y: viewport.height - 90, width: 520, height: 90 } });
+
+  // Visible: the toolbar steps aside while the page is captured, then the card opens.
+  await bar.getByRole('button', { name: 'Visible' }).click();
+  await page.locator('#shot2ai-preview-card .card').waitFor();
+  await expect(bar).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Dragged by its grip; the place is kept for this site.
+  const grip = bar.locator('.grip');
+  const g = await grip.boundingBox();
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + 300, g.y - 200, { steps: 6 });
+  await page.mouse.up();
+  const moved = await bar.boundingBox();
+  expect(Math.round(moved.x - start.x)).toBeGreaterThan(250);
+  await expect.poll(() => worker.evaluate((site) => chrome.storage.local.get('toolbarPos').then((v) => !!v.toolbarPos?.[site]), base)).toBe(true);
+  await page.reload();
+  await expect(bar).toBeVisible();
+  const kept = await bar.boundingBox();
+  expect(Math.abs(kept.x - moved.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(kept.y - moved.y)).toBeLessThanOrEqual(2);
+
+  // Collapsed to a dot, and back.
+  await bar.getByRole('button', { name: 'Collapse the toolbar' }).click();
+  const dot = page.locator('#shot2ai-toolbar .dot');
+  await expect(dot).toBeVisible();
+  await expect(bar).toBeHidden();
+  await page.reload();
+  await expect(dot).toBeVisible();
+  await dot.click();
+  await expect(bar).toBeVisible();
+
+  // Hidden on this site, listed in Options, shown again.
+  await bar.getByRole('button', { name: 'More' }).click();
+  await page.locator('#shot2ai-toolbar').getByRole('menuitem', { name: 'Hide on this site' }).click();
+  await expect(page.locator('#shot2ai-toolbar')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('#shot2ai-toolbar')).toHaveCount(0);
+  await options.reload();
+  await expect(options.locator('#toolbar-hidden .dest')).toContainText(new URL(base).host);
+  await options.getByRole('button', { name: 'Show again' }).click();
+  await page.reload();
+  await expect(bar).toBeVisible();
+
+  // Off: unregistered, and gone from the page.
+  await options.getByLabel('Show the toolbar on every page').uncheck();
+  await expect(options.locator('#toolbar-state')).toHaveText('Off');
+  expect(await registered()).toEqual([]);
+  await page.reload();
+  await expect(page.locator('#shot2ai-toolbar')).toHaveCount(0);
+  await options.close();
 });

@@ -4,6 +4,7 @@ import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
+import { syncToolbar, ALL_SITES } from './toolbar-setup.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -292,9 +293,44 @@ for (const r of document.querySelectorAll('input[name="format"]')) r.addEventLis
 $('quality').addEventListener('input', (e) => { $('quality-value').textContent = `${e.target.value} %`; });
 $('quality').addEventListener('change', async (e) => { await update({ imageQuality: Number(e.target.value) }); await renderFormat(); });
 
+// ---- floating toolbar ---------------------------------------------------
+
+async function renderToolbar() {
+  const s = await settings();
+  const on = await syncToolbar();
+  $('toolbar-on').checked = on;
+  $('toolbar-state').textContent = on ? 'On' : 'Off';
+  $('toolbar-state').className = `status ${on ? 'ok' : ''}`;
+  const hidden = Object.keys(s.toolbarHidden).filter((k) => s.toolbarHidden[k]);
+  $('toolbar-hidden').replaceChildren(...hidden.map((site) => {
+    const show = document.createElement('button');
+    show.className = 'button text';
+    show.textContent = 'Show again';
+    show.addEventListener('click', async () => { const current = (await settings()).toolbarHidden; delete current[site]; await update({ toolbarHidden: current }); await renderToolbar(); });
+    const el = document.createElement('div');
+    el.className = 'dest';
+    el.innerHTML = '<div><strong></strong><br><small>Toolbar hidden on this site</small></div><span class="push"></span>';
+    el.querySelector('strong').textContent = new URL(site).host;
+    el.append(show);
+    return el;
+  }));
+}
+$('toolbar-on').addEventListener('change', async (e) => {
+  const s = await settings();
+  if (e.target.checked) {
+    // Asked on this click; nothing changes if the owner declines.
+    const granted = await chrome.permissions.request(ALL_SITES).catch(() => false);
+    if (granted) await update({ toolbar: { ...s.toolbar, enabled: true } });
+  } else {
+    await update({ toolbar: { ...s.toolbar, enabled: false } });
+    await chrome.permissions.remove(ALL_SITES).catch(() => {});
+  }
+  await renderToolbar();
+});
+
 // ---- paste --------------------------------------------------------------
 
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts(), renderMulti(), renderToolbar()]);

@@ -22,6 +22,10 @@ const DEFAULTS = {
   defaultDestination: 'chatgpt',
   // Web chats whose send button Shot2AI presses after pasting (by id). Off unless turned on.
   autoSubmit: {},
+  // The floating toolbar: off unless switched on in Options.
+  toolbar: { enabled: false, collapsed: false },
+  toolbarHidden: {},
+  toolbarPos: {},
   // Remembered capture regions by site origin, as fractions of the viewport.
   regions: {},
   // Destinations ticked for "Send to all selected".

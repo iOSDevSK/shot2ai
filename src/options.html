@@ -73,6 +73,13 @@
     <div class="row"><label class="row-label" for="quality">Quality</label><input id="quality" type="range" min="50" max="100" step="5"><output id="quality-value" for="quality"></output></div>
   </section>
 
+  <section class="section" aria-labelledby="toolbar-title">
+    <div class="section-head"><div><h2 id="toolbar-title">Floating toolbar</h2><p>A small Shot2AI bar on every page with Area, Visible, Region and your destination. Drag it by its grip, collapse it to a dot, or hide it on a site from its ⋯ menu.</p></div><span id="toolbar-state" class="status"></span></div>
+    <label class="toggle row"><input id="toolbar-on" type="checkbox"><span>Show the toolbar on every page</span></label>
+    <p class="notice warn">To appear on every page, the toolbar needs access to all sites; Chrome asks you when you switch it on. Shot2AI reads nothing on those pages: it only draws the toolbar and captures when you click it. Switching it off gives up the all-site access. It appears on pages you open or reload after switching it on.</p>
+    <div id="toolbar-hidden" class="list"></div>
+  </section>
+
   <section class="section" aria-labelledby="paste-title">
     <div class="section-head"><div><h2 id="paste-title">Paste a screenshot</h2><p>Took a screenshot some other way? Paste it here to annotate and send it.</p></div></div>
     <div id="paste-zone" class="paste-zone" tabindex="0"><span data-icon="capture"></span><span id="paste-keys"></span></div>
