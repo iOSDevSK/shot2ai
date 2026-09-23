@@ -10,13 +10,25 @@ If the chat cannot take a message right now, for example while the assistant is 
 2. Choose **Load unpacked** and select this folder (the one with `manifest.json`).
 3. Pin **Shot2AI** to the toolbar if you like.
 
-## Choose where screenshots go
+## Where screenshots go
 
-Shot2AI sends nowhere until you choose. On first use the popup asks **"Choose where your screenshots go"**: html2wp (the Mac app), ChatGPT, Claude, a custom chat, Save only or Copy only. You can change the choice any time in **Options → Default destination**. Nothing is preselected; html2wp is listed first.
+Out of the box the default destination is **ChatGPT**. The popup shows it, and until chatgpt.com is allowed it offers an **Allow ChatGPT** button. Chrome asks for that one site on the click. Change the default in **Options → Default destination**: ChatGPT (default), Claude, html2wp (Mac app), your own chats, Copy only or Save only. The card's main button reads **Send to <default>** (or **Copy** / **Save**). Other chats you turn on stay in the card's menu.
 
-Until you choose, each capture is copied to the clipboard and saved to `Downloads/shot2ai/`, and the card's main button is **Copy**. Once you choose, the main button reads **Send to <destination>** (or **Save** / **Copy**). Other chats you turn on stay available in the card's menu.
+The html2wp status (running, pairing, open project, chat ready) appears only when html2wp is the default. It also appears when you pick html2wp in the card's menu: the card then says whether the app is running, paired and ready.
 
-The popup shows the chosen destination and its state. For a web chat that is whether Chrome allowed the site. The html2wp status (running, pairing, open project, chat ready) appears only when html2wp is the chosen destination.
+## Right-click menu
+
+Right-click any page, selection, image or link and choose **Shot2AI**:
+
+- **Capture area…** starts the area selection.
+- **Capture visible page** takes the whole visible part of the page straight to the preview card.
+- **Send to ▸** lists your destinations with a mark on the default. Picking one makes it the default for the next capture.
+- **Capture and send to <default>** captures the visible page and sends it at once. The card only shows the result; the first send to a web chat still asks you to confirm once.
+- **Send this image to <default>** (on an image) takes the image itself, or cuts it out of a capture of the page when the site does not allow reading it, and opens the card.
+- **Send selection with a screenshot** (on selected text) captures the visible page and puts the selected text in the message.
+- **Options**.
+
+A click on the menu gives Shot2AI access to that tab for the capture, as the toolbar button does.
 
 ## Pair with html2wp, once (only if you use html2wp)
 
@@ -36,7 +48,7 @@ Each code pairs one extension. After five wrong codes the code stops working; ch
 
 ## Destinations
 
-html2wp is listed first; the default is whatever you choose. In **Options** you can also turn on **ChatGPT** and **Claude**, or add any other web chat by name and address (for example Gemini, or an internal chat). The card's main button uses your chosen default destination; the menu lists html2wp first, then the chats you turned on.
+ChatGPT is the default until you choose another. In **Options** you can also turn on **ChatGPT** and **Claude**, or add any other web chat by name and address (for example Gemini, or an internal chat). The card's main button uses your default destination; its menu lists ChatGPT and Claude when they are on, then html2wp, then your own chats.
 
 Sending to a web chat finds an open tab of that chat, or opens it. The extension then pastes the screenshot and your message into the chat's message box. **It never submits**: you check the message and press Enter in the chat yourself. If pasting does not work on that site, the screenshot and message are already on the clipboard; the card says "Copied. Paste with ⌘V in <chat>".
 
@@ -66,9 +78,10 @@ npm test
 
 The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on 127.0.0.1:47811) and a mock web chat page on another port. They cover:
 
-- first run: the popup's "Choose where your screenshots go" list, no html2wp status, and a capture that is copied and saved, with **Copy** as the main button
-- choosing html2wp, then pairing
-- choosing ChatGPT, then a custom chat, as the default in Options: the popup shows the chat and its site permission, not html2wp's status
+- out of the box: ChatGPT is the default, the popup shows ChatGPT (and **Allow ChatGPT** when the site is not allowed), and there is no html2wp status
+- the right-click menu: its items and contexts, **Capture visible page**, **Send selection with a screenshot**, and **Send to ▸ Claude** changing the default. Playwright cannot open Chrome's context menu, so the test copy records the items the extension creates and calls the click handler directly. It also cannot check that a real menu click grants activeTab.
+- switching the default to html2wp brings up html2wp's status, then pairing
+- choosing ChatGPT, then a custom chat, as the default in Options
 - a one-click send from the preview card: the mock receives the PNG at the right size and the message, and no editor opens
 - the PNG on the clipboard after a capture
 - auto-hide, which waits while the card is hovered and never runs after an error
@@ -80,7 +93,7 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 
 Screenshots go to `screenshots/`.
 
-The test loads a copy of the extension with two changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's shadow root is opened so the test can reach inside it. The shipped files have neither change. Chrome's own "allow this site" prompt, and the folder picker, cannot be driven by Playwright and are not covered.
+The test loads a copy of the extension with three changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's shadow root is opened so the test can reach inside it. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own "allow this site" prompt, and the folder picker, cannot be driven by Playwright and are not covered.
 
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 

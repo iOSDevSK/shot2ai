@@ -62,13 +62,75 @@ async function base64(blob) {
   return btoa(text);
 }
 
-// The quick preview card, in the page the area came from.
-async function showCard(tabId, id, capture) {
+// The whole visible part of the page, as a capture of its own.
+async function captureVisible(tab) {
+  if (!tab.active) {
+    await chrome.tabs.update(tab.id, { active: true });
+    await wait(200);
+  }
+  let shot;
+  try {
+    shot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  } catch {
+    throw new Error('Chrome does not allow capturing this page.');
+  }
+  const [{ result: viewport }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => ({ width: innerWidth, height: innerHeight }) });
+  const png = await (await fetch(shot)).blob();
+  const bitmap = await createImageBitmap(png);
+  const capture = { png, width: bitmap.width, height: bitmap.height, scale: bitmap.width / viewport.width, url: tab.url || '', title: tab.title || '', tabId: tab.id, tabIndex: tab.index };
+  bitmap.close();
+  const id = crypto.randomUUID();
+  await putCapture(id, capture);
+  return { id, capture };
+}
+
+// An image on the page: fetched as it is, or, when the site does not allow
+// that, cut out of a capture of the visible page.
+async function captureImage(src, tab) {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) throw new Error();
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const png = await canvas.convertToBlob({ type: 'image/png' });
+    const capture = { png, width: canvas.width, height: canvas.height, scale: 1, url: tab.url || '', title: tab.title || '', tabId: tab.id, tabIndex: tab.index };
+    const id = crypto.randomUUID();
+    await putCapture(id, capture);
+    return { id, capture };
+  } catch {
+    const [{ result: rect }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (url) => {
+        const img = [...document.images].find((i) => i.currentSrc === url || i.src === url);
+        const r = img?.getBoundingClientRect();
+        return r && r.width > 2 && r.height > 2 ? { x: Math.max(0, r.x), y: Math.max(0, r.y), width: Math.min(r.width, innerWidth - Math.max(0, r.x)), height: Math.min(r.height, innerHeight - Math.max(0, r.y)), viewport: { width: innerWidth } } : null;
+      },
+      args: [src],
+    });
+    const whole = await captureVisible(tab);
+    if (!rect) return whole;
+    const bitmap = await createImageBitmap(whole.capture.png);
+    const k = bitmap.width / rect.viewport.width;
+    const [x, y, w, h] = [rect.x, rect.y, rect.width, rect.height].map((v) => Math.round(v * k));
+    const canvas = new OffscreenCanvas(w, h);
+    canvas.getContext('2d').drawImage(bitmap, x, y, w, h, 0, 0, w, h);
+    bitmap.close();
+    const png = await canvas.convertToBlob({ type: 'image/png' });
+    const capture = { ...whole.capture, png, width: w, height: h };
+    await updateCapture(whole.id, { png, width: w, height: h });
+    return { id: whole.id, capture };
+  }
+}
+
+// The quick preview card, in the page the area came from. `text` fills the
+// message; `autoSend` sends at once, and the card only shows the result.
+async function showCard(tabId, id, capture, { text = '', autoSend = false } = {}) {
   const s = await settings();
   const chosen = await defaultDestination();
-  // Until a destination is chosen, every capture is copied and saved.
   let saved = null;
-  if (s.saveCopy || !chosen) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
+  if (s.saveCopy) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
   const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null });
   const list = (await destinations()).map(brief);
   const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
@@ -77,7 +139,7 @@ async function showCard(tabId, id, capture) {
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, text, autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -111,6 +173,62 @@ async function flagError() {
   await chrome.action.setBadgeText({ text: '!' });
   setTimeout(() => chrome.action.setBadgeText({ text: '' }), 4000);
 }
+
+// ---- right-click menu ---------------------------------------------------
+
+const CONTEXTS = ['page', 'selection', 'image', 'link'];
+async function menuItems() {
+  const [list, chosen] = await Promise.all([destinations(), defaultDestination()]);
+  const to = { copy: ['Capture and copy', 'Copy this image'], save: ['Capture and save', 'Save this image'] }[chosen.kind]
+    || [`Capture and send to ${chosen.name}`, `Send this image to ${chosen.name}`];
+  const item = (id, title, extra = {}) => ({ id, parentId: 'shot2ai', contexts: CONTEXTS, ...(title ? { title } : {}), ...extra });
+  return [
+    { id: 'shot2ai', title: 'Shot2AI', contexts: CONTEXTS },
+    item('capture-area', 'Capture area…'),
+    item('capture-visible', 'Capture visible page'),
+    item('sep-1', '', { type: 'separator' }),
+    item('send-to', 'Send to'),
+    ...list.map((d) => ({ id: `dest:${d.id}`, parentId: 'send-to', title: d.name, type: 'radio', checked: d.id === chosen.id, contexts: CONTEXTS })),
+    item('capture-send', to[0]),
+    item('send-image', to[1], { contexts: ['image'] }),
+    item('send-selection', 'Send selection with a screenshot', { contexts: ['selection'] }),
+    item('sep-2', '', { type: 'separator' }),
+    item('options', 'Options'),
+  ];
+}
+// One rebuild at a time, so ids never clash.
+let building = Promise.resolve();
+function rebuildMenu() {
+  building = building.then(async () => {
+    await chrome.contextMenus.removeAll();
+    for (const entry of await menuItems()) chrome.contextMenus.create(entry, () => void chrome.runtime.lastError);
+  }).catch(() => {});
+  return building;
+}
+chrome.runtime.onInstalled.addListener(rebuildMenu);
+chrome.runtime.onStartup.addListener(rebuildMenu);
+chrome.storage.onChanged.addListener((changes) => {
+  if (['defaultDestination', 'presets', 'customChats'].some((k) => k in changes)) rebuildMenu();
+});
+
+// A click on the menu grants activeTab for that tab, as the toolbar button does.
+async function onMenuClick(info, tab) {
+  const id = String(info.menuItemId);
+  if (id === 'options') { await chrome.runtime.openOptionsPage(); return; }
+  if (id.startsWith('dest:')) { await update({ defaultDestination: id.slice(5) }); return; }
+  if (!tab?.id) return;
+  if (id === 'capture-area') { await startCapture(tab.id); return; }
+  if (id === 'send-image' && info.srcUrl) {
+    const { id: captureId, capture } = await captureImage(info.srcUrl, tab);
+    await showCard(tab.id, captureId, capture);
+    return;
+  }
+  const { id: captureId, capture } = await captureVisible(tab);
+  if (id === 'capture-visible') await showCard(tab.id, captureId, capture);
+  if (id === 'capture-send') await showCard(tab.id, captureId, capture, { autoSend: true });
+  if (id === 'send-selection') await showCard(tab.id, captureId, capture, { text: (info.selectionText || '').trim().slice(0, 2000) });
+}
+chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab).catch(flagError); });
 
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === 'capture-area') startCapture(tab?.id).catch(flagError);

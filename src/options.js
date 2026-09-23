@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices } from './settings.js';
+import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT } from './settings.js';
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
@@ -52,17 +52,21 @@ const describe = (d) => d.kind === 'html2wp' ? 'The html2wp app on this Mac' : d
 async function renderDefault() {
   const s = await settings();
   const list = await choices();
-  const chosen = list.find((d) => d.id === s.defaultDestination);
-  $('default-state').textContent = chosen ? chosen.name : 'Not chosen';
-  $('default-state').className = `status ${chosen ? 'ok' : 'warn'}`;
+  const chosen = list.find((d) => d.id === s.defaultDestination) || list.find((d) => d.id === FIRST_DEFAULT);
+  const granted = chosen.kind !== 'chat' || await chrome.permissions.contains({ origins: [sitePattern(chosen.url)] });
+  $('default-state').textContent = granted ? chosen.name : `${chosen.name} · needs permission`;
+  $('default-state').className = `status ${granted ? 'ok' : 'warn'}`;
+  $('allow-default').hidden = granted;
+  $('allow-default').textContent = `Allow ${chosen.name}`;
+  $('allow-default').onclick = async () => { await allow(chosen.url); await renderDefault(); };
   $('default-list').replaceChildren(...list.map((d) => {
     const row = document.createElement('label');
-    row.className = `pick${d.id === suggested && !chosen ? ' suggested' : ''}`;
+    row.className = `pick${d.id === suggested ? ' suggested' : ''}`;
     row.innerHTML = '<input type="radio" name="default"><div><strong></strong><br><small></small></div>';
     const radio = row.querySelector('input');
     radio.value = d.id;
-    radio.checked = d.id === s.defaultDestination;
-    row.querySelector('strong').textContent = d.kind === 'html2wp' ? 'html2wp (Mac app)' : d.name;
+    radio.checked = d.id === chosen.id;
+    row.querySelector('strong').textContent = d.kind === 'html2wp' ? 'html2wp (Mac app)' : d.id === FIRST_DEFAULT ? `${d.name} (default)` : d.name;
     row.querySelector('small').textContent = describe(d);
     radio.addEventListener('change', async () => {
       fail('');
@@ -126,7 +130,7 @@ async function renderDestinations() {
     remove.textContent = 'Remove';
     remove.addEventListener('click', async () => {
       const current = await settings();
-      await update({ customChats: current.customChats.filter((x) => x.id !== c.id), ...(current.defaultDestination === c.id ? { defaultDestination: null } : {}) });
+      await update({ customChats: current.customChats.filter((x) => x.id !== c.id), ...(current.defaultDestination === c.id ? { defaultDestination: FIRST_DEFAULT } : {}) });
       await Promise.all([renderDefault(), renderDestinations()]);
     });
     return row(c.name, c.url, remove);

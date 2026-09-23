@@ -13,19 +13,6 @@
     <div class="head-right"><span id="state" class="status" hidden></span><button id="options" class="icon-button" data-icon="gear" aria-label="Options" title="Options"></button></div>
   </header>
 
-  <section id="onboarding" class="panel" hidden>
-    <h1>Choose where your screenshots go</h1>
-    <p>Until you choose, each capture is copied to the clipboard and saved to <b>Downloads/shot2ai</b>.</p>
-    <div class="choices" role="list">
-      <button class="choice" data-choose="html2wp" role="listitem"><strong>html2wp</strong><small>The Mac app’s chat</small></button>
-      <button class="choice" data-choose="chatgpt" role="listitem"><strong>ChatGPT</strong><small>chatgpt.com</small></button>
-      <button class="choice" data-choose="claude" role="listitem"><strong>Claude</strong><small>claude.ai</small></button>
-      <button class="choice" data-choose="custom" role="listitem"><strong>Custom chat</strong><small>Any web chat</small></button>
-      <button class="choice" data-choose="save" role="listitem"><strong>Save only</strong><small>A file on this computer</small></button>
-      <button class="choice" data-choose="copy" role="listitem"><strong>Copy only</strong><small>Paste it anywhere</small></button>
-    </div>
-  </section>
-
   <section id="checking" class="panel center" hidden><span class="spinner spin" data-icon="spinner"></span><p>Looking for html2wp on this Mac…</p></section>
 
   <section id="offline" class="panel" hidden>
@@ -54,13 +41,14 @@
     <div class="label">Screenshots go to</div>
     <div class="project"><div class="dest-name"><strong id="dest-name"></strong><small id="dest-host"></small></div><span id="dest-state" class="status"></span></div>
     <p id="dest-note" class="notice warn" hidden></p>
+    <button id="allow" class="button wide allow" hidden></button>
   </section>
 
   <footer class="popup-foot">
     <button id="capture" class="button primary wide" data-icon="capture">Capture area</button>
     <p id="capture-error" class="notice err" role="alert" hidden></p>
     <div class="hint"><span id="shortcut"></span><span id="paste-hint"></span></div>
-    <div class="links"><button id="change" class="link" type="button">Change destination</button><a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp.dev</a></div>
+    <div class="links"><button id="change" class="link" type="button">Change default destination</button><a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp.dev</a></div>
   </footer>
 </main>
 <script type="module" src="popup.js"></script>

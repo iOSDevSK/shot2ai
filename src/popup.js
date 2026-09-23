@@ -1,11 +1,11 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { isMac, settings, update, defaultDestination, sitePattern, cleanSubfolder } from './settings.js';
+import { isMac, settings, defaultDestination, sitePattern, cleanSubfolder } from './settings.js';
 import { acceptPastedImages } from './paste.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
-const panels = ['onboarding', 'checking', 'offline', 'pairing', 'ready', 'other'];
+const panels = ['checking', 'offline', 'pairing', 'ready', 'other'];
 const show = (name) => panels.forEach((p) => { $(p).hidden = p !== name; });
 const setState = (text, tone = '') => { $('state').textContent = text; $('state').className = `status ${tone}`; $('state').hidden = !text; };
 // The page to capture: the active tab, or ?tabId= when this page runs in a tab of its own.
@@ -31,9 +31,12 @@ async function html2wpStatus() {
   $('chat-reason').textContent = status.chat?.reason || '';
 }
 
-function other(name, host, state, tone, note = '') {
+function other(name, host, state, tone, note = '', allow = null) {
   show('other');
   setState('');
+  $('allow').hidden = !allow;
+  $('allow').textContent = allow?.label || '';
+  $('allow').onclick = allow?.run || null;
   $('dest-name').textContent = name;
   $('dest-host').textContent = host;
   $('dest-state').textContent = state;
@@ -44,14 +47,15 @@ function other(name, host, state, tone, note = '') {
 
 async function refresh() {
   const destination = await defaultDestination();
-  $('change').hidden = !destination;
-  if (!destination) { show('onboarding'); setState('Not set up'); return; }
   if (destination.kind === 'html2wp') { await html2wpStatus(); return; }
   if (destination.kind === 'chat') {
     const host = new URL(destination.url).host;
-    const granted = await chrome.permissions.contains({ origins: [sitePattern(destination.url)] });
+    const origins = [sitePattern(destination.url)];
+    const granted = await chrome.permissions.contains({ origins });
+    // Asked on this click: Chrome shows its prompt for this one site.
+    const allow = { label: `Allow ${destination.name}`, run: async () => { await chrome.permissions.request({ origins }).catch(() => false); await refresh(); } };
     other(destination.name, host, granted ? 'Site permission granted' : 'Needs permission', granted ? 'ok' : 'warn',
-      granted ? '' : `Allow Shot2AI to use ${host} in Options before sending there.`);
+      granted ? '' : `Shot2AI needs your permission to paste screenshots into ${host}.`, granted ? null : allow);
     return;
   }
   const s = await settings();
@@ -59,16 +63,6 @@ async function refresh() {
   else other('Copy only', 'The clipboard', 'Ready', 'ok');
 }
 
-// First run: html2wp, Save only and Copy only are set here; a chat needs its
-// site's permission, which Options asks for.
-for (const b of document.querySelectorAll('[data-choose]')) {
-  b.addEventListener('click', async () => {
-    const id = b.dataset.choose;
-    if (['html2wp', 'save', 'copy'].includes(id)) { await update({ defaultDestination: id }); await refresh(); return; }
-    await openOptions(`#default=${id}`);
-    if (!tabParam) window.close();
-  });
-}
 $('change').addEventListener('click', () => openOptions('#default'));
 $('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('recheck').addEventListener('click', refresh);

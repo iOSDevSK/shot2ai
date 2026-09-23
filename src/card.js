@@ -224,10 +224,13 @@
     $('.copy').addEventListener('click', async () => chip((await copy(false)) ? 'Copied' : ''));
     $('.save').addEventListener('click', () => void save());
 
+    if (o.text) input.value = o.text;
     document.documentElement.appendChild(host);
     // Every capture is on the clipboard too, ready for ⌘V / Ctrl+V anywhere.
     copy(false).then((ok) => chip(ok ? 'Copied' : ''));
     input.focus({ preventScroll: true });
+    // "Capture and send": no click needed; the card shows how it went.
+    if (o.autoSend) void sendTo(main);
     return true;
   };
 })();
