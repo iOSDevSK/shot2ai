@@ -173,7 +173,7 @@ The popup footer, the editor's header, the right-click menu and **Options** show
 
 ## Legal
 
-- `LICENSE`: proprietary, all rights reserved.
+- `LICENSE`: proprietary, all rights reserved, © 2026 BELNEM s.r.o. Shot2AI is a product of BELNEM s.r.o., Beckovska 5, Bratislava, Slovakia (IČO 53713486).
 - `THIRD-PARTY-NOTICES.md`: better-shot (BSD 3-Clause), the only third-party code.
 - `PRIVACY.md`: the privacy policy, published at https://html2wp.dev/shot2ai/privacy (the page is `site/shot2ai/privacy/index.html`). Options → Privacy summarises it, links to it, and has **Clear all captures and settings**. Contact: hello@html2wp.dev.
 - `STORE-LISTING.md`: the Chrome Web Store listing, the single-purpose statement and the permission justifications.
