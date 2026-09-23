@@ -1,5 +1,6 @@
 // The preview card and what its buttons do.
-import { getCapture } from './captures.js';
+import { getCapture, updateCapture, deleteCapture } from './captures.js';
+import { addToStack, stackFor, unhideStack, STACK_CAP } from './stack.js';
 import { sendToApp, outcomeText } from './bridge.js';
 import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatResultText } from './settings.js';
 import { saveImage, savedText } from './save.js';
@@ -17,28 +18,108 @@ async function base64(blob) {
   return btoa(text);
 }
 
-// The quick preview card, in the page the area came from. `text` fills the
-// message; `autoSend` sends at once, and the card only shows the result.
+// A small JPEG of a capture for the card's thumbnail (the card is 280 px wide).
+async function thumbnail(png) {
+  const bitmap = await createImageBitmap(png);
+  const room = Math.min(560 / bitmap.width, 264 / bitmap.height, 1);
+  const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * room)), Math.max(1, Math.round(bitmap.height * room)));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+}
+const formatSignature = (s) => `${s.imageFormat}:${s.imageQuality}`;
+const siteOf = (url) => { try { return new URL(url).origin; } catch { return null; } };
+
+// A new capture joins the tab's stack and comes to the front of the card.
+// `text` fills its message; `autoSend` sends it at once, and the card only
+// shows the result.
 export async function showCard(tabId, id, capture, { text = '', autoSend = false, note = '' } = {}) {
   const s = await settings();
-  const chosen = await defaultDestination();
   let saved = null;
   if (s.saveCopy) saved = await saveImage(capture.png, capture.url).then(savedText, () => 'The copy could not be saved.');
+  const dropped = await addToStack(tabId, id, {
+    thumb: await thumbnail(capture.png),
+    // What a send to a web chat or a save will weigh, in the chosen format.
+    meta: describe(await encode(capture.png, s), s),
+    metaFormat: formatSignature(s),
+    saved, note: note || null, message: text || await defaultPromptText(),
+    result: null, sent: false, selected: false,
+  });
+  await showStack(tabId, { currentId: id, fresh: await base64(capture.png), autoSend, dropped });
+}
+
+// The tab's stack in the card: after a capture, after navigation, or from the popup.
+export async function showStack(tabId, { currentId = null, fresh = null, autoSend = false, dropped = 0 } = {}) {
+  unhideStack(tabId);
+  const s = await settings();
+  let list = await stackFor(tabId);
+  // A restore leaves out what was already sent.
+  if (!fresh) {
+    for (const c of list.filter((x) => x.sent)) await deleteCapture(c.id);
+    list = list.filter((x) => !x.sent);
+  }
+  if (!list.length) return false;
+  const entries = [];
+  for (const c of list) {
+    // The format changed since this capture was taken: say what it weighs now.
+    if (c.metaFormat !== formatSignature(s)) {
+      c.meta = describe(await encode(c.png, s), s);
+      await updateCapture(c.id, { meta: c.meta, metaFormat: formatSignature(s) });
+    }
+    const site = siteOf(c.url);
+    entries.push({
+      id: c.id, thumb: await base64(c.thumb), meta: c.meta, note: c.note, message: c.message || '', result: c.result || null,
+      sent: !!c.sent, selected: !!c.selected, saved: c.saved || null,
+      region: { canRemember: !!(c.region && site), hasSaved: !!(site && s.regions[site]) },
+    });
+  }
+  const chosen = await defaultDestination();
   const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null, auto: !!s.autoSubmit[d.id] });
-  const list = (await destinations()).map(brief);
-  const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
-  // What a send to a web chat or a save will weigh, in the chosen format.
-  const meta = describe(await encode(capture.png, s), s);
+  const destinationsNow = (await destinations()).map(brief);
   const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry', 'region'];
-  let site = null;
-  try { site = new URL(capture.url).origin; } catch { /* a pasted image */ }
-  const region = { canRemember: !!(capture.region && site), hasSaved: !!(site && s.regions[site]) };
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
-    func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, region, note, multi: s.multiSend.filter((d) => list.some((x) => x.id === d)), main, meta, text: text || await defaultPromptText(), prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })), autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    func: (o) => window.__shot2aiStack(o),
+    args: [{
+      entries, currentId: currentId || entries.at(-1).id, fresh, autoSend, dropped, cap: STACK_CAP,
+      destinations: destinationsNow, multi: s.multiSend.filter((d) => destinationsNow.some((x) => x.id === d)),
+      main: { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) },
+      prompts: (await prompts()).map(({ name, text: t }) => ({ name, text: t })),
+      acknowledged: s.acknowledged, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])),
+    }],
   });
+  return true;
+}
+
+// Several captures of the stack to the default destination at once. A web
+// chat gets them in one message; html2wp as many as it takes per message.
+export async function sendCaptures(message) {
+  const s = await settings();
+  const destination = await defaultDestination();
+  const captures = [];
+  for (const id of message.ids) { const c = await getCapture(id); if (c?.png) captures.push({ ...c, id }); }
+  if (!captures.length) return { ok: false, text: 'These screenshots are no longer available.' };
+  if (destination.kind === 'save') {
+    for (const c of captures) await saveImage(c.png, c.url).catch(() => {});
+    return { ok: true, sentIds: captures.map((c) => c.id), text: `Saved ${captures.length} screenshots` };
+  }
+  if (destination.kind === 'html2wp') {
+    const outcome = await sendToApp(message.text, captures.map((c) => c.png));
+    return { ...outcome, ok: !!outcome.ok, sentIds: outcome.ok ? captures.slice(0, outcome.count).map((c) => c.id) : [], text: outcomeText(outcome) };
+  }
+  if (destination.kind !== 'chat') return { ok: false, text: 'Choose a destination in Options to send several screenshots.' };
+  if (message.acknowledge) await update({ acknowledged: { ...s.acknowledged, [message.acknowledge]: true } });
+  const blobs = [];
+  for (const c of captures) blobs.push(await encode(c.png, s));
+  const names = captures.map((c, i) => fileName(s.filenamePattern, c.url, new Date(Date.now() + i * 1000), EXTENSIONS[blobs[i].type]));
+  const r = await pasteIntoChat(destination, blobs, message.text, names);
+  if (!r.ok) return { ok: false, sentIds: [], text: r.needsPermission ? `Allow the extension to use ${new URL(destination.url).host} in Options first.` : `The screenshots could not be pasted into ${destination.name}.` };
+  const text = r.submitted ? `Sent ${captures.length} screenshots to ${destination.name}.` : `Pasted ${captures.length} screenshots into ${destination.name}. ${r.autoSubmit ? 'Its send button was not found; press Enter there.' : 'Press Enter there to send.'}`;
+  return { ok: true, sentIds: captures.map((c) => c.id), text };
 }
 
 export async function openEditor(id, near, text = '') {

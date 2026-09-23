@@ -1,5 +1,5 @@
 // A stand-in for the html2wp app's bridge, speaking the same contract:
-//   GET  /status   POST /pair {code}   POST /message {token, projectId, text, imagePng}
+//   GET  /status   POST /pair {code}   POST /message {token, projectId, text, imagePng | imagesPng[]}
 import http from 'node:http';
 
 export const CODE = '482913';
@@ -28,7 +28,8 @@ export function startMockBridge(port = 0) {
       const bearer = (req.headers.authorization || '').replace(/^Bearer /, '');
       if (req.method === 'GET' && req.url === '/status') {
         const paired = bearer === TOKEN;
-        return reply(200, { app: 'html2wp', version: 'mock', paired, project: paired ? PROJECT : null, chat: paired ? state.chat : null });
+        // Like an app that takes up to 4 screenshots per message.
+        return reply(200, { app: 'html2wp', version: 'mock', paired, project: paired ? PROJECT : null, chat: paired ? state.chat : null, maxImages: 4 });
       }
       if (req.method === 'POST' && req.url === '/pair') {
         return body.code === CODE ? reply(200, { token: TOKEN }) : reply(403, { error: 'wrong code' });
@@ -37,7 +38,8 @@ export function startMockBridge(port = 0) {
         if ((body.token || bearer) !== TOKEN) return reply(401, { error: 'not paired' });
         if (!state.chat.available) return reply(409, { reason: state.chat.reason });
         if (state.refuseMessage) return reply(409, { reason: state.refuseMessage });
-        state.messages.push({ projectId: body.projectId, text: body.text, png: Buffer.from(body.imagePng || '', 'base64') });
+        const pngs = (body.imagesPng || [body.imagePng || '']).map((b) => Buffer.from(b, 'base64'));
+        state.messages.push({ projectId: body.projectId, text: body.text, png: pngs[0], pngs });
         return reply(200, { ok: true });
       }
       reply(404, {});

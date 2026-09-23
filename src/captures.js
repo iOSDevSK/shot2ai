@@ -51,3 +51,8 @@ export const deleteCapture = (id) => run('readwrite', (s) => s.delete(id));
 export const getHandle = (key) => run('readonly', (s) => s.get(key), HANDLES);
 export const putHandle = (key, handle) => run('readwrite', (s) => s.put(handle, key), HANDLES);
 export const deleteHandle = (key) => run('readwrite', (s) => s.delete(key), HANDLES);
+// Every capture, with its id.
+export async function allCaptures() {
+  const [keys, values] = await Promise.all([run('readonly', (s) => s.getAllKeys()), run('readonly', (s) => s.getAll())]);
+  return keys.map((id, index) => ({ ...values[index], id }));
+}

@@ -56,16 +56,18 @@ export async function forget() {
   await chrome.storage.local.remove('token');
 }
 
-// Send the annotated screenshot and the message into the open project's chat.
+// Send the annotated screenshot (or several: an array, when the app takes
+// several per message) and the message into the open project's chat.
 // Returns { ok } | { reason } (the app's own words) | { unpaired } | { tooLarge } | { offline }.
 export async function send(port, projectId, text, pngBase64) {
+  const images = Array.isArray(pngBase64) ? pngBase64 : [pngBase64];
   const { token } = await saved();
   let result;
   try {
     // Starting the assistant's turn can take a while; allow for it.
     result = await request(port, '/message', {
       method: 'POST', token, timeout: 120000,
-      body: { token, projectId, text, imagePng: pngBase64 },
+      body: images.length > 1 ? { token, projectId, text, imagesPng: images } : { token, projectId, text, imagePng: images[0] },
     });
   } catch {
     return { offline: true };
@@ -85,20 +87,27 @@ export async function blobToBase64(blob) {
   return btoa(text);
 }
 
-// The whole html2wp send: find the app, check its chat, send.
-// Returns { ok, project } | { reason } | { unpaired } | { tooLarge } | { offline }.
+// The whole html2wp send: find the app, check its chat, send. With several
+// screenshots, as many go in one message as the app takes (it says how many
+// in its status; an app that does not say takes one); the rest wait.
+// Returns { ok, project, count, total } | { reason } | { unpaired } | { tooLarge } | { offline }.
 export async function sendToApp(text, png) {
   const found = await connect();
   if (!found) return { offline: true };
   const { status } = found;
   if (!status.paired) return { unpaired: true };
   if (!status.chat?.available) return { reason: status.chat?.reason || '' };
-  const outcome = await send(found.port, status.project.id, text, await blobToBase64(png));
-  return { ...outcome, project: status.project };
+  const all = Array.isArray(png) ? png : [png];
+  const batch = all.slice(0, Math.max(1, Number(status.maxImages) || 1));
+  const encoded = await Promise.all(batch.map(blobToBase64));
+  const outcome = await send(found.port, status.project.id, text, encoded.length > 1 ? encoded : encoded[0]);
+  return { ...outcome, project: status.project, count: batch.length, total: all.length, perMessage: Math.max(1, Number(status.maxImages) || 1) };
 }
 
 // What to tell the owner. A reason from the app is shown as it is.
 export function outcomeText(outcome) {
+  if (outcome.ok && outcome.total > 1 && outcome.count < outcome.total) return `Sent ${outcome.count} of ${outcome.total} to ${outcome.project?.name || 'html2wp'}. html2wp takes ${outcome.perMessage} per message; send the rest when the assistant finishes.`;
+  if (outcome.ok && outcome.total > 1) return `Sent ${outcome.total} screenshots to ${outcome.project?.name || 'html2wp'}`;
   if (outcome.ok) return `Sent to ${outcome.project?.name || 'html2wp'}`;
   if (outcome.reason !== undefined) return outcome.reason;
   if (outcome.unpaired) return 'Pair with html2wp first: enter the code from html2wp Settings in the extension.';

@@ -20,7 +20,7 @@ function loaded(tabId, timeout = 20000) {
 // file and puts the message in. With auto-submit on, it then presses the
 // chat's send button: the preset's, or the nearest enabled button that is a
 // submit button or is labelled Send. Returns { ok, submitted }.
-async function pasteInPage(base64, type, text, name, selectors, submit) {
+async function pasteInPage(files, text, selectors, submit) {
   const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 20 && r.height > 10 && getComputedStyle(el).visibility !== 'hidden'; };
   const find = () => {
     for (const s of selectors) { const el = [...document.querySelectorAll(s)].find(visible); if (el) return el; }
@@ -30,11 +30,10 @@ async function pasteInPage(base64, type, text, name, selectors, submit) {
   let composer = null;
   for (let i = 0; i < 40 && !composer; i++) { composer = find(); if (!composer) await new Promise((r) => setTimeout(r, 250)); }
   if (!composer) return { ok: false };
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const file = new File([bytes], name, { type });
   composer.focus();
+  // All the screenshots in one paste, so they land in one message.
   const data = new DataTransfer();
-  data.items.add(file);
+  for (const f of files) data.items.add(new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
   if (text) data.setData('text/plain', text);
   composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   // A synthetic paste inserts nothing by itself: the chat takes the file,
@@ -76,8 +75,11 @@ async function pasteInPage(base64, type, text, name, selectors, submit) {
   return { ok: true, submitted: true };
 }
 
+// One screenshot or several (`blob` and `name` may be arrays).
 // Returns { ok, submitted, autoSubmit } | { needsPermission } | { failed }.
 export async function pasteIntoChat(destination, blob, text, name) {
+  const blobs = Array.isArray(blob) ? blob : [blob];
+  const names = Array.isArray(name) ? name : [name];
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { needsPermission: true };
   // A tab already on the chat's address, else any tab of the same site.
   const tabs = (await chrome.tabs.query({})).filter((t) => t.url);
@@ -89,14 +91,18 @@ export async function pasteIntoChat(destination, blob, text, name) {
   await chrome.tabs.update(tab.id, { active: true });
   await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
   await wait(150);
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const files = [];
+  for (const [index, b] of blobs.entries()) {
+    const bytes = new Uint8Array(await b.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    files.push({ base64: btoa(binary), type: b.type || 'image/png', name: names[index] || names[0] });
+  }
   try {
     // Never for html2wp: only web chats reach this function.
     const autoSubmit = !!(await settings()).autoSubmit?.[destination.id];
     const submit = { on: autoSubmit, selectors: destination.sendSelectors || [] };
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pasteInPage, args: [btoa(binary), blob.type || 'image/png', text, name, destination.selectors || [], submit] });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pasteInPage, args: [files, text, destination.selectors || [], submit] });
     return result?.ok ? { ok: true, submitted: !!result.submitted, autoSubmit } : { failed: true };
   } catch {
     return { failed: true };

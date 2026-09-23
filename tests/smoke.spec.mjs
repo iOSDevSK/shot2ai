@@ -16,6 +16,8 @@ const shots = join(root, 'screenshots');
 const BUSY = 'The assistant is working on Studio site. Send the screenshot when it finishes.';
 const SETUP = 'Wait for environment setup to finish before starting a conversation';
 
+const DARK = `<!doctype html><html><head><title>Dark page</title></head><body style="margin:0;background:#15171a;color:#e8e8e8;font:18px sans-serif;padding:60px">
+<h1>Night mode dashboard</h1><p>Charts and numbers on a dark background.</p><div style="height:220px;border-radius:12px;background:#23272e"></div></body></html>`;
 const PAGE = `<!doctype html><html><head><title>Northwind Studio</title><style>
 body{margin:0;font:16px/1.5 Georgia,serif;background:#f6f1ea;color:#2b2320}
 header{display:flex;justify-content:space-between;align-items:center;padding:22px 48px;background:#fff;border-bottom:1px solid #e6ddd2}
@@ -63,7 +65,7 @@ test.beforeAll(async () => {
   bridge = await startMockBridge();
   site = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(req.url === '/long' ? LONG(6000) : req.url === '/tall' ? LONG(9000) : req.url === '/feed' ? FEED : PAGE);
+    res.end(req.url === '/long' ? LONG(6000) : req.url === '/tall' ? LONG(9000) : req.url === '/feed' ? FEED : req.url === '/dark' ? DARK : PAGE);
   });
   await new Promise((r) => site.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${site.address().port}`;
@@ -102,7 +104,7 @@ const __removeAll = chrome.contextMenus.removeAll.bind(chrome.contextMenus);
 chrome.contextMenus.create = (item, done) => { self.__menu.set(item.id, item); return __create(item, done); };
 chrome.contextMenus.removeAll = (...a) => { self.__menu.clear(); return __removeAll(...a); };
 ${readFileSync(background, 'utf8')}
-self.__shot2ai = { onMenuClick };
+self.__shot2ai = { onMenuClick, clearStack };
 `);
   context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'h2wp-ext-')), {
     channel: 'chromium',
@@ -135,10 +137,19 @@ async function menuShot(card, name) {
   await page.screenshot({ path: join(shots, name), clip: { x: box.x - 8, y: top, width: box.width + 16, height: box.y + box.height + 8 - top } });
 }
 
+// Every test starts with an empty capture stack in the test tab.
+test.beforeEach(async () => {
+  const worker = context.serviceWorkers()[0];
+  await worker.evaluate((id) => self.__shot2ai.clearStack(id), tabId);
+  await page.evaluate(() => document.getElementById('shot2ai-preview-card')?.remove()).catch(() => {});
+});
+
 const editors = () => context.pages().filter((p) => p.url().includes('/src/editor.html'));
 
 // Capture with the popup's Capture area button, then drag an area on the page.
 async function capture(from = [440, 150], to = [760, 350]) {
+  // The card may already show earlier captures: wait for the new one in front.
+  const previous = await page.locator('#shot2ai-preview-card .card').getAttribute('data-id', { timeout: 500 }).catch(() => null);
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
   await popup.getByRole('button', { name: 'Capture area' }).click();
@@ -153,6 +164,7 @@ async function capture(from = [440, 150], to = [760, 350]) {
   await page.mouse.up();
   const card = page.locator('#shot2ai-preview-card .card');
   await card.waitFor();
+  await expect(card).not.toHaveAttribute('data-id', previous || '-');
   return card;
 }
 
@@ -476,7 +488,113 @@ test('prompts: managed in Options, the default fills the card, the picker fills 
   await worker.evaluate(() => chrome.storage.local.set({ defaultPrompt: null }));
 });
 
+test('capture stack: a deck with its counter, per-card messages, close one, Send all, and it survives navigation', async () => {
+  test.setTimeout(180000);
+  const worker = context.serviceWorkers()[0];
+  const card = page.locator('#shot2ai-preview-card .card');
+  const count = card.locator('.count');
+  const message = card.getByLabel('Message');
+  const deckShot = async (name) => {
+    const vp = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: join(shots, name), clip: { x: vp.width - 340, y: vp.height - 560, width: 340, height: 560 } });
+  };
+  const dpr = await page.evaluate(() => devicePixelRatio);
+
+  // Three captures, each with its own message.
+  const areas = [[[300, 120], [620, 320]], [[320, 140], [560, 300]], [[340, 160], [700, 420]]];
+  for (const [index, [from, to]] of areas.entries()) {
+    await capture(from, to);
+    await message.fill(`message ${index + 1}`);
+    await page.waitForTimeout(450);
+  }
+  await expect(count).toHaveText('3 / 3');
+  await expect(page.locator('#shot2ai-preview-card .peek')).toHaveCount(2);
+  await deckShot('stack-3.png');
+  await card.getByRole('button', { name: 'Previous capture' }).click();
+  await expect(count).toHaveText('2 / 3');
+  await expect(message).toHaveValue('message 2');
+  // → flips when the card (not the message field) has focus.
+  await card.locator('.shot').click({ position: { x: 130, y: 70 } });
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toHaveText('3 / 3');
+  await expect(message).toHaveValue('message 3');
+  // A peeking card comes to the front when clicked.
+  await page.locator('#shot2ai-preview-card .peek').last().click({ position: { x: 140, y: 4 } });
+  await expect(count).toHaveText('2 / 3');
+  // Closing the middle capture leaves the other two.
+  await card.getByRole('button', { name: 'Close this capture' }).click();
+  await expect(count).toHaveText('2 / 2');
+  await expect(message).toHaveValue('message 3');
+  await card.getByRole('button', { name: 'Previous capture' }).click();
+  await expect(message).toHaveValue('message 1');
+
+  // Send all: both go to html2wp in one message, with both messages.
+  const before = bridge.state.messages.length;
+  await card.getByRole('button', { name: 'More destinations' }).click();
+  await card.getByRole('menuitem', { name: 'Send all captures (2)' }).click();
+  await expect(card.locator('.result')).toHaveText(`Sent 2 screenshots to ${PROJECT.name}`);
+  expect(bridge.state.messages).toHaveLength(before + 1);
+  const sent = bridge.state.messages.at(-1);
+  expect(sent.text).toBe('message 1\n\nmessage 3');
+  expect(sent.pngs.map(pngSize)).toEqual([{ width: 320 * dpr, height: 200 * dpr }, { width: 360 * dpr, height: 260 * dpr }]);
+  // Sent cards leave; with none left, the stack goes.
+  await page.mouse.move(40, 800);
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0, { timeout: 10000 });
+
+  // The stack survives navigation within the tab.
+  await capture([300, 120], [620, 320]);
+  await message.fill('kept across pages');
+  await page.waitForTimeout(450);
+  await capture([320, 140], [560, 300]);
+  await expect(count).toHaveText('2 / 2');
+  await page.reload();
+  await expect(count).toHaveText('2 / 2', { timeout: 10000 });
+  await card.getByRole('button', { name: 'Previous capture' }).click();
+  await expect(message).toHaveValue('kept across pages');
+  // The popup offers it too, after Esc put it away.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await popup.getByRole('button', { name: 'Show 2 captures on this page' }).click();
+  await popup.close();
+  await page.bringToFront();
+  await expect(count).toHaveText('2 / 2');
+
+  // Seven captures: five layers and a +2 badge, on a light and a dark page.
+  const menuClick = (menuItemId) => worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
+  for (let n = 0; n < 5; n++) await menuClick('capture-visible');
+  await expect(count).toHaveText('7 / 7');
+  await expect(page.locator('#shot2ai-preview-card .more-badge')).toHaveText('+2');
+  await deckShot('stack-7.png');
+  await page.goto(`${base}/dark`);
+  await expect(count).toHaveText('7 / 7', { timeout: 10000 });
+  await deckShot('stack-7-dark.png');
+  // Nothing sticks out of the window.
+  const box = await page.evaluate(() => {
+    const card = document.getElementById('shot2ai-preview-card');
+    return { width: innerWidth, height: innerHeight };
+  });
+  const cardBox = await card.boundingBox();
+  const peekBox = await page.locator('#shot2ai-preview-card .peek').first().boundingBox();
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(box.width);
+  expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(box.height);
+  expect(peekBox.y).toBeGreaterThanOrEqual(0);
+  // Clear all empties it.
+  await card.getByRole('button', { name: 'More destinations' }).click();
+  await card.getByRole('menuitem', { name: 'Clear all' }).click();
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+  expect(await worker.evaluate(async (id) => (await chrome.runtime.getContexts({})).length >= 0 && id, tabId)).toBe(tabId);
+  await page.goto(`${base}/`);
+  await capture([300, 120], [620, 320]);
+  await expect(card.locator('.nav')).toBeHidden();
+  await deckShot('stack-1.png');
+  await page.keyboard.press('Escape');
+});
+
 test('options: a custom chat receives the pasted image and text; a copy is saved to Downloads', async () => {
+  const sentBefore = bridge.state.messages.length;
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
   await expect(options.locator('#app-state')).toHaveText('Paired');
@@ -532,7 +650,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
-  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/, 'Capture full page']);
+  await expect(card.getByRole('menuitem')).toHaveText([/^ChatGPT/, /^Claude/, /^html2wp/, /^Team chat/, 'Capture full page', 'Add a chat in Options…']);
   await menuShot(card, 'card-menu.png');
   await card.getByRole('button', { name: 'More destinations' }).click();
   await card.getByLabel('Message').fill('Please check this spacing.');
@@ -555,7 +673,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   expect(received.composer).toContain('Please check this spacing.');
   await chat.screenshot({ path: join(shots, 'webchat-pasted.png') });
   await expect(card.locator('.result')).toHaveText('Pasted into Team chat. Press Enter there to send.');
-  expect(bridge.state.messages).toHaveLength(3);
+  expect(bridge.state.messages).toHaveLength(sentBefore);
 
   // Send to several at once: tick html2wp and Team chat in Options, then one click in the card.
   await page.keyboard.press('Escape');
@@ -579,9 +697,9 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await expect(again.locator('.result li').nth(1)).toHaveText('✓ Team chatPasted; press Enter there');
   await again.screenshot({ path: join(shots, 'card-multi.png') });
   // html2wp gets PNG even with JPEG chosen; the chat gets the JPEG, in its existing tab.
-  expect(bridge.state.messages).toHaveLength(4);
-  expect(bridge.state.messages[3].text).toBe('Both, please.');
-  expect(pngSize(bridge.state.messages[3].png)).toEqual({ width: 400 * dpr, height: 260 * dpr });
+  expect(bridge.state.messages).toHaveLength(sentBefore + 1);
+  expect(bridge.state.messages.at(-1).text).toBe('Both, please.');
+  expect(pngSize(bridge.state.messages.at(-1).png)).toEqual({ width: 400 * dpr, height: 260 * dpr });
   await chat.waitForFunction(() => window.received.files.length === 2);
   expect((await chat.evaluate(() => window.received.files[1])).type).toBe('image/jpeg');
   expect(context.pages().filter((p) => p.url().startsWith(chatBase))).toHaveLength(1);

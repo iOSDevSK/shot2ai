@@ -1,10 +1,11 @@
 // Shot2AI's service worker: the toolbar button, shortcuts, right-click menu
 // and the preview card's requests all arrive here. The card's actions run
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
-import { deleteCapture, getCapture } from './captures.js';
+import { deleteCapture, getCapture, updateCapture } from './captures.js';
 import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
 import { syncToolbar } from './toolbar-setup.js';
-import { showCard, openEditor, cardSend, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
+import { showCard, showStack, sendCaptures, openEditor, cardSend, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
+import { stackFor, clearStack, hideStack, stackHidden } from './stack.js';
 import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
@@ -29,7 +30,35 @@ async function savedRegionCard(tab) {
   if (result) await showCard(tab.id, result.id, result.capture);
 }
 
+async function png64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+
+// The stack survives navigation within the tab: it comes back once the new
+// page has loaded (where Shot2AI may draw on it), unless it was put away.
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (info.status !== 'complete' || stackHidden(tabId)) return;
+  stackFor(tabId).then((list) => { if (list.some((c) => !c.sent)) return showStack(tabId); return null; }).catch(() => {});
+});
+chrome.tabs.onRemoved.addListener((tabId) => { clearStack(tabId).catch(() => {}); });
+
 const handlers = {
+  // The card keeps each capture's message, result and state here.
+  'stack-update': async (m) => {
+    const allowed = ['message', 'result', 'sent', 'selected', 'saved'];
+    await updateCapture(m.id, Object.fromEntries(Object.entries(m.patch || {}).filter(([k]) => allowed.includes(k))));
+    return { ok: true };
+  },
+  'stack-remove': async (m) => { await deleteCapture(m.id); return { ok: true }; },
+  'stack-clear': async (m, sender) => { if (sender.tab) await clearStack(sender.tab.id); return { ok: true }; },
+  'stack-hide': async (m, sender) => { if (sender.tab) hideStack(sender.tab.id); return { ok: true }; },
+  'stack-png': async (m) => { const c = await getCapture(m.id); return c?.png ? { png: await png64(c.png) } : {}; },
+  'show-stack': async (m) => ({ ok: await showStack(m.tabId) }),
+  'stack-count': async (m) => ({ count: (await stackFor(m.tabId)).filter((c) => !c.sent).length }),
+  'send-captures': sendCaptures,
   'remember-region': rememberRegion,
   'full-page': async (m, sender) => {
     const tab = m.tabId ? await chrome.tabs.get(m.tabId) : sender.tab;

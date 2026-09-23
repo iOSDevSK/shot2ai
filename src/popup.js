@@ -84,6 +84,17 @@ $('pair-form').addEventListener('submit', async (e) => {
     : 'That code did not match. Check Settings in html2wp; after five wrong codes, choose New code there.';
   $('pair-error').hidden = false;
 });
+// Captures still waiting in this tab's stack: bring the card back.
+async function stackButton() {
+  let tabId = tabParam;
+  if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tabId) return;
+  const { count = 0 } = (await chrome.runtime.sendMessage({ type: 'stack-count', tabId }).catch(() => null)) || {};
+  $('show-stack').hidden = !count;
+  $('show-stack').textContent = `Show ${count} capture${count === 1 ? '' : 's'} on this page`;
+  $('show-stack').onclick = async () => { await chrome.runtime.sendMessage({ type: 'show-stack', tabId }); if (!tabParam) window.close(); };
+}
+stackButton();
 $('capture-full').addEventListener('click', async () => {
   let tabId = tabParam;
   if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });

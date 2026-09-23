@@ -5,9 +5,8 @@
 // back. Infinite feeds stop at a height, a screen count, or when the page
 // keeps growing at its bottom.
 import { putCapture } from './captures.js';
+import { captureTab } from './capture.js';
 
-// Chrome allows about two captureVisibleTab calls per second.
-const CAPTURE_GAP_MS = 550;
 // The largest canvas side Chrome draws reliably, and the smallest scale we
 // accept before splitting the page into several images instead.
 const MAX_SIDE = 16384;
@@ -15,7 +14,6 @@ const MIN_SCALE = 0.5;
 export const MAX_FRAMES = 30;
 export const DEFAULT_MAX_HEIGHT = 20000;
 
-let lastCapture = 0;
 const cancelled = new Set();
 export const cancelFullPage = (tabId) => cancelled.add(tabId);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -114,19 +112,6 @@ async function run(tabId, func, args = []) {
   return result;
 }
 
-async function grab(windowId) {
-  const gap = CAPTURE_GAP_MS - (Date.now() - lastCapture);
-  if (gap > 0) await wait(gap);
-  try {
-    return await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
-  } catch (e) {
-    // Past the rate limit (another capture just ran): wait and try once more.
-    await wait(1000);
-    return chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
-  } finally {
-    lastCapture = Date.now();
-  }
-}
 
 // Returns { parts: [{ id, capture }], note } or { cancelled: true }.
 // `progress(done, total)` is called after each screen.
@@ -143,7 +128,7 @@ export async function captureFullPage(tab, { maxHeight = DEFAULT_MAX_HEIGHT, pro
     for (;;) {
       if (cancelled.has(tab.id)) return { cancelled: true };
       const at = await run(tab.id, pageStep, [y, frames.length > 0]);
-      const shot = await grab(tab.windowId);
+      const shot = await captureTab(tab.windowId);
       await run(tab.id, pageReveal);
       frames.push({ y: at.y, blob: await (await fetch(shot)).blob() });
       const covered = at.y + m.viewH;

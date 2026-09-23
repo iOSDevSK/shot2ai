@@ -3,6 +3,47 @@ import { putCapture, getCapture, updateCapture, deleteCapture } from './captures
 
 export const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Chrome allows about two captureVisibleTab calls per second: every capture
+// waits its turn, and tries once more if Chrome still says no.
+const CAPTURE_GAP_MS = 550;
+let lastCapture = 0;
+let queue = Promise.resolve();
+// Shot2AI's own card, toolbar and progress stay out of every screenshot.
+const OUR_UI = ['shot2ai-preview-card', 'shot2ai-toolbar', 'shot2ai-progress'];
+async function ourUi(tabId, visible) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: async (ids, show) => {
+      for (const id of ids) { const host = document.getElementById(id); if (host) host.style.visibility = show ? '' : 'hidden'; }
+      if (!show) await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    },
+    args: [OUR_UI, visible],
+  }).catch(() => {});
+}
+// The visible tab, without Shot2AI's own UI in it.
+export async function captureClean(tab) {
+  await ourUi(tab.id, false);
+  try { return await captureTab(tab.windowId); } finally { await ourUi(tab.id, true); }
+}
+
+export function captureTab(windowId) {
+  const turn = queue.then(async () => {
+    const gap = CAPTURE_GAP_MS - (Date.now() - lastCapture);
+    if (gap > 0) await wait(gap);
+    try {
+      return await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+    } catch (e) {
+      if (!/MAX_CAPTURE|per second/i.test(String(e?.message))) throw e;
+      await wait(1000);
+      return chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+    } finally {
+      lastCapture = Date.now();
+    }
+  });
+  queue = turn.catch(() => {});
+  return turn;
+}
+
 export async function startCapture(tabId) {
   const tab = tabId ? await chrome.tabs.get(tabId) : (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
   if (!tab?.id) throw new Error('There is no page to capture.');
@@ -12,7 +53,7 @@ export async function startCapture(tabId) {
   }
   let shot;
   try {
-    shot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+    shot = await captureClean(tab);
   } catch {
     throw new Error('Chrome does not allow capturing this page. Open the page you want to report and try again.');
   }
@@ -81,7 +122,7 @@ export async function captureVisible(tab) {
   }
   let shot;
   try {
-    shot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+    shot = await captureClean(tab);
   } catch {
     throw new Error('Chrome does not allow capturing this page.');
   }
