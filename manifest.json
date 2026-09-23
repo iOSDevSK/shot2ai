@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Shot2AI — AI Screenshot Extension for ChatGPT, Claude & html2wp",
   "short_name": "Shot2AI",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Capture an area of any page, annotate it and send it in one click to html2wp, ChatGPT, Claude or your own AI chat.",
   "minimum_chrome_version": "116",
   "permissions": [

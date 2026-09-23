@@ -22,8 +22,10 @@ Right-click any page, selection, image or link and choose **Shot2AI**:
 
 - **Capture area…** starts the area selection.
 - **Capture visible page** takes the whole visible part of the page straight to the preview card.
+- **Capture saved region** captures this site's remembered region (see Saved region).
 - **Send to ▸** lists your destinations with a mark on the default. Picking one makes it the default for the next capture.
 - **Capture and send to <default>** captures the visible page and sends it at once. The card only shows the result; the first send to a web chat still asks you to confirm once.
+- **Send with prompt ▸** captures the visible page and sends it with one of your saved prompts.
 - **Send this image to <default>** (on an image) takes the image itself, or cuts it out of a capture of the page when the site does not allow reading it, and opens the card.
 - **Send selection with a screenshot** (on selected text) captures the visible page and puts the selected text in the message.
 - **Options**.
@@ -54,6 +56,30 @@ Sending to a web chat finds an open tab of that chat, or opens it. The extension
 
 Chrome asks you once per site to let the extension use it. The extension holds no permission for any site until you allow it.
 
+## Send to several at once
+
+Tick destinations in the card's menu (the chevron next to Send), or in **Options → Send to several at once**, and choose **Send to all selected**. Each web chat gets its own tab and paste, one after another. html2wp gets the screenshot through the app at the same time. The card lists the result for each destination. The first time the set includes a web chat you have not sent to before, one notice names all such sites before anything goes.
+
+## Prompts
+
+Saved messages to send with a screenshot. Four come built in: **Fix this bug**, **Explain this**, **Match this design** and **What's wrong here?**. In **Options → Prompts** you can add, edit, delete and reorder prompts and choose a **default prompt**, which fills the message of every new capture. The card and the editor have a **Prompt** picker next to the message: picking one fills the message, and you can still edit it. Right-click → Shot2AI → **Send with prompt ▸** captures the visible page and sends it with that prompt.
+
+## Send automatically (opt-in)
+
+Each web chat in **Options → Other destinations** has a **Send automatically** switch, off by default. With it on, Shot2AI presses the chat's send button after pasting, so the message goes without you reviewing it. ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. If none is found, the card says so and the text waits for you to press Enter. It is never used for html2wp, which has its own flow.
+
+## Saved region
+
+After capturing an area, choose **Region → Remember this region** in the card. The region is kept for that site as a share of the window, not in pixels. **Capture saved region** (in the card's Region menu, the right-click menu, or **Alt+Shift+R**) captures that part of the visible page again in one step. It is cut to the window if the window is now smaller. On a site without a saved region, it starts the area selection.
+
+## Image format & quality
+
+In **Options → Image format & quality**: **PNG** (lossless, the default), or **JPEG** or **WebP** at 50–100 %. It applies to screenshots sent to web chats and to saved copies (the file extension follows). html2wp always receives PNG, and a copy to the clipboard stays PNG, the only image type the clipboard accepts. The card shows the format and size, for example "JPEG 80 % · 64 KB".
+
+## Floating toolbar (opt-in)
+
+**Options → Floating toolbar** puts a small bar on every page with **Area**, **Visible**, **Region** and your destination. It is off by default. Switching it on asks Chrome for access to all sites, which it needs to appear on every page and capture from it; switching it off gives up that access. Drag it by its grip: its place is kept per site and it stays inside the window. Collapse it to a dot with **–**, or choose **⋯ → Hide on this site**; Options lists hidden sites with **Show again**. The bar steps aside while a capture is taken, so it is never in the screenshot. It appears on pages you open or reload after switching it on.
+
 ## Saving
 
 Options → **Saving**:
@@ -67,6 +93,8 @@ Options → **Saving**:
 
 - **html2wp**: the screenshot and the message go **only to 127.0.0.1**, the html2wp app on this computer. The app listens on 127.0.0.1 only, on port 47811 (or the next free one up to 47815). It answers only the paired extension: every request needs the pairing token, and a request from a web page's origin is refused. Once it has the screenshot, html2wp handles it like any image you attach in its chat.
 - **A web chat** (ChatGPT, Claude, or one you added) **is a website**. A screenshot you send there goes to that site and is handled under its terms. The card and the editor say this the first time you send to each chat, and the Options page says it next to the destinations.
+- **Send automatically** and **Send to all selected** send to web chats too: with Send automatically on, the message goes to that site without you reviewing it first.
+- The **floating toolbar** needs access to all sites while it is on. It reads nothing on those pages: it draws itself and captures only when you click it.
 - Captures stay in the extension's own storage in this browser until you send, copy or save them. They are removed after sending to html2wp, or after a day.
 
 ## Develop
@@ -89,11 +117,16 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - Annotate, then drawing and sending from the editor
 - pasting an image into the editor with ⌘V or Ctrl+V
 - a custom web chat receiving the pasted PNG file and the text
-- a copy saved through the Downloads fallback
+- a copy saved through the Downloads fallback, in JPEG at 80 % (the chat gets a JPEG too, html2wp still gets PNG)
+- send to several at once: html2wp and a web chat from one click, with a result line for each
+- auto-submit: off never presses the chat's send button, on presses it once, and a missing button is reported
+- prompts: add, reorder, delete and a default prompt in Options; the picker in the card and the editor; Send with prompt from the right-click menu
+- saved region: remembered per site, captured again at the same size, and clamped to the window
+- floating toolbar: off by default, registered when switched on, the Visible button, dragging (the place is kept after a reload), collapsing, hiding per site and showing again, and switching off
 
 Screenshots go to `screenshots/`.
 
-The test loads a copy of the extension with three changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's shadow root is opened so the test can reach inside it. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own "allow this site" prompt, and the folder picker, cannot be driven by Playwright and are not covered.
+The test loads a copy of the extension with a few changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's and the toolbar's shadow roots are opened so the test can reach inside them. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own permission prompts (a chat site, all sites for the toolbar), the folder picker, keyboard shortcuts and real ChatGPT and Claude pages cannot be driven by Playwright and are not covered.
 
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 
