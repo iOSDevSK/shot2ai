@@ -65,4 +65,6 @@ Certifications:
 - The developer does not use or transfer user data for purposes unrelated to the item's single purpose.
 - The developer does not use or transfer user data to determine creditworthiness or for lending purposes.
 
-Privacy policy: PRIVACY.md (to be hosted at a public URL before submission).
+Privacy policy: https://html2wp.dev/shot2ai/privacy (the same text as PRIVACY.md; the page is `site/shot2ai/privacy/index.html`).
+
+Developer contact: hello@html2wp.dev

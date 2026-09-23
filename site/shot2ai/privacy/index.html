@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shot2AI privacy policy</title>
+<meta name="description" content="What the Shot2AI Chrome extension captures, where it goes, and what it never does.">
+<style>
+:root{--ink:#232a23;--muted:#5f6b57;--line:#e3e6dd;--accent:#2f6b3f;--bg:#fafaf8;--card:#fff}
+@media (prefers-color-scheme:dark){:root{--ink:#e7ebe3;--muted:#a9b3a0;--line:#2f362e;--accent:#8fd19e;--bg:#141814;--card:#1b201b}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:48px 20px 72px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;font-weight:650;letter-spacing:-.01em}
+.brand svg{width:30px;height:30px}
+h1{margin:0 0 6px;font-size:30px;line-height:1.2;letter-spacing:-.02em}
+h1 + p{margin-top:0;color:var(--muted)}
+h2{margin:36px 0 10px;padding-top:20px;border-top:1px solid var(--line);font-size:19px;letter-spacing:-.01em}
+p,ul{margin:0 0 14px}
+ul{padding-left:22px}
+li{margin:6px 0}
+a{color:var(--accent);text-underline-offset:2px}
+code{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;padding:1px 5px;border-radius:4px;background:var(--card);border:1px solid var(--line)}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#16964c"/><path d="M8 13V9.5A1.5 1.5 0 0 1 9.5 8H13M19 8h3.5A1.5 1.5 0 0 1 24 9.5V13M24 19v3.5a1.5 1.5 0 0 1-1.5 1.5H19M13 24H9.5A1.5 1.5 0 0 1 8 22.5V19" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><rect x="13" y="13" width="6" height="6" rx="1.2" fill="#c8f578"/></svg>Shot2AI</div>
+<h1>Shot2AI privacy policy</h1>
+<p>Last updated: 23 September 2026</p>
+<p>This policy is published at <a href="https://html2wp.dev/shot2ai/privacy">https://html2wp.dev/shot2ai/privacy</a>.</p>
+<p>Shot2AI is a Chrome extension that captures part of a web page, lets you mark it up and sends it where you choose. This policy explains what it handles and where that goes.</p>
+<h2>What Shot2AI captures</h2>
+<ul><li><strong>Screenshots</strong> of the page you are on, and only when you ask for one: the toolbar button, the keyboard shortcut, the right-click menu, the floating toolbar or the preview card. This includes an area you select, the visible page, a full page, a saved region, or an image on the page.</li><li><strong>The message you type</strong> to go with a screenshot, and the prompts you save.</li><li><strong>Text you have selected</strong>, when you choose "Send selection with a screenshot".</li><li>The <strong>address and title</strong> of the page a screenshot comes from. They are used to label the screenshot and to name saved files.</li></ul>
+<p>Shot2AI reads nothing else from the pages you visit.</p>
+<h2>Where it goes</h2>
+<p>There is <strong>no Shot2AI server</strong>. Shot2AI never sends anything to its developer or to any service of its own.</p>
+<p>A screenshot and its message go only where you send them:</p>
+<ul><li><strong>html2wp</strong> (the Mac app): only to the app on your own computer, at 127.0.0.1. Nothing leaves your computer this way.</li><li><strong>A web chat you choose</strong> (for example ChatGPT, Claude, or a chat you add): to that website, in its tab, under that site's own terms and privacy policy. Chrome asks for your permission for each site first, and Shot2AI tells you the first time you send to it. With <strong>Send automatically</strong> on (off by default), Shot2AI also presses that site's send button for you.</li><li><strong>Copy</strong> puts the screenshot on your clipboard. <strong>Save</strong> writes a file to a folder you choose or to your Downloads folder.</li></ul>
+<h2>What is stored, and where</h2>
+<p>Everything is stored locally in your browser:</p>
+<ul><li><strong>Settings, prompts and destinations</strong> are in Chrome's extension storage (<code>chrome.storage.local</code>).</li><li><strong>Captures</strong> waiting in the preview card (the capture stack) or the editor are in the extension's IndexedDB. They are deleted when you send, close or clear them, when their tab is closed, and at the latest a day later.</li><li><strong>The pairing token for html2wp</strong> is in extension storage.</li><li><strong>The folder you chose for saving</strong> is stored as a folder handle in IndexedDB. Shot2AI can write only to that folder.</li></ul>
+<p>You can delete all of it at any time: <strong>Options → Privacy → Clear all captures and settings</strong>. Removing the extension also deletes it.</p>
+<h2>What Shot2AI does not do</h2>
+<ul><li>No analytics, no tracking, no advertising, no telemetry.</li><li>No sale or transfer of your data to anyone.</li><li>No use of your data for any purpose other than the one you asked for (capturing and sending a screenshot).</li><li>No remote code: everything Shot2AI runs is inside the extension.</li></ul>
+<h2>Permissions</h2>
+<p>Shot2AI asks for the permissions it needs to do the above: capturing the current tab when you ask, storing settings, saving files, copying to the clipboard, the right-click menu, and access to the chat sites you choose. The floating toolbar, when you switch it on, needs access to all sites so it can appear on every page. Shot2AI's Chrome Web Store listing explains each permission.</p>
+<h2>Chrome Web Store Limited Use</h2>
+<p>The use of information received from Chrome APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements. Shot2AI uses the data it handles only to provide its single purpose: capturing, annotating and sending screenshots where you choose. It does not transfer that data to third parties except to the destination you choose, does not use it for advertising, and does not let people read it except as needed for that purpose, for security, or to comply with law.</p>
+<h2>Trademarks</h2>
+<p>ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.</p>
+<h2>Contact</h2>
+<p>Filip Dvoran, <a href="mailto:hello@html2wp.dev">hello@html2wp.dev</a></p>
+<footer>Shot2AI is a Chrome extension by Filip Dvoran · <a href="https://html2wp.dev/">html2wp.dev</a></footer>
+</main>
+</body>
+</html>

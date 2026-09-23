@@ -1030,6 +1030,8 @@ test('legal: manifest name and description fit, the disclaimer shows, the versio
   await expect(options.locator('#disclaimer')).toHaveText('ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.');
   await expect(options.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
   await expect(options.getByRole('link', { name: "What's new" })).toHaveAttribute('href', `https://github.com/iOSDevSK/shot2ai/releases/tag/v${manifest.version}`);
+  await expect(options.locator('#privacy-link')).toHaveAttribute('href', 'https://html2wp.dev/shot2ai/privacy');
+  await expect(options.locator('.foot').getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', 'https://html2wp.dev/shot2ai/privacy');
   await options.locator('#privacy').screenshot({ path: join(shots, 'options-privacy.png') });
   await options.locator('.foot').screenshot({ path: join(shots, 'options-footer.png') });
   await options.close();

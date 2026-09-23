@@ -162,7 +162,7 @@ The popup footer, the editor's header, the right-click menu and **Options** show
 
 - `LICENSE`: proprietary, all rights reserved.
 - `THIRD-PARTY-NOTICES.md`: better-shot (BSD 3-Clause), the only third-party code.
-- `PRIVACY.md`: the privacy policy. Options → Privacy summarises it and has **Clear all captures and settings**.
+- `PRIVACY.md`: the privacy policy, published at https://html2wp.dev/shot2ai/privacy (the page is `site/shot2ai/privacy/index.html`). Options → Privacy summarises it, links to it, and has **Clear all captures and settings**. Contact: hello@html2wp.dev.
 - `STORE-LISTING.md`: the Chrome Web Store listing, the single-purpose statement and the permission justifications.
 
 ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.

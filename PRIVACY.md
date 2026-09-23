@@ -2,6 +2,8 @@
 
 Last updated: 23 September 2026
 
+This policy is published at https://html2wp.dev/shot2ai/privacy.
+
 Shot2AI is a Chrome extension that captures part of a web page, lets you mark it up and sends it where you choose. This policy explains what it handles and where that goes.
 
 ## What Shot2AI captures
@@ -28,7 +30,7 @@ A screenshot and its message go only where you send them:
 Everything is stored locally in your browser:
 
 - **Settings, prompts and destinations** are in Chrome's extension storage (`chrome.storage.local`).
-- **Captures** waiting in the preview card or the editor are in the extension's IndexedDB. Captures older than a day are deleted when a new one is saved.
+- **Captures** waiting in the preview card (the capture stack) or the editor are in the extension's IndexedDB. They are deleted when you send, close or clear them, when their tab is closed, and at the latest a day later.
 - **The pairing token for html2wp** is in extension storage.
 - **The folder you chose for saving** is stored as a folder handle in IndexedDB. Shot2AI can write only to that folder.
 
@@ -43,7 +45,7 @@ You can delete all of it at any time: **Options → Privacy → Clear all captur
 
 ## Permissions
 
-Shot2AI asks for the permissions it needs to do the above: capturing the current tab when you ask, storing settings, saving files, copying to the clipboard, the right-click menu, and access to the chat sites you choose. The floating toolbar, when you switch it on, needs access to all sites so it can appear on every page. `STORE-LISTING.md` explains each permission.
+Shot2AI asks for the permissions it needs to do the above: capturing the current tab when you ask, storing settings, saving files, copying to the clipboard, the right-click menu, and access to the chat sites you choose. The floating toolbar, when you switch it on, needs access to all sites so it can appear on every page. Shot2AI's Chrome Web Store listing explains each permission.
 
 ## Chrome Web Store Limited Use
 
@@ -55,4 +57,4 @@ ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is
 
 ## Contact
 
-Filip Dvoran, CONTACT-EMAIL (the developer contact address, to be filled in before publishing)
+Filip Dvoran, hello@html2wp.dev
