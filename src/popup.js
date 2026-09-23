@@ -113,7 +113,11 @@ $('capture').addEventListener('click', async () => {
   $('capture-error').hidden = false;
 });
 $('paste-hint').innerHTML = `Or paste an image with <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> to annotate it`;
-acceptPastedImages(() => { if (!tabParam) window.close(); });
+(async () => {
+  let tabId = tabParam;
+  if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });
+  acceptPastedImages(() => { if (!tabParam) window.close(); }, tabId);
+})();
 chrome.commands.getAll().then((commands) => {
   const key = commands.find((c) => c.name === 'capture-area')?.shortcut;
   $('shortcut').innerHTML = key ? `<kbd>${key.replace(/</g, '')}</kbd> captures from any page` : '';

@@ -56,7 +56,29 @@ Sending to a web chat finds an open tab of that chat, or opens it. The extension
 
 Chrome asks you once per site to let the extension use it. The extension holds no permission for any site until you allow it.
 
-## Send to several at once
+## Capture stack
+
+Every capture in a tab stays in the card's corner as a stack of cards. The newest is on top, and older ones peek out behind it: up to five layers, then a **+N** badge. **‹ ›** (or **← →** when the card has focus) flip through them, with a counter such as **2 / 5**. Clicking a card behind brings it to the front. Each card keeps its own message and its own result, for example "Sent to Claude".
+
+- **×** closes one capture. **Clear all** (in the card's menu) closes them all.
+- **Send all captures** sends every unsent capture to your default destination:
+  - A web chat gets them all pasted into one message.
+  - html2wp gets as many per message as the app says it takes. The rest wait, with the app's reason, until the assistant finishes.
+  - **Select captures** turns on a checkbox per card, for **Send selected captures**.
+- After a send, the sent cards leave after a moment. The stack disappears when it is empty, never while you hover over it, and never while it still has unsent captures unless you close it.
+- The stack belongs to the tab and survives navigating within it: it comes back when the new page loads, if Shot2AI may draw on that page. Otherwise the popup offers **Show N captures on this page**. **Esc** puts it away until your next capture.
+- A tab keeps 20 captures at most; beyond that the oldest go, and the card says so.
+- Area, visible page, full page, saved region, image and pasted-image captures all join the stack.
+
+## Full-page capture
+
+**Capture full page** is in the popup, the card's menu, the right-click menu and the floating toolbar, or press **Alt+Shift+F**. Shot2AI scrolls the page one screen at a time and joins the screens into one image, which opens in the card like any capture.
+
+- **Scrolling:** a page that does not scroll itself but has a large scrolling panel (an app, a chat) scrolls that panel. Sticky and fixed headers and footers appear once: they are hidden after the first screen and put back afterwards, and so is your scroll position.
+- **Progress** shows as **Capturing 3/8…** with **Cancel**; **Esc** cancels too.
+- **Pages that never end** (infinite feeds) stop at the height set in **Options → Full-page capture** (5,000–50,000 px, default 20,000), after 30 screens, or when the page keeps growing at its bottom. The card says so: "Stopped at 20,000 px (the page keeps loading more)".
+- **Very tall pages** would exceed the browser's 16,384 px image limit. Shot2AI scales the image down to fit, or, if it would have to go below half size, splits it into several images, and says which.
+
 
 Tick destinations in the card's menu (the chevron next to Send), or in **Options → Send to several at once**, and choose **Send to all selected**. Each web chat gets its own tab and paste, one after another. html2wp gets the screenshot through the app at the same time. The card lists the result for each destination. The first time the set includes a web chat you have not sent to before, one notice names all such sites before anything goes.
 
@@ -131,6 +153,10 @@ The test loads a copy of the extension with a few changes. Its manifest also hol
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 
 html2wp converts any website to WordPress: https://html2wp.dev/
+
+## Version
+
+The popup footer, the editor's header, the right-click menu and **Options** show the version of Shot2AI that is loaded (for example **Shot2AI v0.3.0**). Options links **What's new** to that version's release notes.
 
 ## Legal
 

@@ -1,7 +1,7 @@
 // Shot2AI's service worker: the toolbar button, shortcuts, right-click menu
 // and the preview card's requests all arrive here. The card's actions run
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
-import { deleteCapture, getCapture, updateCapture } from './captures.js';
+import { deleteCapture, getCapture, updateCapture, putCapture } from './captures.js';
 import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
 import { syncToolbar } from './toolbar-setup.js';
 import { showCard, showStack, sendCaptures, openEditor, cardSend, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
@@ -59,6 +59,18 @@ const handlers = {
   'show-stack': async (m) => ({ ok: await showStack(m.tabId) }),
   'stack-count': async (m) => ({ count: (await stackFor(m.tabId)).filter((c) => !c.sent).length }),
   'send-captures': sendCaptures,
+  // A pasted image (from the popup) joins the tab's stack like a capture.
+  'import-image': async (m) => {
+    const tab = await chrome.tabs.get(m.tabId).catch(() => null);
+    if (!tab) return { ok: false };
+    const png = new Blob([Uint8Array.from(atob(m.png), (c) => c.charCodeAt(0))], { type: 'image/png' });
+    const bitmap = await createImageBitmap(png);
+    const capture = { png, width: bitmap.width, height: bitmap.height, scale: m.scale || 1, url: tab.url || '', title: 'Pasted image', tabId: tab.id, tabIndex: tab.index, kind: 'pasted' };
+    bitmap.close();
+    const id = crypto.randomUUID();
+    await putCapture(id, capture);
+    try { await showCard(tab.id, id, capture); return { ok: true }; } catch { await deleteCapture(id); return { ok: false }; }
+  },
   'remember-region': rememberRegion,
   'full-page': async (m, sender) => {
     const tab = m.tabId ? await chrome.tabs.get(m.tabId) : sender.tab;

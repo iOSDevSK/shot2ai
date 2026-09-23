@@ -562,6 +562,24 @@ test('capture stack: a deck with its counter, per-card messages, close one, Send
   await page.bringToFront();
   await expect(count).toHaveText('2 / 2');
 
+  // A pasted image joins the stack too (⌘V / Ctrl+V in the popup).
+  const pasteIn = await context.newPage();
+  await pasteIn.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await pasteIn.evaluate(async () => {
+    const c = new OffscreenCanvas(240, 150);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#2e7aff';
+    ctx.fillRect(0, 0, 240, 150);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': await c.convertToBlob({ type: 'image/png' }) })]);
+  });
+  await pasteIn.locator('body').click({ position: { x: 20, y: 20 } });
+  await pasteIn.keyboard.press('ControlOrMeta+V');
+  await page.bringToFront();
+  await expect(count).toHaveText('3 / 3', { timeout: 10000 });
+  await pasteIn.close();
+  await card.getByRole('button', { name: 'Close this capture' }).click();
+  await expect(count).toHaveText('2 / 2');
+
   // Seven captures: five layers and a +2 badge, on a light and a dark page.
   const menuClick = (menuItemId) => worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
   for (let n = 0; n < 5; n++) await menuClick('capture-visible');
