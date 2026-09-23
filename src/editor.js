@@ -7,7 +7,7 @@
 import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
-import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY } from './settings.js';
+import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { encode, EXTENSIONS } from './imaging.js';
@@ -389,6 +389,7 @@ async function submit(target = destination, confirmed = false) {
   await check();
 }
 $('send').addEventListener('click', () => void submit());
+$('prompt').addEventListener('change', () => { $('message').value = $('prompt').value; $('prompt').selectedIndex = 0; $('message').focus(); });
 $('more').addEventListener('click', async () => {
   const menu = $('menu');
   if (!menu.hidden) { menu.hidden = true; return; }
@@ -474,6 +475,10 @@ async function start() {
     await load(capture.png, { title: capture.title, url: capture.url }, capture.scale);
   }
   if (params.get('text')) $('message').value = params.get('text');
+  else if (!$('message').value) $('message').value = await defaultPromptText();
+  // A saved prompt fills the message; it can still be edited.
+  for (const p of await prompts()) $('prompt').append(new Option(p.name, p.text));
+  $('prompt').hidden = $('prompt').options.length < 2;
   choose((await defaultDestination()) || COPY_ONLY);
 }
 addEventListener('resize', fit);

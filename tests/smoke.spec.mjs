@@ -157,7 +157,8 @@ test('right-click menu: its items, Capture visible page, selection text, and Sen
   const menu = () => worker.evaluate(() => [...self.__menu.values()].map((m) => ({ id: m.id, title: m.title, parentId: m.parentId, type: m.type, checked: m.checked, contexts: m.contexts })));
   await expect.poll(async () => (await menu()).map((m) => m.title || m.type)).toEqual([
     'Shot2AI', 'Capture area…', 'Capture visible page', 'separator', 'Send to', 'ChatGPT', 'html2wp',
-    'Capture and send to ChatGPT', 'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
+    'Capture and send to ChatGPT', 'Send with prompt', 'Fix this bug', 'Explain this', 'Match this design', "What's wrong here?",
+    'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
   const items = await menu();
   expect(items.find((m) => m.id === 'shot2ai').contexts).toEqual(['page', 'selection', 'image', 'link']);
   expect(items.find((m) => m.id === 'send-image').contexts).toEqual(['image']);
@@ -391,6 +392,55 @@ test('pasting an image into the editor loads it for annotation', async () => {
   await editor.close();
 });
 
+test('prompts: managed in Options, the default fills the card, the picker fills the message, the menu sends with one', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  const names = () => options.locator('#prompt-list input').evaluateAll((els) => els.map((e) => e.value));
+  await expect.poll(names).toEqual(['Fix this bug', 'Explain this', 'Match this design', "What's wrong here?"]);
+  await options.getByRole('button', { name: 'Add prompt' }).click();
+  await options.getByLabel('Name of prompt 5').fill('Check spacing');
+  await options.getByLabel('Name of prompt 5').press('Tab');
+  await options.getByLabel('Text of prompt 5').fill('Check the spacing in this screenshot.');
+  await options.getByLabel('Text of prompt 5').press('Tab');
+  await options.locator('.prompt-row').nth(4).getByRole('button', { name: 'Up' }).click();
+  await expect.poll(names).toEqual(['Fix this bug', 'Explain this', 'Match this design', 'Check spacing', "What's wrong here?"]);
+  await options.locator('.prompt-row').nth(1).getByRole('button', { name: 'Delete' }).click();
+  await expect.poll(names).toEqual(['Fix this bug', 'Match this design', 'Check spacing', "What's wrong here?"]);
+  await options.getByLabel('Default prompt').selectOption({ label: 'Check spacing' });
+  await options.locator('section[aria-labelledby="prompts-title"]').screenshot({ path: join(shots, 'options-prompts.png') });
+  await options.close();
+
+  // The default prompt fills a new capture's message; the picker replaces it.
+  const card = await capture();
+  const message = card.getByLabel('Message');
+  await expect(message).toHaveValue('Check the spacing in this screenshot.');
+  await card.getByLabel('Prompts').selectOption({ label: 'Fix this bug' });
+  await expect(message).toHaveValue('This screenshot shows a bug. Find the cause and fix it.');
+  await card.screenshot({ path: join(shots, 'card-prompt.png') });
+  await page.keyboard.press('Escape');
+
+  // The editor has the same picker.
+  const editor = await context.newPage();
+  await editor.goto(`chrome-extension://${extensionId}/src/editor.html`);
+  await expect(editor.locator('#message')).toHaveValue('Check the spacing in this screenshot.');
+  await editor.getByLabel('Prompts').selectOption({ label: 'Match this design' });
+  await expect(editor.locator('#message')).toHaveValue(/^Make my implementation match the design/);
+  await editor.close();
+
+  // Right-click → Send with prompt ▸ Fix this bug: captured and sent with that text.
+  const worker = context.serviceWorkers()[0];
+  await expect.poll(() => worker.evaluate(() => [...self.__menu.values()].filter((m) => m.parentId === 'prompts').map((m) => m.title)))
+    .toEqual(['Fix this bug', 'Match this design', 'Check spacing', "What's wrong here?"]);
+  const before = bridge.state.messages.length;
+  await page.bringToFront();
+  await worker.evaluate(async (id) => self.__shot2ai.onMenuClick({ menuItemId: 'prompt:fix-bug' }, await chrome.tabs.get(id)), tabId);
+  await expect(page.locator('#shot2ai-preview-card .result')).toHaveText(`Sent to ${PROJECT.name}`);
+  expect(bridge.state.messages).toHaveLength(before + 1);
+  expect(bridge.state.messages.at(-1).text).toBe('This screenshot shows a bug. Find the cause and fix it.');
+  await page.keyboard.press('Escape');
+  await worker.evaluate(() => chrome.storage.local.set({ defaultPrompt: null }));
+});
+
 test('options: a custom chat receives the pasted image and text; a copy is saved to Downloads', async () => {
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
@@ -470,7 +520,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   expect(received.composer).toContain('Please check this spacing.');
   await chat.screenshot({ path: join(shots, 'webchat-pasted.png') });
   await expect(card.locator('.result')).toHaveText('Pasted into Team chat. Press Enter there to send.');
-  expect(bridge.state.messages).toHaveLength(2);
+  expect(bridge.state.messages).toHaveLength(3);
 
   // Every request to the bridge came from the extension, never from a web page.
   expect(bridge.state.origins.every((o) => o === null || o.startsWith(`chrome-extension://${extensionId}`))).toBe(true);

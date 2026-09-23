@@ -10,7 +10,7 @@ import { saveImage, savedText } from './save.js';
 chrome.runtime.onInstalled.addListener(rebuildMenu);
 chrome.runtime.onStartup.addListener(rebuildMenu);
 chrome.storage.onChanged.addListener((changes) => {
-  if (['defaultDestination', 'presets', 'customChats'].some((k) => k in changes)) rebuildMenu();
+  if (['defaultDestination', 'presets', 'customChats', 'prompts'].some((k) => k in changes)) rebuildMenu();
 });
 chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab).catch(flagError); });
 

@@ -20,6 +20,8 @@ const DEFAULTS = {
   customChats: [],
   // The destination the card's main button uses.
   defaultDestination: 'chatgpt',
+  // The prompt that fills the message of every new capture, or null.
+  defaultPrompt: null,
   // Web chats the owner has been told receive the screenshot (by origin).
   acknowledged: {},
 };
@@ -40,6 +42,26 @@ export function sitePattern(url) {
 
 const chat = (c) => ({ ...c, kind: 'chat', selectors: c.selectors || [], origin: origin(c.url) });
 export const FIRST_DEFAULT = 'chatgpt';
+
+// Saved prompts. These four are there on first use; the owner may edit or delete them.
+export const BUILTIN_PROMPTS = [
+  { id: 'fix-bug', name: 'Fix this bug', text: 'This screenshot shows a bug. Find the cause and fix it.' },
+  { id: 'explain', name: 'Explain this', text: 'Explain what this screenshot shows.' },
+  { id: 'match-design', name: 'Match this design', text: 'Make my implementation match the design in this screenshot. List the differences first, then fix them.' },
+  { id: 'whats-wrong', name: "What's wrong here?", text: 'What looks wrong in this screenshot? List the problems, the most important first.' },
+];
+// The owner's prompts, in their order. Seeded once, so a deleted built-in stays deleted.
+export async function prompts() {
+  const { prompts: saved } = await chrome.storage.local.get('prompts');
+  if (Array.isArray(saved)) return saved;
+  await update({ prompts: BUILTIN_PROMPTS });
+  return BUILTIN_PROMPTS;
+}
+// The text of the default prompt, or '' when none is set.
+export async function defaultPromptText() {
+  const [list, s] = await Promise.all([prompts(), settings()]);
+  return list.find((p) => p.id === s.defaultPrompt)?.text || '';
+}
 // Everything the owner can choose as the default: ChatGPT, Claude, html2wp,
 // their own chats, then Copy only and Save only.
 export async function choices() {

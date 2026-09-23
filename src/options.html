@@ -41,6 +41,13 @@
     <p id="dest-error" class="notice err" role="alert" hidden></p>
   </section>
 
+  <section class="section" aria-labelledby="prompts-title">
+    <div class="section-head"><div><h2 id="prompts-title">Prompts</h2><p>Saved messages to send with a screenshot. Pick one in the card or the editor, or right-click → Shot2AI → Send with prompt.</p></div></div>
+    <div id="prompt-list" class="list prompts"></div>
+    <div class="row"><button id="add-prompt" class="button" type="button">Add prompt</button><span class="push"></span><label class="row-label short" for="default-prompt">Default prompt</label><select id="default-prompt" class="field"></select></div>
+    <p class="note">The default prompt fills the message of every new capture.</p>
+  </section>
+
   <section class="section" aria-labelledby="save-title">
     <div class="section-head"><div><h2 id="save-title">Saving</h2><p>Keep a copy of your screenshots on this computer.</p></div></div>
     <label class="toggle row"><input id="save-copy" type="checkbox"><span>Save a copy of every capture</span></label>

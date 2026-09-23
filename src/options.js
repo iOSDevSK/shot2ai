@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT } from './settings.js';
+import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT, prompts } from './settings.js';
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
@@ -186,6 +186,61 @@ $('allow-folder').addEventListener('click', async () => {
 });
 $('forget-folder').addEventListener('click', async () => { await deleteHandle(FOLDER); await renderSaving(); });
 
+// ---- prompts ------------------------------------------------------------
+
+async function savePrompts(list) { await update({ prompts: list }); await renderPrompts(); }
+async function renderPrompts() {
+  const [list, s] = await Promise.all([prompts(), settings()]);
+  $('prompt-list').replaceChildren(...list.map((p, index) => {
+    const row = document.createElement('div');
+    row.className = 'prompt-row';
+    row.innerHTML = '<input aria-label="Prompt name" maxlength="60"><div class="moves"><button class="button up" type="button">Up</button><button class="button down" type="button">Down</button><button class="button text delete" type="button">Delete</button></div><textarea aria-label="Prompt text" maxlength="2000"></textarea>';
+    const [name, text] = [row.querySelector('input'), row.querySelector('textarea')];
+    name.value = p.name;
+    text.value = p.text;
+    name.setAttribute('aria-label', `Name of prompt ${index + 1}`);
+    text.setAttribute('aria-label', `Text of prompt ${index + 1}`);
+    const edited = async () => {
+      const current = await prompts();
+      await update({ prompts: current.map((x) => x.id === p.id ? { ...x, name: name.value.trim() || 'Untitled', text: text.value } : x) });
+      await renderDefaultPrompt();
+    };
+    name.addEventListener('change', edited);
+    text.addEventListener('change', edited);
+    const move = async (by) => {
+      const current = await prompts();
+      const at = current.findIndex((x) => x.id === p.id);
+      const to = at + by;
+      if (to < 0 || to >= current.length) return;
+      [current[at], current[to]] = [current[to], current[at]];
+      await savePrompts(current);
+    };
+    row.querySelector('.up').disabled = index === 0;
+    row.querySelector('.down').disabled = index === list.length - 1;
+    row.querySelector('.up').addEventListener('click', () => move(-1));
+    row.querySelector('.down').addEventListener('click', () => move(1));
+    row.querySelector('.delete').addEventListener('click', async () => {
+      const current = await prompts();
+      if (s.defaultPrompt === p.id) await update({ defaultPrompt: null });
+      await savePrompts(current.filter((x) => x.id !== p.id));
+    });
+    return row;
+  }));
+  await renderDefaultPrompt();
+}
+async function renderDefaultPrompt() {
+  const [list, s] = await Promise.all([prompts(), settings()]);
+  $('default-prompt').replaceChildren(new Option('None', ''), ...list.map((p) => new Option(p.name, p.id)));
+  $('default-prompt').value = list.some((p) => p.id === s.defaultPrompt) ? s.defaultPrompt : '';
+}
+$('default-prompt').addEventListener('change', (e) => update({ defaultPrompt: e.target.value || null }));
+$('add-prompt').addEventListener('click', async () => {
+  const current = await prompts();
+  await savePrompts([...current, { id: `prompt-${crypto.randomUUID().slice(0, 8)}`, name: 'New prompt', text: '' }]);
+  const names = $('prompt-list').querySelectorAll('input');
+  names[names.length - 1]?.select();
+});
+
 // ---- image format -------------------------------------------------------
 
 async function renderFormat() {
@@ -204,4 +259,4 @@ $('quality').addEventListener('change', async (e) => { await update({ imageQuali
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat(), renderPrompts()]);

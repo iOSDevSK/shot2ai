@@ -21,7 +21,10 @@
     .chip{position:absolute;left:6px;bottom:6px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:rgba(47,60,48,.88);color:#fff;font-size:11px;font-weight:560}
     .chip svg{width:11px;height:11px}
     .meta{position:absolute;right:6px;bottom:6px;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.9);color:#4d5a47;font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums}
-    .message{width:100%;height:34px;margin:9px 0 8px;padding:0 10px;border:1px solid #dfe2d9;border-radius:8px;background:#fff;color:#232a23;font:13px ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;outline:none}
+    .compose{display:flex;gap:6px;margin:9px 0 8px}
+    .prompt{flex:none;width:86px;height:34px;padding:0 6px 0 9px;border:1px solid #dfe2d9;border-radius:8px;background:#fff;color:#4d5a47;font:600 11.5px ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
+    .prompt:focus{outline:none;border-color:#547254;box-shadow:0 0 0 2px rgba(84,114,84,.2)}
+    .message{min-width:0;flex:1;height:34px;margin:0;padding:0 10px;border:1px solid #dfe2d9;border-radius:8px;background:#fff;color:#232a23;font:13px ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;outline:none}
     .message::placeholder{color:#a6ae9b}
     .message:focus{border-color:#547254;box-shadow:0 0 0 2px rgba(84,114,84,.2)}
     .split{position:relative;display:flex;height:36px;border-radius:8px;background:#2f3c30;color:#fff}
@@ -66,7 +69,7 @@
       <div class="shot"><canvas aria-label="Captured area"></canvas>
         <button class="close" aria-label="Dismiss" title="Dismiss (Esc)">${i.close}</button>
         <span class="chip" hidden>${i.check}<span></span></span><span class="meta" title="Format and size of what is sent to web chats and saved"></span></div>
-      <input class="message" placeholder="Add a message (optional)" aria-label="Message" maxlength="2000">
+      <div class="compose"><select class="prompt" aria-label="Prompts" title="Fill the message with a saved prompt"><option value="" selected disabled>Prompt</option></select><input class="message" placeholder="Add a message (optional)" aria-label="Message" maxlength="2000"></div>
       <div class="split"><button class="send">${{ copy: i.copy, save: i.download }[o.main.kind] || i.send}<span></span></button><button class="more" aria-label="More destinations" aria-haspopup="menu" title="More destinations">${i.chevron}</button>
         <div class="menu" role="menu" hidden></div></div>
       <div class="tools">
@@ -228,6 +231,11 @@
     $('.save').addEventListener('click', () => void save());
 
     if (o.text) input.value = o.text;
+    // A saved prompt fills the message; it can still be edited.
+    const picker = $('.prompt');
+    for (const p of o.prompts || []) picker.append(new Option(p.name, p.text));
+    picker.hidden = !(o.prompts || []).length;
+    picker.addEventListener('change', () => { input.value = picker.value; picker.selectedIndex = 0; input.focus(); });
     document.documentElement.appendChild(host);
     // Every capture is on the clipboard too, ready for ⌘V / Ctrl+V anywhere.
     copy(false).then((ok) => chip(ok ? 'Copied' : ''));
