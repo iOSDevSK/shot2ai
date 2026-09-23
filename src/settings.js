@@ -8,7 +8,7 @@ export const PRESETS = [
 ];
 const DEFAULTS = {
   saveCopy: false,
-  saveSubfolder: 'Shot2AI',
+  saveSubfolder: 'shot2ai',
   filenamePattern: 'shot2ai-{host}-{date}-{time}',
   presets: {},
   customChats: [],

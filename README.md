@@ -40,7 +40,7 @@ Options → **Saving**:
 
 - **Save a copy of every capture**: every capture is saved as soon as you select the area. The **Save** buttons in the card and the editor work whether or not this is on.
 - **Folder**: choose any folder on your computer. If Chrome's access to it lapses, choose **Allow again**. Until you do, copies go to Downloads.
-- **Downloads subfolder** (default `Shot2AI/`): used when no folder is chosen, or when access to the chosen folder has lapsed.
+- **Downloads subfolder** (default `shot2ai/`): used when no folder is chosen, or when access to the chosen folder has lapsed.
 - **File name**: a pattern with `{host}`, `{date}` and `{time}`. The default gives names like `shot2ai-example.com-2026-09-23-114512.png`.
 
 ## Privacy

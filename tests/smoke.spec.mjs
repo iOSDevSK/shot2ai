@@ -316,7 +316,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   const card = await capture([300, 120], [700, 380]);
   const saved = card.locator('.saved');
-  await expect(saved).toHaveText(/^Saved to Downloads\/Shot2AI\/shot2ai-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.png$/);
+  await expect(saved).toHaveText(/^Saved to Downloads\/shot2ai\/shot2ai-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.png$/);
   const worker = context.serviceWorkers()[0];
   const download = await worker.evaluate(async () => {
     for (let i = 0; i < 50; i++) {
