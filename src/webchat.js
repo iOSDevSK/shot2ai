@@ -18,7 +18,7 @@ function loaded(tabId, timeout = 20000) {
 // Runs inside the chat's page. Finds the composer (the preset's selectors
 // first, then the largest visible editable field), pastes the image as a
 // file and puts the message in. Returns { ok, composer }.
-async function pasteInPage(base64, text, name, selectors) {
+async function pasteInPage(base64, type, text, name, selectors) {
   const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 20 && r.height > 10 && getComputedStyle(el).visibility !== 'hidden'; };
   const find = () => {
     for (const s of selectors) { const el = [...document.querySelectorAll(s)].find(visible); if (el) return el; }
@@ -29,7 +29,7 @@ async function pasteInPage(base64, text, name, selectors) {
   for (let i = 0; i < 40 && !composer; i++) { composer = find(); if (!composer) await new Promise((r) => setTimeout(r, 250)); }
   if (!composer) return { ok: false };
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const file = new File([bytes], name, { type: 'image/png' });
+  const file = new File([bytes], name, { type });
   composer.focus();
   const data = new DataTransfer();
   data.items.add(file);
@@ -69,7 +69,7 @@ export async function pasteIntoChat(destination, blob, text, name) {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   try {
-    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pasteInPage, args: [btoa(binary), text, name, destination.selectors || []] });
+    const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pasteInPage, args: [btoa(binary), blob.type || 'image/png', text, name, destination.selectors || []] });
     return result?.ok ? { ok: true } : { failed: true };
   } catch {
     return { failed: true };

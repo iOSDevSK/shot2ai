@@ -51,6 +51,16 @@
     <p class="note">Example: <code id="example"></code></p>
   </section>
 
+  <section class="section" aria-labelledby="format-title">
+    <div class="section-head"><div><h2 id="format-title">Image format &amp; quality</h2><p>Used for screenshots sent to web chats and for saved copies. html2wp always receives PNG, and a copy to the clipboard stays PNG.</p></div></div>
+    <div class="row formats" role="radiogroup" aria-label="Image format">
+      <label class="toggle"><input type="radio" name="format" value="png"><span>PNG <small>lossless</small></span></label>
+      <label class="toggle"><input type="radio" name="format" value="jpeg"><span>JPEG</span></label>
+      <label class="toggle"><input type="radio" name="format" value="webp"><span>WebP</span></label>
+    </div>
+    <div class="row"><label class="row-label" for="quality">Quality</label><input id="quality" type="range" min="50" max="100" step="5"><output id="quality-value" for="quality"></output></div>
+  </section>
+
   <section class="section" aria-labelledby="paste-title">
     <div class="section-head"><div><h2 id="paste-title">Paste a screenshot</h2><p>Took a screenshot some other way? Paste it here to annotate and send it.</p></div></div>
     <div id="paste-zone" class="paste-zone" tabindex="0"><span data-icon="capture"></span><span id="paste-keys"></span></div>

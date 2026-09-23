@@ -10,6 +10,7 @@ import { icons, paint } from './icons.js';
 import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
+import { encode, EXTENSIONS } from './imaging.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -362,7 +363,8 @@ async function submit(target = destination, confirmed = false) {
     const png = await flattened();
     // Copied first, while this page has focus: the fallback if pasting fails.
     const copied = await toClipboard(true);
-    const r = await pasteIntoChat(target, png, text, fileName(s.filenamePattern, source.url));
+    const encoded = await encode(png, s);
+    const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]));
     sending = false;
     setSend(actionLabel(destination));
     if (r.ok) { showResult('ok', `Pasted into ${target.name}. Press Enter there to send.`); return; }

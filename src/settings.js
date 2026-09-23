@@ -12,6 +12,9 @@ export const PRESETS = [
 const DEFAULTS = {
   saveCopy: false,
   saveSubfolder: 'shot2ai',
+  // Sends to web chats and saves: 'png' (lossless), 'jpeg' or 'webp' at imageQuality %.
+  imageFormat: 'png',
+  imageQuality: 90,
   filenamePattern: 'shot2ai-{host}-{date}-{time}',
   presets: {},
   customChats: [],
@@ -65,13 +68,13 @@ export function actionLabel(destination) {
 
 const pad = (n) => String(n).padStart(2, '0');
 // A file name from the owner's pattern: {host}, {date} (YYYY-MM-DD), {time} (HHMMSS).
-export function fileName(pattern, pageUrl, when = new Date()) {
+export function fileName(pattern, pageUrl, when = new Date(), ext = 'png') {
   let host = 'screenshot';
   try { host = new URL(pageUrl).hostname || host; } catch { /* pasted image or no page */ }
   const date = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`;
   const time = `${pad(when.getHours())}${pad(when.getMinutes())}${pad(when.getSeconds())}`;
   const name = (pattern || DEFAULTS.filenamePattern).replaceAll('{host}', host).replaceAll('{date}', date).replaceAll('{time}', time);
-  return `${name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/^[.\s-]+|[.\s]+$/g, '').slice(0, 120) || 'screenshot'}.png`;
+  return `${name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/^[.\s-]+|[.\s]+$/g, '').slice(0, 120) || 'screenshot'}.${ext}`;
 }
 export function cleanSubfolder(value) {
   return String(value || '').split(/[\\/]+/).map((p) => p.replace(/[:*?"<>|\u0000-\u001f]+/g, '-').trim()).filter((p) => p && p !== '.' && p !== '..').join('/');

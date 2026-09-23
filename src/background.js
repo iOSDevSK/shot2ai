@@ -8,6 +8,7 @@ import { destinations, defaultDestination, settings, update, fileName, actionLab
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { icons } from './icons.js';
+import { encode, describe, EXTENSIONS } from './imaging.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const isMac = async () => (await chrome.runtime.getPlatformInfo()).os === 'mac';
@@ -134,12 +135,14 @@ async function showCard(tabId, id, capture, { text = '', autoSend = false } = {}
   const brief = (d) => ({ id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null });
   const list = (await destinations()).map(brief);
   const main = { ...brief(chosen || COPY_ONLY), label: actionLabel(chosen) };
+  // What a send to a web chat or a save will weigh, in the chosen format.
+  const meta = describe(await encode(capture.png, s), s);
   const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry'];
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
     func: (o) => window.__shot2aiShowCard(o),
-    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, text, autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
+    args: [{ id, png: await base64(capture.png), scale: capture.scale, destinations: list, main, meta, text, autoSend, acknowledged: s.acknowledged, saved, mod: (await isMac()) ? '⌘' : 'Ctrl+', icons: Object.fromEntries(pick.map((k) => [k, icons[k]])) }],
   });
 }
 
@@ -165,7 +168,8 @@ async function cardSend(message) {
     await update({ acknowledged: { ...acknowledged, [message.acknowledge]: true } });
   }
   const s = await settings();
-  return pasteIntoChat(destination, capture.png, message.text, fileName(s.filenamePattern, capture.url));
+  const blob = await encode(capture.png, s);
+  return pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
 }
 
 async function flagError() {

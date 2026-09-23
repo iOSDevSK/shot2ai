@@ -3,6 +3,7 @@
 // Downloads through chrome.downloads.
 import { getHandle } from './captures.js';
 import { settings, fileName, cleanSubfolder } from './settings.js';
+import { encode, EXTENSIONS } from './imaging.js';
 
 export const FOLDER = 'save-folder';
 
@@ -10,7 +11,7 @@ async function toDataUrl(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let text = '';
   for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  return `data:image/png;base64,${btoa(text)}`;
+  return `data:${blob.type || 'image/png'};base64,${btoa(text)}`;
 }
 
 // { granted, name } for the chosen folder, or null when there is none.
@@ -24,7 +25,8 @@ export async function folderAccess(ask = false) {
 }
 
 async function unique(dir, name) {
-  const [stem, ext] = [name.replace(/\.png$/, ''), '.png'];
+  const dot = name.lastIndexOf('.');
+  const [stem, ext] = [name.slice(0, dot), name.slice(dot)];
   for (let i = 0; i < 100; i++) {
     const candidate = i ? `${stem} (${i})${ext}` : name;
     try { await dir.getFileHandle(candidate); } catch { return candidate; }
@@ -32,10 +34,11 @@ async function unique(dir, name) {
   return `${stem}-${Date.now()}${ext}`;
 }
 
-// Returns { where: 'folder'|'downloads', path, lapsed? }.
-export async function saveImage(blob, pageUrl, { ask = false } = {}) {
+// Saved in the owner's image format. Returns { where: 'folder'|'downloads', path, lapsed? }.
+export async function saveImage(png, pageUrl, { ask = false } = {}) {
   const s = await settings();
-  const name = fileName(s.filenamePattern, pageUrl);
+  const blob = await encode(png, s);
+  const name = fileName(s.filenamePattern, pageUrl, new Date(), EXTENSIONS[blob.type] || 'png');
   const folder = await folderAccess(ask);
   if (folder?.granted) {
     try {

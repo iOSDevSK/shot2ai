@@ -417,6 +417,11 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await options.getByRole('radio', { name: /^Team chat/ }).check();
   await expect(options.locator('#default-state')).toHaveText('Team chat');
   await options.getByLabel('Save a copy of every capture').check();
+  // JPEG at 80 % for web chats and saves.
+  await options.getByRole('radio', { name: 'JPEG' }).check();
+  await options.getByRole('slider', { name: 'Quality' }).fill('80');
+  await options.getByRole('slider', { name: 'Quality' }).dispatchEvent('change');
+  await expect(options.locator('#quality-value')).toHaveText('80 %');
   await options.locator('#default').scrollIntoViewIfNeeded();
   await expect(options.locator('#example')).toHaveText(/^shot2ai-example\.com-\d{4}-\d\d-\d\d-\d{6}\.png$/);
   await options.screenshot({ path: join(shots, 'options.png'), fullPage: true });
@@ -424,7 +429,8 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
 
   const card = await capture([300, 120], [700, 380]);
   const saved = card.locator('.saved');
-  await expect(saved).toHaveText(/^Saved to Downloads\/shot2ai\/shot2ai-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.png$/);
+  await expect(saved).toHaveText(/^Saved to Downloads\/shot2ai\/shot2ai-127\.0\.0\.1-\d{4}-\d\d-\d\d-\d{6}\.jpg$/);
+  await expect(card.locator('.meta')).toHaveText(/^JPEG 80 % · \d+ KB$/);
   const worker = context.serviceWorkers()[0];
   const download = await worker.evaluate(async () => {
     for (let i = 0; i < 50; i++) {
@@ -434,10 +440,10 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
     }
     return null;
   });
-  // Playwright stores downloads under its own names; the file on disk is the PNG.
+  // Playwright stores downloads under its own names; the file on disk is the JPEG.
   expect(download?.state).toBe('complete');
   expect(existsSync(download.filename)).toBe(true);
-  expect(readFileSync(download.filename).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(readFileSync(download.filename).subarray(0, 3).toString('hex')).toBe('ffd8ff');
 
   // The menu lists html2wp first, then the chats; the main button is the chosen default.
   await card.getByRole('button', { name: 'More destinations' }).click();
@@ -458,7 +464,8 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   const received = await chat.evaluate(() => ({ ...window.received, composer: document.getElementById('composer').innerText }));
   const dpr = await page.evaluate(() => devicePixelRatio);
   expect(received.files).toHaveLength(1);
-  expect(received.files[0]).toMatchObject({ type: 'image/png', width: 400 * dpr, height: 260 * dpr });
+  expect(received.files[0]).toMatchObject({ type: 'image/jpeg', width: 400 * dpr, height: 260 * dpr });
+  expect(received.files[0].name).toMatch(/\.jpg$/);
   expect(received.text).toBe('Please check this spacing.');
   expect(received.composer).toContain('Please check this spacing.');
   await chat.screenshot({ path: join(shots, 'webchat-pasted.png') });

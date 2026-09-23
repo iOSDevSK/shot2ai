@@ -46,3 +46,8 @@
 .pick.suggested{border-color:var(--green);box-shadow:0 0 0 3px rgba(84,114,84,.16)}
 #default-list{gap:6px}
 .head-actions{display:flex;align-items:center;gap:10px;flex:none}
+.formats{gap:22px}
+.formats small{color:var(--faint);font-size:11px}
+#quality{width:260px;accent-color:var(--green-dark)}
+#quality:disabled{opacity:.4}
+#quality-value{font-size:12.5px;font-weight:600;color:var(--green-dark);min-width:64px}

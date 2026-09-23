@@ -186,9 +186,22 @@ $('allow-folder').addEventListener('click', async () => {
 });
 $('forget-folder').addEventListener('click', async () => { await deleteHandle(FOLDER); await renderSaving(); });
 
+// ---- image format -------------------------------------------------------
+
+async function renderFormat() {
+  const s = await settings();
+  for (const r of document.querySelectorAll('input[name="format"]')) r.checked = r.value === (s.imageFormat || 'png');
+  $('quality').value = s.imageQuality;
+  $('quality').disabled = s.imageFormat === 'png';
+  $('quality-value').textContent = s.imageFormat === 'png' ? 'Lossless' : `${s.imageQuality} %`;
+}
+for (const r of document.querySelectorAll('input[name="format"]')) r.addEventListener('change', async () => { await update({ imageFormat: r.value }); await renderFormat(); });
+$('quality').addEventListener('input', (e) => { $('quality-value').textContent = `${e.target.value} %`; });
+$('quality').addEventListener('change', async (e) => { await update({ imageQuality: Number(e.target.value) }); await renderFormat(); });
+
 // ---- paste --------------------------------------------------------------
 
 $('paste-keys').innerHTML = `Press <kbd>${isMac ? '⌘V' : 'Ctrl+V'}</kbd> anywhere on this page to open a pasted image in the editor`;
 acceptPastedImages();
 
-await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving()]);
+await Promise.all([renderDefault(), refreshApp(), renderDestinations(), renderSaving(), renderFormat()]);
