@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Screenshot for html2wp</title>
+<link rel="icon" href="../icons/icon-32.png">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-symbol" data-icon="code"></span><span>html<span class="two">2</span>wp</span></div>
+  <div class="source"><strong id="page-title">Screenshot</strong><span id="page-url"></span></div>
+  <div class="top-actions">
+    <button id="copy" class="button" data-icon="copy" title="Copy the annotated image">Copy</button>
+    <button id="download" class="button" data-icon="download" title="Save the annotated image as PNG">Download</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <main class="stage">
+    <div class="toolbar" role="toolbar" aria-label="Annotation tools">
+      <div class="group" role="radiogroup" aria-label="Tool">
+        <button class="tool" data-tool="arrow" data-icon="arrow" role="radio" aria-label="Arrow" title="Arrow (A)"></button>
+        <button class="tool" data-tool="rect" data-icon="rect" role="radio" aria-label="Rectangle" title="Rectangle (R)"></button>
+        <button class="tool" data-tool="text" data-icon="text" role="radio" aria-label="Text" title="Text (T)"></button>
+        <button class="tool" data-tool="highlight" data-icon="highlight" role="radio" aria-label="Highlight" title="Highlight (H)"></button>
+        <button class="tool" data-tool="blur" data-icon="blur" role="radio" aria-label="Blur" title="Blur private details (B)"></button>
+      </div>
+      <span class="sep"></span>
+      <div id="swatches" class="group swatches" role="radiogroup" aria-label="Colour"></div>
+      <span class="sep"></span>
+      <div id="sizes" class="group sizes" role="radiogroup" aria-label="Stroke"></div>
+      <span class="sep"></span>
+      <div class="group">
+        <button id="undo" class="tool" data-icon="undo" aria-label="Undo" title="Undo (⌘Z)" disabled></button>
+        <button id="redo" class="tool" data-icon="redo" aria-label="Redo" title="Redo (⇧⌘Z)" disabled></button>
+      </div>
+    </div>
+    <div id="canvas-area" class="canvas-area">
+      <div id="frame" class="frame" hidden>
+        <canvas id="canvas" aria-label="Screenshot to annotate"></canvas>
+        <div id="text-input" class="text-input" contenteditable="plaintext-only" spellcheck="false" hidden></div>
+      </div>
+      <div id="missing" class="missing" hidden>
+        <h1>This screenshot is no longer available</h1>
+        <p>Capture the area again from the page you want to report.</p>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </main>
+
+  <aside class="send-panel" aria-label="Send to html2wp">
+    <div class="label">Send to</div>
+    <div class="target">
+      <div class="target-name"><strong id="target-name">html2wp</strong><small id="target-note">Checking the app…</small></div>
+      <span id="target-state" class="status">Checking</span>
+    </div>
+
+    <form id="pair-form" class="pair" hidden>
+      <p>Pair once: in html2wp open <b>Settings → Chrome extension</b> and enter the 6-digit code.</p>
+      <div class="pair-row">
+        <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" aria-label="Pairing code">
+        <button id="pair" class="button" type="submit">Pair</button>
+      </div>
+    </form>
+
+    <label class="label" for="message">Message</label>
+    <textarea id="message" rows="7" placeholder="Describe what is wrong or what should change…"></textarea>
+
+    <div id="result" class="notice" role="status" hidden></div>
+    <button id="send" class="button primary wide" data-icon="send"><span id="send-label">Send to html2wp</span></button>
+    <p class="privacy">The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).</p>
+  </aside>
+</div>
+<script type="module" src="editor.js"></script>
+</body>
+</html>

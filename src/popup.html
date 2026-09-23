@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>html2wp</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main class="popup">
+  <header class="popup-head">
+    <div class="brand"><span class="brand-symbol" data-icon="code"></span><span>html<span class="two">2</span>wp</span></div>
+    <span id="state" class="status">Checking</span>
+  </header>
+
+  <section id="checking" class="panel center"><span class="spinner spin" data-icon="spinner"></span><p>Looking for html2wp on this Mac…</p></section>
+
+  <section id="offline" class="panel" hidden>
+    <h1>html2wp is not running</h1>
+    <p>Open the html2wp app on this Mac, then check again.</p>
+    <button id="recheck" class="button" data-icon="retry">Check again</button>
+  </section>
+
+  <section id="pairing" class="panel" hidden>
+    <h1>Pair with html2wp</h1>
+    <p>In html2wp, open <b>Settings → Chrome extension</b> and enter the 6-digit code.</p>
+    <form id="pair-form" class="pair-form">
+      <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" aria-label="Pairing code">
+      <button id="pair" class="button primary" type="submit">Pair</button>
+    </form>
+    <p id="pair-error" class="notice err" role="alert" hidden></p>
+  </section>
+
+  <section id="ready" class="panel" hidden>
+    <div class="label">Open project</div>
+    <div class="project"><strong id="project-name"></strong><span id="chat-state" class="status"></span></div>
+    <p id="chat-reason" class="notice warn" hidden></p>
+  </section>
+
+  <footer class="popup-foot">
+    <button id="capture" class="button primary wide" data-icon="capture">Capture area</button>
+    <p id="capture-error" class="notice err" role="alert" hidden></p>
+    <div class="hint"><span id="shortcut"></span><span>Screenshots go only to 127.0.0.1</span></div>
+  </footer>
+</main>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
