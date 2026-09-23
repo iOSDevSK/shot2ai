@@ -12,6 +12,8 @@ export function startMockBridge(port = 0) {
     chat: { available: true, reason: null },
     // When set, /status says the chat is open but /message still refuses with this reason.
     refuseMessage: null,
+    // Like html2wp 0.2.8 or older: no maxImages in /status, one image per message.
+    oldApp: false,
     messages: [],
     origins: [],
   };
@@ -29,7 +31,8 @@ export function startMockBridge(port = 0) {
       if (req.method === 'GET' && req.url === '/status') {
         const paired = bearer === TOKEN;
         // Like an app that takes up to 4 screenshots per message.
-        return reply(200, { app: 'html2wp', version: 'mock', paired, project: paired ? PROJECT : null, chat: paired ? state.chat : null, maxImages: 4 });
+        const limit = state.oldApp ? {} : { maxImages: 4 };
+        return reply(200, { app: 'html2wp', version: 'mock', paired, project: paired ? PROJECT : null, chat: paired ? state.chat : null, ...limit });
       }
       if (req.method === 'POST' && req.url === '/pair') {
         return body.code === CODE ? reply(200, { token: TOKEN }) : reply(403, { error: 'wrong code' });

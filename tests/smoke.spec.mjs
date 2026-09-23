@@ -562,6 +562,20 @@ test('capture stack: a deck with its counter, per-card messages, close one, Send
   await page.bringToFront();
   await expect(count).toHaveText('2 / 2');
 
+  // An html2wp that does not report maxImages (0.2.8 or older) takes one per message.
+  bridge.state.oldApp = true;
+  await card.getByRole('button', { name: 'More destinations' }).click();
+  await card.getByRole('menuitem', { name: 'Send all captures (2)' }).click();
+  await expect(card.locator('.result')).toHaveText(`Sent 1 of 2 to ${PROJECT.name}. Sending several screenshots in one message needs html2wp 0.2.9 or later; send the rest when the assistant finishes.`);
+  expect(bridge.state.messages.at(-1).pngs).toHaveLength(1);
+  bridge.state.oldApp = false;
+  // The one that went leaves; the other stays, unsent.
+  await page.mouse.move(40, 800);
+  await expect(count).toBeHidden({ timeout: 10000 });
+  await expect(page.locator('#shot2ai-preview-card .card')).toHaveCount(1);
+  await capture([340, 160], [700, 420]);
+  await expect(count).toHaveText('2 / 2');
+
   // A pasted image joins the stack too (⌘V / Ctrl+V in the popup).
   const pasteIn = await context.newPage();
   await pasteIn.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
@@ -791,7 +805,13 @@ test('saved region: remembered per site, captured again from the menu, clamped t
     await page.bringToFront();
     return size;
   };
-  const menuClick = (menuItemId) => worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
+  // A menu capture: wait until the new capture is in front of the card.
+  const menuClick = async (menuItemId) => {
+    const front = page.locator('#shot2ai-preview-card .card');
+    const previous = await front.getAttribute('data-id', { timeout: 500 }).catch(() => null);
+    await worker.evaluate(async ({ menuItemId, id }) => self.__shot2ai.onMenuClick({ menuItemId }, await chrome.tabs.get(id)), { menuItemId, id: tabId });
+    await expect(front).not.toHaveAttribute('data-id', previous || '-');
+  };
   await menuClick('capture-saved');
   const [w, h] = await capturedSize();
   expect(Math.abs(w - 320 * viewport.dpr)).toBeLessThanOrEqual(2);

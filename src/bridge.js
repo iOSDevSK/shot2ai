@@ -101,12 +101,17 @@ export async function sendToApp(text, png) {
   const batch = all.slice(0, Math.max(1, Number(status.maxImages) || 1));
   const encoded = await Promise.all(batch.map(blobToBase64));
   const outcome = await send(found.port, status.project.id, text, encoded.length > 1 ? encoded : encoded[0]);
-  return { ...outcome, project: status.project, count: batch.length, total: all.length, perMessage: Math.max(1, Number(status.maxImages) || 1) };
+  return { ...outcome, project: status.project, count: batch.length, total: all.length, perMessage: Math.max(1, Number(status.maxImages) || 1), limitKnown: !!status.maxImages };
 }
 
 // What to tell the owner. A reason from the app is shown as it is.
 export function outcomeText(outcome) {
-  if (outcome.ok && outcome.total > 1 && outcome.count < outcome.total) return `Sent ${outcome.count} of ${outcome.total} to ${outcome.project?.name || 'html2wp'}. html2wp takes ${outcome.perMessage} per message; send the rest when the assistant finishes.`;
+  if (outcome.ok && outcome.total > 1 && outcome.count < outcome.total) {
+    const to = `Sent ${outcome.count} of ${outcome.total} to ${outcome.project?.name || 'html2wp'}.`;
+    // An app that does not say how many it takes (html2wp 0.2.8 or older) takes one.
+    if (!outcome.limitKnown) return `${to} Sending several screenshots in one message needs html2wp 0.2.9 or later; send the rest when the assistant finishes.`;
+    return `${to} html2wp takes ${outcome.perMessage} per message; send the rest when the assistant finishes.`;
+  }
   if (outcome.ok && outcome.total > 1) return `Sent ${outcome.total} screenshots to ${outcome.project?.name || 'html2wp'}`;
   if (outcome.ok) return `Sent to ${outcome.project?.name || 'html2wp'}`;
   if (outcome.reason !== undefined) return outcome.reason;

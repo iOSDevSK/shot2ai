@@ -63,7 +63,7 @@ Every capture in a tab stays in the card's corner as a stack of cards. The newes
 - **×** closes one capture. **Clear all** (in the card's menu) closes them all.
 - **Send all captures** sends every unsent capture to your default destination:
   - A web chat gets them all pasted into one message.
-  - html2wp gets as many per message as the app says it takes. The rest wait, with the app's reason, until the assistant finishes.
+  - html2wp gets up to 4 per message (html2wp 0.2.9 or later; older versions take one per message, and the card says so). The rest wait until the assistant finishes.
   - **Select captures** turns on a checkbox per card, for **Send selected captures**.
 - After a send, the sent cards leave after a moment. The stack disappears when it is empty, never while you hover over it, and never while it still has unsent captures unless you close it.
 - The stack belongs to the tab and survives navigating within it: it comes back when the new page loads, if Shot2AI may draw on that page. Otherwise the popup offers **Show N captures on this page**. **Esc** puts it away until your next capture.

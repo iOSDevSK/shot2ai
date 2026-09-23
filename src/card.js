@@ -309,12 +309,17 @@
       if (text) setTimeout(() => { if ($('.toast').textContent === text) $('.toast').hidden = true; }, 6000);
     }
 
+    // Leaving: fade out, then go. A capture arriving meanwhile cancels it.
+    let leaving = 0;
+    function leave() {
+      clearTimeout(hideTimer);
+      clearTimeout(leaving);
+      deck.classList.add('out');
+      leaving = setTimeout(() => { window.removeEventListener('keydown', onKey, true); host.remove(); }, 200);
+    }
     // Esc: the stack leaves the screen; its captures wait for the next capture.
     function dismiss() {
-      clearTimeout(hideTimer);
-      window.removeEventListener('keydown', onKey, true);
-      deck.classList.add('out');
-      setTimeout(() => host.remove(), 200);
+      leave();
       ask({ type: 'stack-hide' });
     }
     function removeEntry(entry, tell = true) {
@@ -322,7 +327,7 @@
       if (at < 0) return;
       entries.splice(at, 1);
       if (tell) ask({ type: 'stack-remove', id: entry.id });
-      if (!entries.length) { clearTimeout(hideTimer); window.removeEventListener('keydown', onKey, true); deck.classList.add('out'); setTimeout(() => host.remove(), 200); return; }
+      if (!entries.length) { leave(); return; }
       current = Math.min(at, entries.length - 1);
       render();
     }
@@ -533,7 +538,7 @@
         const ticked = entries.filter((e) => e.selected && !e.sent).length;
         if (canSendAll && selecting && ticked) add(`${verb} selected captures (${ticked})`, () => void sendCaptures('selected'));
         add(selecting ? 'Done selecting' : 'Select captures', () => { selecting = !selecting; menu.hidden = true; render(); }, '');
-        add('Clear all', () => { menu.hidden = true; ask({ type: 'stack-clear' }); entries = []; clearTimeout(hideTimer); window.removeEventListener('keydown', onKey, true); host.remove(); }, '');
+        add('Clear all', () => { menu.hidden = true; ask({ type: 'stack-clear' }); entries = []; leave(); }, '');
       }
       add('Capture full page', () => { dismiss(); ask({ type: 'full-page' }); }, 'options');
       add('Add a chat in Options…', () => ask({ type: 'open-options' }), 'options');
@@ -584,7 +589,10 @@
         picker.options[0].disabled = true;
         for (const x of p.prompts || []) picker.append(new Option(x.name, x.text));
         picker.hidden = !(p.prompts || []).length;
+        clearTimeout(leaving);
         deck.classList.remove('out');
+        window.removeEventListener('keydown', onKey, true);
+        window.addEventListener('keydown', onKey, true);
         render(0);
         if (p.dropped) toast(`The oldest ${p.dropped > 1 ? `${p.dropped} captures were` : 'capture was'} removed: a tab keeps ${p.cap} at most.`);
         if (p.fresh) {
