@@ -5,6 +5,7 @@ import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
 import { syncToolbar, ALL_SITES } from './toolbar-setup.js';
+import { formatOf } from './imaging.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
@@ -283,11 +284,11 @@ $('add-prompt').addEventListener('click', async () => {
 // ---- image format -------------------------------------------------------
 
 async function renderFormat() {
-  const s = await settings();
-  for (const r of document.querySelectorAll('input[name="format"]')) r.checked = r.value === (s.imageFormat || 'png');
-  $('quality').value = s.imageQuality;
-  $('quality').disabled = s.imageFormat === 'png';
-  $('quality-value').textContent = s.imageFormat === 'png' ? 'Lossless' : `${s.imageQuality} %`;
+  const { format, quality } = formatOf(await settings());
+  for (const r of document.querySelectorAll('input[name="format"]')) r.checked = r.value === format;
+  $('quality').value = quality;
+  $('quality').disabled = format === 'png';
+  $('quality-value').textContent = format === 'png' ? 'Lossless' : `${quality} %`;
 }
 for (const r of document.querySelectorAll('input[name="format"]')) r.addEventListener('change', async () => { await update({ imageFormat: r.value }); await renderFormat(); });
 $('quality').addEventListener('input', (e) => { $('quality-value').textContent = `${e.target.value} %`; });

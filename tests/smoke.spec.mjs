@@ -701,6 +701,12 @@ test('floating toolbar: off by default, on with all-site access, draggable, coll
   await page.reload();
   await expect(bar).toBeVisible();
 
+  // A stored quality outside 50–100 is shown as it is applied.
+  await worker.evaluate(() => chrome.storage.local.set({ imageFormat: 'webp', imageQuality: 30 }));
+  await options.reload();
+  await expect(options.locator('#quality-value')).toHaveText('50 %');
+  await worker.evaluate(() => chrome.storage.local.set({ imageFormat: 'jpeg', imageQuality: 80 }));
+
   // Off: unregistered, and gone from the page.
   await options.getByLabel('Show the toolbar on every page').uncheck();
   await expect(options.locator('#toolbar-state')).toHaveText('Off');
@@ -708,4 +714,16 @@ test('floating toolbar: off by default, on with all-site access, draggable, coll
   await page.reload();
   await expect(page.locator('#shot2ai-toolbar')).toHaveCount(0);
   await options.close();
+
+  // All-site access gone while the toolbar is on: it switches itself off.
+  // (The test copy always holds all-site access, so this page pretends it is missing.)
+  await worker.evaluate(() => chrome.storage.local.set({ toolbar: { enabled: true, collapsed: false } }));
+  const revoked = await context.newPage();
+  await revoked.addInitScript(() => { chrome.permissions.contains = async () => false; });
+  await revoked.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await expect(revoked.locator('#toolbar-state')).toHaveText('Off');
+  await expect(revoked.getByLabel('Show the toolbar on every page')).not.toBeChecked();
+  expect(await worker.evaluate(async () => (await chrome.storage.local.get('toolbar')).toolbar.enabled)).toBe(false);
+  expect(await registered()).toEqual([]);
+  await revoked.close();
 });

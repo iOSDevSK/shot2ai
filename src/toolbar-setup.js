@@ -9,6 +9,9 @@ export async function syncToolbar() {
   const { toolbar } = await chrome.storage.local.get('toolbar');
   const allowed = await chrome.permissions.contains(ALL_SITES);
   const registered = (await chrome.scripting.getRegisteredContentScripts({ ids: [ID] })).length > 0;
+  // All-site access taken away (in Chrome's settings, say): the toolbar is off,
+  // and stays off until the owner switches it on again.
+  if (toolbar?.enabled && !allowed) await chrome.storage.local.set({ toolbar: { ...toolbar, enabled: false } });
   const wanted = !!toolbar?.enabled && allowed;
   if (wanted && !registered) {
     await chrome.scripting.registerContentScripts([{ id: ID, matches: ['http://*/*', 'https://*/*'], js: ['src/toolbar.js'], runAt: 'document_idle', persistAcrossSessions: true }]);
