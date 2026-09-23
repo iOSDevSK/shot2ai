@@ -6,7 +6,8 @@ export const CODE = '482913';
 export const TOKEN = 'mock-token-7f3a9c';
 export const PROJECT = { id: '0584dcf1-7f08-4efb-85cf-ae7284faf8f9', name: 'Studio site' };
 
-export function startMockBridge(port = 47811) {
+// Port 0 picks a free port: the real html2wp app may be listening on 47811–47815.
+export function startMockBridge(port = 0) {
   const state = {
     chat: { available: true, reason: null },
     // When set, /status says the chat is open but /message still refuses with this reason.
@@ -42,7 +43,7 @@ export function startMockBridge(port = 47811) {
       reply(404, {});
     });
   });
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ state, close: () => new Promise((r) => server.close(r)) })));
+  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ state, port: server.address().port, close: () => new Promise((r) => server.close(r)) })));
 }
 
 // Width and height from a PNG's IHDR chunk.

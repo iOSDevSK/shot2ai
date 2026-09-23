@@ -1,5 +1,5 @@
 // End to end in a real Chromium with the unpacked extension loaded, against a
-// mock of the html2wp bridge on 127.0.0.1:47811 and a mock web chat.
+// mock of the html2wp bridge on a free 127.0.0.1 port and a mock web chat.
 import { test, expect, chromium } from '@playwright/test';
 import http from 'node:http';
 import { mkdtempSync, mkdirSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -11,6 +11,7 @@ import { startMockBridge, pngSize, CODE, PROJECT } from './mock-bridge.mjs';
 test.describe.configure({ mode: 'serial' });
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const manifestVersion = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version;
 const shots = join(root, 'screenshots');
 const BUSY = 'The assistant is working on Studio site. Send the screenshot when it finishes.';
 const SETUP = 'Wait for environment setup to finish before starting a conversation';
@@ -46,7 +47,7 @@ let tabId;
 
 test.beforeAll(async () => {
   mkdirSync(shots, { recursive: true });
-  bridge = await startMockBridge(47811);
+  bridge = await startMockBridge();
   site = http.createServer((_, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE); });
   await new Promise((r) => site.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${site.address().port}`;
@@ -71,6 +72,11 @@ test.beforeAll(async () => {
   writeFileSync(toolbar, readFileSync(toolbar, 'utf8').replace("mode: 'closed'", "mode: 'open'"));
   // Playwright cannot open Chrome's context menu: the copy records the items
   // it creates and exposes the click handler, which the tests call directly.
+  // The copy talks only to the mock's port, never to a real html2wp app on 47811–47815.
+  const bridgeJs = join(extension, 'src', 'bridge.js');
+  const probing = readFileSync(bridgeJs, 'utf8');
+  if (!probing.includes('export const PORTS = [47811, 47812, 47813, 47814, 47815];')) throw new Error('bridge.js ports changed; update the test');
+  writeFileSync(bridgeJs, probing.replace('export const PORTS = [47811, 47812, 47813, 47814, 47815];', `export const PORTS = [${bridge.port}];`));
   const background = join(extension, 'src', 'background.js');
   writeFileSync(background, `self.__menu = new Map();
 const __create = chrome.contextMenus.create.bind(chrome.contextMenus);
@@ -167,7 +173,7 @@ test('right-click menu: its items, Capture visible page, selection text, and Sen
   const worker = context.serviceWorkers()[0];
   const menu = () => worker.evaluate(() => [...self.__menu.values()].map((m) => ({ id: m.id, title: m.title, parentId: m.parentId, type: m.type, checked: m.checked, contexts: m.contexts })));
   await expect.poll(async () => (await menu()).map((m) => m.title || m.type)).toEqual([
-    'Shot2AI', 'Capture area…', 'Capture visible page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
+    'Shot2AI', `Shot2AI v${manifestVersion}`, 'Capture area…', 'Capture visible page', 'Capture saved region', 'separator', 'Send to', 'ChatGPT', 'html2wp',
     'Capture and send to ChatGPT', 'Send with prompt', 'Fix this bug', 'Explain this', 'Match this design', "What's wrong here?",
     'Send this image to ChatGPT', 'Send selection with a screenshot', 'separator', 'Options']);
   const items = await menu();
@@ -457,7 +463,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
   await expect(options.locator('#app-state')).toHaveText('Paired');
   await expect(options.getByRole('radio', { name: /^html2wp \(Mac app\)/ })).toBeChecked();
-  await expect(options.locator('.foot a')).toHaveAttribute('href', 'https://html2wp.dev/');
+  await expect(options.locator('.foot').getByRole('link', { name: /^html2wp — convert/ })).toHaveAttribute('href', 'https://html2wp.dev/');
 
   // ChatGPT as the default: the popup shows ChatGPT and its site permission, not html2wp's status.
   await options.getByRole('radio', { name: /^ChatGPT/ }).check();
@@ -568,7 +574,21 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   // Auto-submit on for Team chat: after pasting, its send button is pressed.
   const auto = await context.newPage();
   await auto.goto(`chrome-extension://${extensionId}/src/options.html`);
-  await auto.getByLabel('Send automatically to Team chat').check();
+  // The terms notice comes the first time auto-submit is turned on; Cancel leaves it off.
+  await auto.getByLabel('Send automatically to Team chat').click();
+  await expect(auto.locator('#terms-notice')).toBeVisible();
+  await expect(auto.locator('#terms-text')).toHaveText('Auto-submit presses the send button on a third-party website for you. Some services restrict automated use in their terms; you are responsible for using it within them.');
+  await auto.getByRole('button', { name: 'Cancel' }).first().click();
+  await expect(auto.getByLabel('Send automatically to Team chat')).not.toBeChecked();
+  await auto.getByLabel('Send automatically to Team chat').click();
+  await auto.getByRole('button', { name: 'I understand, turn it on' }).click();
+  await expect(auto.getByLabel('Send automatically to Team chat')).toBeChecked();
+  // Only once: a second chat turns on without the notice, and back off.
+  await auto.getByLabel('Send automatically to Claude').click();
+  await expect(auto.locator('#terms-notice')).toBeHidden();
+  await expect(auto.getByLabel('Send automatically to Claude')).toBeChecked();
+  await auto.getByLabel('Send automatically to Claude').click();
+  await expect(auto.getByLabel('Send automatically to Claude')).not.toBeChecked();
   await expect(auto.getByLabel('Send automatically to ChatGPT')).not.toBeChecked();
   await auto.locator('#dest-title').scrollIntoViewIfNeeded();
   await auto.locator('section[aria-labelledby="dest-title"]').screenshot({ path: join(shots, 'options-destinations.png') });
@@ -726,4 +746,62 @@ test('floating toolbar: off by default, on with all-site access, draggable, coll
   expect(await worker.evaluate(async () => (await chrome.storage.local.get('toolbar')).toolbar.enabled)).toBe(false);
   expect(await registered()).toEqual([]);
   await revoked.close();
+});
+
+test('legal: manifest name and description fit, the disclaimer shows, the version is the manifest\'s', async () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
+  expect(manifest.name).toBe('Shot2AI — Screenshot, Annotate & Send to AI');
+  expect(manifest.name.length).toBeLessThanOrEqual(75);
+  expect(manifest.description.length).toBeLessThanOrEqual(132);
+  expect(`${manifest.name} ${manifest.short_name}`).not.toMatch(/gpt|claude|openai|anthropic/i);
+
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await expect(options.locator('#disclaimer')).toHaveText('ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.');
+  await expect(options.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
+  await expect(options.getByRole('link', { name: "What's new" })).toHaveAttribute('href', `https://github.com/iOSDevSK/shot2ai/releases/tag/v${manifest.version}`);
+  await options.locator('#privacy').screenshot({ path: join(shots, 'options-privacy.png') });
+  await options.locator('.foot').screenshot({ path: join(shots, 'options-footer.png') });
+  await options.close();
+
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await expect(popup.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
+  await popup.close();
+  const editor = await context.newPage();
+  await editor.goto(`chrome-extension://${extensionId}/src/editor.html`);
+  await expect(editor.locator('#version')).toHaveText(`v${manifest.version}`);
+  await editor.close();
+});
+
+test('privacy: Clear all captures and settings empties storage and captures', async () => {
+  const worker = context.serviceWorkers()[0];
+  expect(Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).toEqual(expect.arrayContaining(['token', 'customChats', 'defaultDestination']));
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  await options.getByRole('button', { name: 'Clear all captures and settings' }).click();
+  await expect(options.locator('#clear-confirm')).toBeVisible();
+  await options.locator('#privacy').screenshot({ path: join(shots, 'options-clear.png') });
+  await options.getByRole('button', { name: 'Clear everything' }).click();
+  await options.waitForLoadState('load');
+  await expect(options.locator('#default-state')).toHaveText(/ChatGPT/);
+  // Only what the reopened page writes back: the built-in prompts, and the
+  // port where it just found the app. The pairing token and the rest are gone.
+  const left = await worker.evaluate(() => chrome.storage.local.get(null));
+  expect(Object.keys(left).filter((k) => !['prompts', 'port'].includes(k))).toEqual([]);
+  expect(left.token).toBeUndefined();
+  expect((left.prompts || []).map((p) => p.name)).toEqual(['Fix this bug', 'Explain this', 'Match this design', "What's wrong here?"]);
+  // The captures database was deleted; the reopened page may create it again, empty.
+  const counts = await worker.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('shot2ai-captures', 2);
+    req.onupgradeneeded = () => { for (const n of ['captures', 'handles']) if (!req.result.objectStoreNames.contains(n)) req.result.createObjectStore(n); };
+    req.onsuccess = () => {
+      const tx = req.result.transaction(['captures', 'handles']);
+      const a = tx.objectStore('captures').count();
+      const b = tx.objectStore('handles').count();
+      tx.oncomplete = () => { req.result.close(); resolve([a.result, b.result]); };
+    };
+  }));
+  expect(counts).toEqual([0, 0]);
+  await options.close();
 });

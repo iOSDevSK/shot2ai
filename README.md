@@ -1,4 +1,4 @@
-# Shot2AI: AI screenshot extension for ChatGPT, Claude & html2wp
+# Shot2AI — Screenshot, Annotate & Send to AI
 
 Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also paste the screenshot into a web chat such as ChatGPT or Claude, or save a copy.
 
@@ -66,7 +66,7 @@ Saved messages to send with a screenshot. Four come built in: **Fix this bug**, 
 
 ## Send automatically (opt-in)
 
-Each web chat in **Options → Other destinations** has a **Send automatically** switch, off by default. With it on, Shot2AI presses the chat's send button after pasting, so the message goes without you reviewing it. ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. If none is found, the card says so and the text waits for you to press Enter. It is never used for html2wp, which has its own flow.
+Each web chat in **Options → Other destinations** has a **Send automatically** switch, off by default. The first time you turn one on, Shot2AI shows a notice: auto-submit presses the send button on a third-party website for you, and some services restrict automated use in their terms. With it on, Shot2AI presses the chat's send button after pasting, so the message goes without you reviewing it. ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. If none is found, the card says so and the text waits for you to press Enter. It is never used for html2wp, which has its own flow.
 
 ## Saved region
 
@@ -131,6 +131,15 @@ The test loads a copy of the extension with a few changes. Its manifest also hol
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 
 html2wp converts any website to WordPress: https://html2wp.dev/
+
+## Legal
+
+- `LICENSE`: proprietary, all rights reserved.
+- `THIRD-PARTY-NOTICES.md`: better-shot (BSD 3-Clause), the only third-party code.
+- `PRIVACY.md`: the privacy policy. Options → Privacy summarises it and has **Clear all captures and settings**.
+- `STORE-LISTING.md`: the Chrome Web Store listing, the single-purpose statement and the permission justifications.
+
+ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.
 
 ## Credits
 

@@ -22,6 +22,8 @@ const DEFAULTS = {
   defaultDestination: 'chatgpt',
   // Web chats whose send button Shot2AI presses after pasting (by id). Off unless turned on.
   autoSubmit: {},
+  // The owner has read the terms notice for Send automatically (shown once).
+  autoSubmitTermsAck: false,
   // The floating toolbar: off unless switched on in Options.
   toolbar: { enabled: false, collapsed: false },
   toolbarHidden: {},

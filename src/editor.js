@@ -13,6 +13,7 @@ import { pasteIntoChat } from './webchat.js';
 import { encode, EXTENSIONS } from './imaging.js';
 
 paint();
+document.getElementById('version').textContent = `v${chrome.runtime.getManifest().version}`;
 const $ = (id) => document.getElementById(id);
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d');

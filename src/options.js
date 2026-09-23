@@ -123,6 +123,20 @@ async function allow(url) {
 }
 // Off by default: pressing the chat's send button means the message goes
 // without the owner reviewing it.
+// The terms notice comes once, the first time any Send automatically is turned on.
+let pendingAutoSubmit = null;
+function askTerms(run) {
+  pendingAutoSubmit = run;
+  $('terms-notice').hidden = false;
+  $('terms-ok').focus();
+}
+$('terms-ok').addEventListener('click', async () => {
+  await update({ autoSubmitTermsAck: true });
+  $('terms-notice').hidden = true;
+  await pendingAutoSubmit?.();
+  pendingAutoSubmit = null;
+});
+$('terms-cancel').addEventListener('click', async () => { $('terms-notice').hidden = true; pendingAutoSubmit = null; await renderDestinations(); });
 function autoSubmitToggle(id, name, s) {
   const label = document.createElement('label');
   label.className = 'toggle auto';
@@ -130,9 +144,14 @@ function autoSubmitToggle(id, name, s) {
   const box = label.querySelector('input');
   box.checked = !!s.autoSubmit[id];
   box.setAttribute('aria-label', `Send automatically to ${name}`);
-  box.addEventListener('change', async () => {
+  const set = async (on) => {
     const current = (await settings()).autoSubmit;
-    await update({ autoSubmit: { ...current, [id]: box.checked } });
+    await update({ autoSubmit: { ...current, [id]: on } });
+    await renderDestinations();
+  };
+  box.addEventListener('change', async () => {
+    if (box.checked && !(await settings()).autoSubmitTermsAck) { box.checked = false; askTerms(() => set(true)); return; }
+    await set(box.checked);
   });
   return label;
 }
@@ -328,6 +347,28 @@ $('toolbar-on').addEventListener('change', async (e) => {
   }
   await renderToolbar();
 });
+
+// ---- privacy ------------------------------------------------------------
+
+$('clear-all').addEventListener('click', () => { $('clear-confirm').hidden = false; $('clear-yes').focus(); });
+$('clear-no').addEventListener('click', () => { $('clear-confirm').hidden = true; });
+$('clear-yes').addEventListener('click', async () => {
+  await chrome.storage.local.clear();
+  await chrome.storage.session?.clear?.().catch(() => {});
+  await new Promise((resolve) => { const req = indexedDB.deleteDatabase('shot2ai-captures'); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
+  await syncToolbar().catch(() => {});
+  // Sites allowed for web chats and the toolbar's all-site access go too.
+  const { origins = [] } = await chrome.permissions.getAll();
+  const optional = origins.filter((o) => o !== 'http://127.0.0.1/*');
+  if (optional.length) await chrome.permissions.remove({ origins: optional }).catch(() => {});
+  location.reload();
+});
+
+// ---- version ------------------------------------------------------------
+
+const { version } = chrome.runtime.getManifest();
+$('version').textContent = `Shot2AI v${version}`;
+$('whats-new').href = `https://github.com/iOSDevSK/shot2ai/releases/tag/v${version}`;
 
 // ---- paste --------------------------------------------------------------
 

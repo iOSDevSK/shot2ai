@@ -101,4 +101,6 @@ chrome.commands.getAll().then((commands) => {
   const key = commands.find((c) => c.name === 'capture-area')?.shortcut;
   $('shortcut').innerHTML = key ? `<kbd>${key.replace(/</g, '')}</kbd> captures from any page` : '';
 });
+// Read from the manifest, so the popup always names the build that is loaded.
+$('version').textContent = `Shot2AI v${chrome.runtime.getManifest().version}`;
 refresh();

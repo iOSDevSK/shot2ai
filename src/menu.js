@@ -11,6 +11,7 @@ export async function menuItems() {
   const item = (id, title, extra = {}) => ({ id, parentId: 'shot2ai', contexts: CONTEXTS, ...(title ? { title } : {}), ...extra });
   return [
     { id: 'shot2ai', title: 'Shot2AI', contexts: CONTEXTS },
+    item('version', `Shot2AI v${chrome.runtime.getManifest().version}`, { enabled: false }),
     item('capture-area', 'Capture area…'),
     item('capture-visible', 'Capture visible page'),
     item('capture-saved', 'Capture saved region'),

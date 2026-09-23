@@ -1,12 +1,12 @@
-"""Builds dist/shot2ai-<version>.zip: manifest.json, src, icons, licenses and
-README.md, nothing else. It fails when a file that the manifest, a page, a
+"""Builds dist/shot2ai-<version>.zip: manifest.json, src, icons, licenses,
+README.md, LICENSE, THIRD-PARTY-NOTICES.md and PRIVACY.md, nothing else. It fails when a file that the manifest, a page, a
 module import or an injected script refers to is not in the ZIP.
 Run from the repo root: python3 scripts/package.py"""
 import json, posixpath, re, sys, zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PARTS = ['manifest.json', 'src', 'icons', 'licenses', 'README.md']
+PARTS = ['manifest.json', 'src', 'icons', 'licenses', 'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'PRIVACY.md']
 
 def files():
     for part in PARTS:
@@ -38,7 +38,13 @@ def references(names):
     return refs
 
 def main():
-    version = json.loads((ROOT / 'manifest.json').read_text())['version']
+    manifest = json.loads((ROOT / 'manifest.json').read_text())
+    version = manifest['version']
+    # Chrome Web Store limits: a 75-character name, a 132-character description.
+    for field, limit in (('name', 75), ('short_name', 12), ('description', 132)):
+        if len(manifest[field]) > limit:
+            print(f'manifest {field} is {len(manifest[field])} characters; the limit is {limit}')
+            sys.exit(1)
     names = list(files())
     missing = [(who, ref) for who, ref in references(names) if ref not in names]
     if missing:

@@ -65,3 +65,10 @@ select.field{height:36px}
 .dest .auto{font-size:12px;color:var(--muted);margin-right:14px}
 .privacy-note b{font-weight:650}
 .dest>:last-child{min-width:78px;display:flex;justify-content:flex-end}
+.terms{margin-top:10px}
+.terms p,#clear-confirm p{margin:0 0 10px}
+.notice .actions{display:flex;gap:8px}
+.facts{margin:0 0 12px;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--ink)}
+.facts b{font-weight:650}
+.foot p{margin:0 0 6px}
+.disclaimer{color:var(--faint);font-size:11px;line-height:1.5}

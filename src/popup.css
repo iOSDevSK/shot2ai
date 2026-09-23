@@ -27,3 +27,6 @@ body{width:340px;background:var(--canvas)}
 .links a:hover,.link:hover{text-decoration:underline}
 .links a{margin-left:auto}
 .allow{margin-bottom:6px;border-color:var(--green);color:var(--green-dark);font-weight:600}
+.links .meta-links{margin-left:auto;color:var(--faint)}
+.links a{margin-left:0}
+.version{color:var(--faint)}

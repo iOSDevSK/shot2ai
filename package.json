@@ -1,9 +1,9 @@
 {
   "name": "shot2ai",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Shot2AI: send an annotated screenshot to html2wp, ChatGPT, Claude or any AI chat",
+  "description": "Shot2AI: capture, annotate and send screenshots to an AI chat or the html2wp app",
   "scripts": {
     "test": "playwright test"
   },

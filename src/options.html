@@ -43,6 +43,10 @@
       <button class="button" type="submit">Add chat</button>
     </form>
     <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once. <b>Send automatically</b> (off by default) presses the chat's send button after pasting, so the message goes without you reviewing it; it is never used for html2wp. Send to all selected sends to every ticked site.</p>
+    <div id="terms-notice" class="notice warn terms" role="alertdialog" aria-labelledby="terms-text" hidden>
+      <p id="terms-text">Auto-submit presses the send button on a third-party website for you. Some services restrict automated use in their terms; you are responsible for using it within them.</p>
+      <div class="actions"><button id="terms-ok" class="button primary" type="button">I understand, turn it on</button><button id="terms-cancel" class="button" type="button">Cancel</button></div>
+    </div>
     <p id="dest-error" class="notice err" role="alert" hidden></p>
   </section>
 
@@ -80,12 +84,31 @@
     <div id="toolbar-hidden" class="list"></div>
   </section>
 
+  <section class="section" id="privacy" aria-labelledby="privacy-title">
+    <div class="section-head"><div><h2 id="privacy-title">Privacy</h2><p>What Shot2AI handles, and where it goes. <a href="../PRIVACY.md" target="_blank" rel="noopener">Full privacy policy</a></p></div></div>
+    <ul class="facts">
+      <li><b>Captured:</b> screenshots of the page you are on, only when you ask; the message you type; text you selected for "Send selection"; the page's address and title, to label the capture.</li>
+      <li><b>Sent:</b> only where you send it. html2wp is the app on this computer (127.0.0.1); a web chat is the site you chose, under its own terms. There is no Shot2AI server.</li>
+      <li><b>Stored:</b> settings, prompts and destinations in Chrome's extension storage; captures in the extension's IndexedDB (deleted after a day); all on this device.</li>
+      <li><b>Never:</b> no analytics, no tracking, no advertising, no sale of data.</li>
+    </ul>
+    <p class="note">The use of information received from Chrome APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.</p>
+    <div class="row"><button id="clear-all" class="button" type="button">Clear all captures and settings</button></div>
+    <div id="clear-confirm" class="notice err" role="alertdialog" aria-labelledby="clear-text" hidden>
+      <p id="clear-text">This deletes every capture, your settings, prompts, destinations, saved regions and the html2wp pairing, and turns the floating toolbar off. It cannot be undone.</p>
+      <div class="actions"><button id="clear-yes" class="button primary" type="button">Clear everything</button><button id="clear-no" class="button" type="button">Cancel</button></div>
+    </div>
+  </section>
+
   <section class="section" aria-labelledby="paste-title">
     <div class="section-head"><div><h2 id="paste-title">Paste a screenshot</h2><p>Took a screenshot some other way? Paste it here to annotate and send it.</p></div></div>
     <div id="paste-zone" class="paste-zone" tabindex="0"><span data-icon="capture"></span><span id="paste-keys"></span></div>
   </section>
 </main>
-<footer class="foot">Shot2AI · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></footer>
+<footer class="foot">
+  <p><span id="version">Shot2AI</span> · <a id="whats-new" href="https://github.com/iOSDevSK/shot2ai/releases" target="_blank" rel="noopener">What's new</a> · <a href="../PRIVACY.md" target="_blank" rel="noopener">Privacy</a> · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></p>
+  <p id="disclaimer" class="disclaimer">ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.</p>
+</footer>
 <script type="module" src="options.js"></script>
 </body>
 </html>
