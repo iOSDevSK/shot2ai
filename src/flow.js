@@ -124,7 +124,7 @@ export async function sendCaptures(message) {
   const blobs = [];
   for (const c of captures) blobs.push(await encode(c.png, s));
   const names = captures.map((c, i) => fileName(s.filenamePattern, c.url, new Date(Date.now() + i * 1000), EXTENSIONS[blobs[i].type]));
-  const r = await pasteIntoChat(destination, blobs, message.text, names);
+  const r = await pasteIntoChat(destination, blobs, message.text, names, { newChat: !!message.newChat });
   if (r.needsPermission) return { ok: false, sentIds: [], text: `Allow the extension to use ${new URL(destination.url).host} in Options first.` };
   if (r.submitted) return { ok: true, sentIds: captures.map((c) => c.id), text: `Sent ${captures.length} screenshots to ${destination.name}.`, tabId: r.tabId };
   if (r.ok && !r.autoSubmit) return { ok: true, sentIds: captures.map((c) => c.id), text: `Pasted ${captures.length} screenshots into ${destination.name}. Press Enter there to send.`, tabId: r.tabId };
@@ -155,9 +155,9 @@ export async function cardSend(message, sender) {
   }
   const s = await settings();
   const blob = await encode(capture.png, s);
-  const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+  const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]), { newChat: !!message.newChat });
   const outcome = chatOutcome(destination.name, r);
-  // Sent to ChatGPT or Claude: the card turns into the answer card.
+  // Sent to a chat whose answer Shot2AI reads (sites/): the card turns into the answer card.
   if (r.submitted && readsAnswers(destination) && sender?.tab && await getCapture(message.id)) {
     await updateCapture(message.id, { asked: message.text || '' });
     watchAnswer({ captureId: message.id, originTabId: sender.tab.id, chatTabId: r.tabId, destination, baseline: r.baseline });
@@ -224,6 +224,7 @@ function manyText(r) {
   if (r.needsPermission) return 'Needs permission in Options';
   const line = {
     noSendButton: 'Pasted; send button not found, press Enter there', notAttached: 'The image did not attach; nothing sent, it is on the clipboard',
+    login: 'Log in there once, keep the tab open; nothing sent', plan: 'It did not take the image (a plan or a sign-in?); nothing sent',
     noComposer: 'Message box not found; nothing sent', busy: 'Still answering; nothing sent', noText: 'The message did not go in; nothing sent',
     uploadFailed: 'The upload failed; nothing sent', notConfirmed: 'Send not confirmed; check its tab',
   }[r.reason];

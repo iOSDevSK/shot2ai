@@ -1,5 +1,5 @@
 // The chat's answer, back on the owner's page. After a confirmed send to
-// ChatGPT or Claude, the service worker reads the newest answer in the chat's
+// ChatGPT, Claude, Gemini or Perplexity, the service worker reads the newest answer in the chat's
 // tab every moment and passes it to the card in the tab the screenshot came
 // from. It reads only that chat's answer to this message: the page's own
 // text as it is shown, never its cookies or its data. The answer travels as
@@ -11,6 +11,7 @@
 // long as the answer takes (an open port alone does not), and the watch, its
 // timeouts and the relay stay in one place.
 import { updateCapture, getCapture } from './captures.js';
+import { rememberConversation } from './webchat.js';
 
 // poll: between reads. settle: an answer that stopped changing, with no stop
 // button, is finished after this (longer when no stop button was ever seen).
@@ -37,8 +38,24 @@ export function readAnswer(sel, baseline) {
   const asked = mine.length > baseline.user ? mine[mine.length - 1] : null;
   const answer = asked ? messages.filter((m) => asked.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)
     : messages.length > baseline.answers ? [messages[messages.length - 1]] : [];
-  const out = { started: answer.length > 0, stop, streaming, blocks: [], truncated: false, url: location.href };
+  const out = { started: answer.length > 0, stop, streaming, blocks: [], sources: [], truncated: false, url: location.href };
   if (!answer.length) return out;
+  // Sources the chat lists with its answer (Perplexity): links to other sites,
+  // from the answer's own entry on the page, eight at most.
+  if (sel.sources.length) {
+    const entry = sel.entry.map((s) => answer[0].closest(s)).find(Boolean) || answer[0].parentElement || answer[0];
+    const seen = new Set();
+    for (const s of sel.sources) {
+      for (const link of entry.querySelectorAll(s)) {
+        let href = '';
+        try { const u = new URL(link.getAttribute('href') || '', location.href); if (/^https?:$/.test(u.protocol) && u.origin !== location.origin) href = u.href; } catch { /* not an address */ }
+        if (!href || seen.has(href) || out.sources.length >= 8) continue;
+        seen.add(href);
+        const title = (link.getAttribute('title') || link.textContent || '').replace(/\s+/g, ' ').trim();
+        out.sources.push({ href, title: (title.length > 3 ? title : new URL(href).hostname).slice(0, 120) });
+      }
+    }
+  }
   const roots = [];
   for (const message of answer) {
     let found = [];
@@ -135,13 +152,15 @@ function relay(job, answer) {
   chrome.tabs.sendMessage(job.originTabId, { type: 'shot2ai-answer', id: job.captureId, answer }, { frameId: 0 }).catch(() => { /* the card is not there now; it shows what is kept */ });
 }
 function snapshot(job, state, blocks = job.blocks, truncated = job.truncated) {
-  return { state, name: job.name, destination: job.destination, tabId: job.chatTabId, blocks, truncated: !!truncated };
+  return { state, name: job.name, destination: job.destination, tabId: job.chatTabId, blocks, sources: job.sources, truncated: !!truncated };
 }
 async function finish(job, state) {
   jobs.delete(job.captureId);
   clearTimeout(job.timer);
   const answer = snapshot(job, state);
   relay(job, answer);
+  // Where this conversation is now (a new chat gets its own address once it starts).
+  if (job.url) await rememberConversation(job.site, job.url).catch(() => {});
   if (await getCapture(job.captureId).catch(() => null)) await updateCapture(job.captureId, { answer }).catch(() => {});
 }
 
@@ -158,9 +177,10 @@ async function tick(job) {
   }
   if (!jobs.has(job.captureId)) return;
   if (!snap) { job.timer = setTimeout(() => void tick(job), TIMING.poll); return; }
-  const key = JSON.stringify(snap.blocks);
+  if (snap.url) job.url = snap.url;
+  const key = JSON.stringify([snap.blocks, snap.sources]);
   const started = snap.started && snap.blocks.length > 0;
-  if (key !== job.key) { job.key = key; job.changedAt = now; job.activeAt = now; job.blocks = snap.blocks; job.truncated = snap.truncated; }
+  if (key !== job.key) { job.key = key; job.changedAt = now; job.activeAt = now; job.blocks = snap.blocks; job.sources = snap.sources; job.truncated = snap.truncated; }
   if (snap.stop || snap.streaming) { job.activeAt = now; job.sawStop = job.sawStop || snap.stop; }
   const still = now - job.changedAt;
   if (started && !snap.stop && !snap.streaming && still >= (job.sawStop ? TIMING.settle : TIMING.settleUnsure)) { await finish(job, 'done'); return; }
@@ -178,9 +198,12 @@ export function watchAnswer({ captureId, originTabId, chatTabId, destination, ba
   stopAnswer(captureId);
   const now = Date.now();
   const job = {
-    captureId, originTabId, chatTabId, name: destination.name, destination: destination.id, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
-    selectors: { answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [], user: destination.userSelectors || [] },
-    startedAt: now, changedAt: now, activeAt: now, sentAt: 0, key: '[]', relayedKey: null, blocks: [], truncated: false, sawStop: false, timer: 0,
+    captureId, originTabId, chatTabId, name: destination.name, destination: destination.id, site: destination, url: null, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
+    selectors: {
+      answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [],
+      user: destination.userSelectors || [], sources: destination.sourceSelectors || [], entry: destination.entrySelectors || [],
+    },
+    startedAt: now, changedAt: now, activeAt: now, sentAt: 0, key: '[[],[]]', relayedKey: null, blocks: [], sources: [], truncated: false, sawStop: false, timer: 0,
   };
   jobs.set(captureId, job);
   updateCapture(captureId, { answer: snapshot(job, 'answering') }).catch(() => {});

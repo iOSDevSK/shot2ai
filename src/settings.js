@@ -1,37 +1,20 @@
 // Shot2AI settings: the owner's choices, kept in chrome.storage.local, and the
 // destinations a screenshot can go to. ChatGPT is the default out of the box;
 // the owner can choose another in Options.
+import chatgpt from './sites/chatgpt.js';
+import claude from './sites/claude.js';
+import gemini from './sites/gemini.js';
+import perplexity from './sites/perplexity.js';
+
 export const HTML2WP = { id: 'html2wp', name: 'html2wp', kind: 'html2wp' };
 export const SAVE_ONLY = { id: 'save', name: 'Save only', kind: 'save' };
 export const COPY_ONLY = { id: 'copy', name: 'Copy only', kind: 'copy' };
-// Web chats with a known composer. Any other chat uses the generic finder.
-// For ChatGPT and Claude Shot2AI also knows the stop button (shown while the
-// chat answers), the owner's messages and the chat's answers, so it can
-// confirm a send and read the answer back. These follow the sites' pages as
-// they are and may need updating when a site changes; every one has a
-// fallback, and a send that cannot be confirmed says so in the card.
-export const PRESETS = [
-  {
-    id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/',
-    selectors: ['#prompt-textarea', 'div[contenteditable="true"].ProseMirror'],
-    sendSelectors: ['button[data-testid="send-button"]', '#composer-submit-button', 'button[aria-label="Send prompt"]'],
-    stopSelectors: ['button[data-testid="stop-button"]', 'button[aria-label="Stop streaming"]', 'button[aria-label^="Stop" i]'],
-    userSelectors: ['[data-message-author-role="user"]'],
-    answerSelectors: ['[data-message-author-role="assistant"]'],
-    contentSelectors: ['.markdown'],
-    streamingSelectors: ['.result-streaming'],
-  },
-  {
-    id: 'claude', name: 'Claude', url: 'https://claude.ai/new',
-    selectors: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'],
-    sendSelectors: ['button[aria-label="Send message"]', 'button[aria-label="Send Message"]'],
-    stopSelectors: ['button[aria-label="Stop response"]', 'button[aria-label^="Stop" i]'],
-    userSelectors: ['[data-testid="user-message"]'],
-    answerSelectors: ['.font-claude-response', '.font-claude-message', '[data-is-streaming]'],
-    contentSelectors: ['.font-claude-response', '.font-claude-message'],
-    streamingSelectors: ['[data-is-streaming="true"]'],
-  },
-];
+// Web chats with a known composer, each in its own file under sites/: the
+// message box, the send and stop buttons, the owner's messages and the chat's
+// answers, so Shot2AI can send there, confirm the send and read the answer
+// back. When one site changes its page, only its file needs updating. Any
+// other chat uses the generic finder.
+export const PRESETS = [chatgpt, claude, gemini, perplexity];
 const DEFAULTS = {
   saveCopy: false,
   saveSubfolder: 'shot2ai',
@@ -44,7 +27,7 @@ const DEFAULTS = {
   // The destination the card's main button uses.
   defaultDestination: 'chatgpt',
   // Web chats whose send button Shot2AI presses after pasting (by id): on
-  // for ChatGPT and Claude, off for the owner's own chats, unless changed.
+  // for the known chats (sites/), off for the owner's own chats, unless changed.
   autoSubmit: {},
   // The owner has read the terms notice for Send automatically (shown once).
   autoSubmitTermsAck: false,
@@ -69,7 +52,7 @@ export async function settings() {
 }
 export const update = (patch) => chrome.storage.local.set(patch);
 
-// Send automatically: ChatGPT and Claude unless the owner turned it off,
+// Send automatically: the known chats (sites/) unless the owner turned it off,
 // their own chats only when turned on.
 export const autoSubmitOn = (s, id) => s.autoSubmit?.[id] ?? PRESETS.some((p) => p.id === id);
 // The chats whose answer Shot2AI can read back into the card.
@@ -81,6 +64,8 @@ export const readsAnswers = (d) => !!d?.answerSelectors?.length;
 export function chatOutcome(name, r) {
   if (r.submitted) return { tone: 'ok', text: `Sent to ${name}.` };
   switch (r.reason) {
+    case 'login': return { tone: 'warn', open: true, retry: 'Send again', text: `Log in to ${name} once, then keep the tab open. Your screenshot waits here; nothing was sent.` };
+    case 'plan': return { tone: 'warn', open: true, text: `${name} did not take the screenshot${r.detail ? `: “${r.detail.replace(/[\s.!]+$/, '')}”` : ''}. It may need a sign-in or a paid plan. Nothing was sent.` };
     case 'noComposer': return { tone: 'warn', open: true, text: `${name}'s message box was not found, so nothing was sent. Are you signed in there?` };
     case 'busy': return { tone: 'warn', open: true, retry: true, text: `${name} is still answering in its tab, so nothing was sent. Send again when it finishes.` };
     case 'noText': return { tone: 'warn', open: true, text: `${name} took the screenshot but not your message, so nothing was sent. Finish it in the ${name} tab.` };
@@ -109,6 +94,8 @@ export function sitePattern(url) {
 }
 
 const chat = (c) => ({ ...c, kind: 'chat', selectors: c.selectors || [], sendSelectors: c.sendSelectors || [], origin: origin(c.url) });
+// A known chat (sites/): its tab and its conversation are remembered.
+const preset = (p) => chat({ ...p, preset: true });
 export const FIRST_DEFAULT = 'chatgpt';
 
 // Saved prompts. These four are there on first use; the owner may edit or delete them.
@@ -130,11 +117,11 @@ export async function defaultPromptText() {
   const [list, s] = await Promise.all([prompts(), settings()]);
   return list.find((p) => p.id === s.defaultPrompt)?.text || '';
 }
-// Everything the owner can choose as the default: ChatGPT, Claude, html2wp,
+// Everything the owner can choose as the default: ChatGPT, Claude, Gemini, Perplexity, html2wp,
 // their own chats, then Copy only and Save only.
 export async function choices() {
   const s = await settings();
-  return [...PRESETS.map(chat), HTML2WP, ...s.customChats.map(chat), COPY_ONLY, SAVE_ONLY];
+  return [...PRESETS.map(preset), HTML2WP, ...s.customChats.map(chat), COPY_ONLY, SAVE_ONLY];
 }
 // Choosing the default (the popup's list, Options): a preset chat chosen as
 // the default is also turned on in the card's menu.
@@ -146,7 +133,7 @@ export function defaultPatch(id, s) {
 export async function destinations() {
   const s = await settings();
   const on = (p) => s.presets[p.id] || s.defaultDestination === p.id;
-  return [...PRESETS.filter(on).map(chat), HTML2WP, ...s.customChats.map(chat)];
+  return [...PRESETS.filter(on).map(preset), HTML2WP, ...s.customChats.map(chat)];
 }
 // The default destination; ChatGPT unless the owner chose another.
 export async function defaultDestination() {

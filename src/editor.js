@@ -369,7 +369,7 @@ async function submit(target = destination, confirmed = false) {
     sending = false;
     setSend(actionLabel(destination));
     // Sent in the background, or stopped short: the chat's tab is one click away.
-    const open = r.tabId ? [[`Open ${target.name} tab`, () => void openChatTab(r.tabId, target.url), !r.submitted]] : [];
+    const open = r.tabId ? [[`Open ${target.name} tab`, () => void openChatTab(r.tabId, target), !r.submitted]] : [];
     const outcome = r.needsPermission ? null : chatOutcome(target.name, r);
     if (r.submitted) { showResult('ok', outcome.text, open); return; }
     if (r.notAttached) { showResult('warn', copied ? `${target.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${modKey}V.` : `${target.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, open); return; }

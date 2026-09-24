@@ -121,7 +121,7 @@ async function allow(url) {
   if (!granted) fail(`Chrome did not allow the extension to use ${hostOf(url)}. Try again and choose Allow.`);
   return granted;
 }
-// On for ChatGPT and Claude, off for the owner's own chats: pressing the
+// On for the known chats (ChatGPT, Claude, Gemini, Perplexity), off for the owner's own: pressing the
 // chat's send button means the message goes without the owner reviewing it.
 // The terms notice comes once, the first time any Send automatically is turned on.
 let pendingAutoSubmit = null;

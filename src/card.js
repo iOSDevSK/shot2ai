@@ -6,7 +6,7 @@
 // which keeps the stack, so it survives navigation within the tab. Only the
 // clipboard is written here, while the page has focus.
 //
-// Sent to ChatGPT or Claude, the card turns into an answer card: "Sending…",
+// Sent to ChatGPT, Claude, Gemini or Perplexity, the card turns into an answer card: "Sending…",
 // then the chat's answer as the service worker reads it from the chat's tab.
 // The answer arrives as a tree of paragraphs, lists, code and links and is
 // built here from text only (createElement, textContent): nothing from the
@@ -73,6 +73,10 @@
     .menu .all{margin-top:4px;border-top:1px solid #eef0ea;border-radius:0;font-weight:600;color:#2f3c30}
     .menu .strong{font-weight:600;color:#2f3c30}
     .menu .options{border-top:1px solid #eef0ea;margin-top:4px;border-radius:0 0 6px 6px;color:#547254}
+    .menu .new-chat{justify-content:flex-start;gap:8px;margin-top:4px;border-top:1px solid #eef0ea;border-radius:0}
+    .menu .new-chat small{margin-left:auto}
+    .menu .new-chat .box{flex:none;width:15px;height:15px;border:1.5px solid #9fae94;border-radius:4px;background:#fff}
+    .menu .new-chat[aria-checked="true"] .box{border-color:#2f3c30;background:#2f3c30 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/11px no-repeat}
     .tools{display:flex;gap:2px;margin-top:8px}
     .tools button{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;height:30px;padding:0 3px;gap:4px;border-radius:7px;color:#4d5a47;font-size:11px;font-weight:560;white-space:nowrap}
     .tools button:hover{background:#eef0ea}
@@ -84,8 +88,8 @@
     .result.ok{border-color:#d5e3c8;background:#edf3e7;color:#34502a}
     .result.warn{border-color:#efe2c2;background:#faf3e3;color:#5f4a1f}
     .result.err{border-color:#eed8d0;background:#fbefeb;color:#6f3f33}
-    .result .actions{display:flex;gap:6px;margin-top:7px}
-    .result .actions button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:1px solid #dfe2d9;border-radius:6px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600}
+    .result .actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+    .result .actions button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border:1px solid #dfe2d9;border-radius:6px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
     .result .actions button.primary{border-color:#2f3c30;background:#2f3c30;color:#fff}
     .result .actions svg{width:13px;height:13px}
     .result ul{margin:0;padding:0;list-style:none}
@@ -136,6 +140,14 @@
     .a-body .skeleton i:nth-child(2){width:86%}.a-body .skeleton i:nth-child(3){width:58%}
     @keyframes shimmer{to{background-position:-200% 0}}
     .a-note{margin-top:6px;font-size:11px;color:#8a6a2c}
+    .a-sources{margin-top:8px}
+    .a-sources h3{margin:0 0 4px;font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:#969f88}
+    .a-sources ol{display:flex;flex-direction:column;gap:3px;margin:0;padding:0;list-style:none;counter-reset:source}
+    .a-sources li{display:flex;align-items:baseline;gap:6px;min-width:0;font-size:11.5px;counter-increment:source}
+    .a-sources li::before{content:counter(source);flex:none;min-width:16px;padding:0 4px;border-radius:4px;background:#eef0ea;color:#4d5a47;font-size:10px;font-weight:650;text-align:center}
+    .a-sources a{min-width:0;overflow:hidden;color:#3d6a3d;text-decoration:none;text-overflow:ellipsis;white-space:nowrap}
+    .a-sources a:hover{text-decoration:underline}
+    .a-sources small{flex:none;color:#969f88;font-size:10.5px}
     .a-actions{display:flex;align-items:center;gap:6px;margin-top:9px}
     .a-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:0;height:30px;padding:0 10px;border:1px solid #dfe2d9;border-radius:7px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
     .a-actions button:hover:not(:disabled){background:#f1f3ee}
@@ -241,6 +253,12 @@
     return out.join('\n\n').split('\n').map((l, n) => (n && l ? indent + l : l)).join('\n');
   }
 
+  // "Copy answer": the answer as Markdown, then its sources.
+  function answerText(a) {
+    const sources = (Array.isArray(a?.sources) ? a.sources : []).filter((x) => /^https?:\/\//i.test(x?.href || ''));
+    return markdown(a?.blocks) + (sources.length ? `\n\nSources:\n${sources.map((x, n) => `${n + 1}. [${x.title || x.href}](${x.href})`).join('\n')}` : '');
+  }
+
   let ui = null;
 
   // payload: the stack's captures (oldest first), which one is in front, and
@@ -290,6 +308,7 @@
           <div class="a-head"><span class="a-icon"></span><span class="a-status" role="status"></span></div>
           <div class="a-asked" hidden></div>
           <div class="a-body" tabindex="0" role="region"></div>
+          <div class="a-sources" hidden><h3>Sources</h3><ol></ol></div>
           <div class="a-note" hidden></div>
           <div class="a-actions"></div>
         </div>
@@ -371,7 +390,8 @@
       const kind = o.main.kind;
       const svg = { copy: i.copy, save: i.download }[kind] || i.send;
       $('.send').innerHTML = `${svg}<span></span>`;
-      $('.send span').textContent = o.main.label;
+      // "New chat" in the menu: the next send starts a new conversation.
+      $('.send span').textContent = kind === 'chat' && now()?.newChat ? `${o.main.label} (new chat)` : o.main.label;
     }
 
     function showResult(tone, text, actions = [], lines = null) {
@@ -442,7 +462,7 @@
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
       else if (r?.actions === 'open-chat') {
         const again = r.retry && o.destinations.find((d) => d.id === r.chat.destination);
-        showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [['Try again', () => void sendTo(again), false, 'retry']] : [])]);
+        showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [[typeof r.retry === 'string' ? r.retry : 'Try again', () => void sendTo(again), false, 'retry']] : [])]);
       } else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
       else showResult('', '');
       label();
@@ -506,6 +526,22 @@
       else if (a.state === 'gone') hint('Shot2AI can no longer read the answer.');
       body.replaceChildren(content);
       if (atEnd) body.scrollTop = body.scrollHeight;
+      // The answer's sources (Perplexity lists them): http and https only, in a new tab.
+      const sources = (Array.isArray(a.sources) ? a.sources : []).filter((x) => typeof x?.href === 'string' && /^https?:\/\//i.test(x.href)).slice(0, 8);
+      $('.a-sources ol').replaceChildren(...sources.map((x) => {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = x.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer nofollow';
+        link.textContent = String(x.title || x.href).slice(0, 120);
+        link.title = x.href;
+        const host = document.createElement('small');
+        try { host.textContent = new URL(x.href).hostname.replace(/^www\./, ''); } catch { /* shown without its site */ }
+        li.append(link, host);
+        return li;
+      }));
+      $('.a-sources').hidden = !sources.length;
       $('.a-note').textContent = a.truncated ? `The answer is longer than the card shows; see the rest in ${name}.` : '';
       $('.a-note').hidden = !a.truncated;
       // Actions.
@@ -523,7 +559,7 @@
       if (a.state === 'done') {
         const copyButton = button('Copy answer', async () => {
           let ok = false;
-          try { await navigator.clipboard.writeText(markdown(blocks)); ok = true; } catch { /* the page lost focus */ }
+          try { await navigator.clipboard.writeText(answerText(a)); ok = true; } catch { /* the page lost focus */ }
           copyButton.querySelector('span').textContent = ok ? 'Copied' : 'Could not copy';
           setTimeout(() => { if (copyButton.isConnected) copyButton.querySelector('span').textContent = 'Copy answer'; }, 1600);
         }, 'primary', 'copy');
@@ -532,7 +568,7 @@
         button(`Continue in ${name}`, () => openChat(chat), '', 'open');
       } else if (a.state !== 'sending' && a.state !== 'gone') {
         button(`Open ${name} tab`, () => openChat(chat), 'primary', 'open');
-        if (blocks.length) button('Copy answer', () => navigator.clipboard.writeText(markdown(blocks)).catch(() => {}), '', 'copy');
+        if (blocks.length) button('Copy answer', () => navigator.clipboard.writeText(answerText(a)).catch(() => {}), '', 'copy');
       }
       if (a.state !== 'sending') button('Close', () => removeEntry(entry), 'quiet');
       $('.a-actions').replaceChildren(...actions);
@@ -703,7 +739,7 @@
         }
         // Copied first, while this page has focus: the fallback if pasting fails.
         const copied = await copy(entry, true);
-        // Sent automatically to ChatGPT or Claude: the card becomes the answer card now.
+        // Sent automatically to a chat whose answer Shot2AI reads: the card becomes the answer card now.
         const answering = !!destination.answers;
         const chat = { destination: destination.id, name: destination.name };
         setBusy(true);
@@ -714,7 +750,9 @@
           if (entry === now()) render();
           if (focused) card.focus({ preventScroll: true });
         }
-        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin });
+        const newChat = !!entry.newChat;
+        entry.newChat = false;
+        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat });
         setBusy(false);
         chat.tabId = r?.tabId;
         if (r?.watching) {
@@ -729,7 +767,7 @@
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
         const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
         if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }
-        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: !!r.retry, ...(r.open ? open : {}) }); return; }
+        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: r.retry || false, ...(r.open ? open : {}) }); return; }
         setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
         return;
       }
@@ -780,7 +818,9 @@
       }
       setBusy(true, `Sending ${list.length}…`);
       const text = list.map((e) => (e.message || '').trim()).filter(Boolean).join('\n\n');
-      const r = await ask({ type: 'send-captures', ids: list.map((e) => e.id), text, acknowledge: d.origin || null });
+      const newChat = !!now()?.newChat;
+      if (now()) now().newChat = false;
+      const r = await ask({ type: 'send-captures', ids: list.map((e) => e.id), text, acknowledge: d.origin || null, newChat });
       setBusy(false);
       const sent = new Set(r?.sentIds || []);
       const tone = r?.ok ? (sent.size === list.length ? 'ok' : 'warn') : 'err';
@@ -827,6 +867,23 @@
       all.hidden = chosenDestinations.length < 2;
       all.addEventListener('click', () => void sendToMany());
       menu.append(all);
+      // Each screenshot continues the chat's conversation, unless the owner
+      // asks for a new one here (for the next send only).
+      if (o.destinations.some((d) => d.kind === 'chat')) {
+        const entry = now();
+        const fresh = document.createElement('button');
+        fresh.className = 'new-chat';
+        fresh.setAttribute('role', 'menuitemcheckbox');
+        fresh.setAttribute('aria-checked', String(!!entry?.newChat));
+        fresh.innerHTML = '<span class="box" aria-hidden="true"></span><span>New chat</span><small>next send only</small>';
+        fresh.addEventListener('click', () => {
+          if (!entry) return;
+          entry.newChat = !entry.newChat;
+          fresh.setAttribute('aria-checked', String(entry.newChat));
+          label();
+        });
+        menu.append(fresh);
+      }
       const add = (text, run, cls = 'strong') => {
         const b = document.createElement('button');
         b.className = cls;

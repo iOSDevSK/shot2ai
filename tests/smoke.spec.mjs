@@ -63,6 +63,9 @@ let bridge;
 let ai;
 let aiChatGPT;
 let aiClaude;
+let aiGemini;
+let aiPerplexity;
+let aiAccounts;
 let site;
 let chatSite;
 let chatBase;
@@ -79,6 +82,9 @@ test.beforeAll(async () => {
   ai = await startMockAI();
   aiChatGPT = `http://127.0.0.1:${ai.port}`;
   aiClaude = `http://localhost:${ai.port}`;
+  aiGemini = `http://127.0.0.1:${ai.port2}`;
+  aiPerplexity = `http://localhost:${ai.port2}`;
+  aiAccounts = `http://127.0.0.1:${ai.accountsPort}`;
   site = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(req.url === '/long' ? LONG(6000) : req.url === '/tall' ? LONG(9000) : req.url === '/feed' ? FEED : req.url === '/dark' ? DARK : PAGE);
@@ -113,14 +119,14 @@ test.beforeAll(async () => {
   const probing = readFileSync(bridgeJs, 'utf8');
   if (!probing.includes('export const PORTS = [47811, 47812, 47813, 47814, 47815];')) throw new Error('bridge.js ports changed; update the test');
   writeFileSync(bridgeJs, probing.replace('export const PORTS = [47811, 47812, 47813, 47814, 47815];', `export const PORTS = [${bridge.port}];`));
-  // ChatGPT and Claude point at the stand-ins; the real sites are never loaded.
-  const settingsJs = join(extension, 'src', 'settings.js');
-  let presets = readFileSync(settingsJs, 'utf8');
-  for (const [from, to] of [["url: 'https://chatgpt.com/'", `url: '${aiChatGPT}/chatgpt/'`], ["url: 'https://claude.ai/new'", `url: '${aiClaude}/claude/new'`]]) {
-    if (!presets.includes(from)) throw new Error(`settings.js presets changed (${from}); update the test`);
-    presets = presets.replace(from, to);
+  // The chat sites point at the stand-ins; the real sites are never loaded.
+  for (const [site, from, to] of [['chatgpt', "url: 'https://chatgpt.com/'", `url: '${aiChatGPT}/chatgpt/'`], ['claude', "url: 'https://claude.ai/new'", `url: '${aiClaude}/claude/new'`],
+    ['gemini', "url: 'https://gemini.google.com/app'", `url: '${aiGemini}/gemini/app'`], ['perplexity', "url: 'https://www.perplexity.ai/'", `url: '${aiPerplexity}/perplexity/'`]]) {
+    const file = join(extension, 'src', 'sites', `${site}.js`);
+    const text = readFileSync(file, 'utf8');
+    if (!text.includes(from)) throw new Error(`src/sites/${site}.js changed (${from}); update the test`);
+    writeFileSync(file, text.replace(from, to));
   }
-  writeFileSync(settingsJs, presets);
   // Shorter waits for the answer, so the timeout test takes seconds.
   const answerJs = join(extension, 'src', 'answer.js');
   const timing = 'export const TIMING = { poll: 800, settle: 1600, settleUnsure: 5000, quiet: 45000, total: 360000, heartbeat: 5000 };';
@@ -1063,11 +1069,11 @@ test('legal: manifest name and description fit, the disclaimer shows, the versio
   expect(manifest.name).toBe('Shot2AI — Screenshot, Annotate & Send to AI');
   expect(manifest.name.length).toBeLessThanOrEqual(75);
   expect(manifest.description.length).toBeLessThanOrEqual(132);
-  expect(`${manifest.name} ${manifest.short_name}`).not.toMatch(/gpt|claude|openai|anthropic/i);
+  expect(`${manifest.name} ${manifest.short_name}`).not.toMatch(/gpt|claude|openai|anthropic|gemini|google|perplexity/i);
 
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/src/options.html`);
-  await expect(options.locator('#disclaimer')).toHaveText('ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.');
+  await expect(options.locator('#disclaimer')).toHaveText('ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Gemini is a trademark of Google LLC. Perplexity is a trademark of Perplexity AI, Inc. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI, Anthropic, Google or Perplexity AI.');
   await expect(options.locator('#version')).toHaveText(`Shot2AI v${manifest.version}`);
   await expect(options.locator('#publisher')).toContainText('BELNEM s.r.o.');
   await expect(options.getByRole('link', { name: "What's new" })).toHaveAttribute('href', `https://github.com/iOSDevSK/shot2ai/releases/tag/v${manifest.version}`);
@@ -1193,7 +1199,7 @@ test('web chat: a chat that takes no image gets nothing, and the card says why',
 const activeTab = () => context.serviceWorkers()[0].evaluate(async () => (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.url);
 // A fresh stand-in page for every case: the mode is read when it loads.
 async function freshAI(mode) {
-  for (const p of context.pages()) if (p.url().startsWith(aiChatGPT) || p.url().startsWith(aiClaude)) await p.close();
+  for (const p of context.pages()) if ([aiChatGPT, aiClaude, aiGemini, aiPerplexity, aiAccounts].some((o) => p.url().startsWith(o))) await p.close();
   ai.reset(mode);
 }
 async function useDefault(id) {
@@ -1411,7 +1417,7 @@ test('auto-send failures: nothing half-done is sent, and the card says what happ
   }
   // Open Claude tab: the owner finishes there.
   await page.locator('#shot2ai-preview-card .card').getByRole('button', { name: 'Open Claude tab' }).click();
-  await expect.poll(activeTab).toMatch(/\/claude\/new$/);
+  await expect.poll(activeTab).toContain(`${aiClaude}/claude/`);
   await page.bringToFront();
   await page.keyboard.press('Escape');
 });
@@ -1465,4 +1471,171 @@ test('answer sanitization: script, event handlers and javascript: links arrive a
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
   await answerShot(card, 'answer-sanitized.png');
   await card.getByRole('button', { name: 'Close', exact: true }).click();
+});
+
+// ---- the chat's own tab, Gemini and Perplexity ------------------------------
+
+const tabsOf = (site) => context.pages().filter((p) => p.url().startsWith(site));
+const clearCards = async () => {
+  await context.serviceWorkers()[0].evaluate((id) => self.__shot2ai.clearStack(id), tabId);
+  await page.evaluate(() => document.getElementById('shot2ai-preview-card')?.remove());
+};
+
+test('Gemini: the image goes in by paste, sent behind the page, and the answer comes to the card', async () => {
+  test.setTimeout(90000);
+  await clearCards();
+  await freshAI('ok');
+  await useDefault('gemini');
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('Gemini, what is off here?');
+  await sendNow(card, 'Gemini');
+  await expect(card.locator('.a-status')).toHaveText('Gemini answered', { timeout: 30000 });
+  expect(await activeTab()).toBe(`${base}/`);
+  expect(ai.state.sent).toEqual([expect.objectContaining({ kind: 'gemini', text: 'Gemini, what is off here?' })]);
+  expect(ai.state.uploads).toHaveLength(1);
+  await expect(card.locator('.a-body strong')).toHaveText('Book a consultation');
+  await expect(card.locator('.a-body pre code')).toHaveText(ANSWER_CODE);
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+});
+
+test('Perplexity: its answer and its sources, the unsafe one left out', async () => {
+  test.setTimeout(90000);
+  await clearCards();
+  await freshAI('ok');
+  await useDefault('perplexity');
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('Why is the button shifted?');
+  await sendNow(card, 'Perplexity');
+  await expect(card.locator('.a-status')).toHaveText('Perplexity answered', { timeout: 30000 });
+  expect(await activeTab()).toBe(`${base}/`);
+  expect(ai.state.sent).toEqual([expect.objectContaining({ kind: 'perplexity', text: 'Why is the button shifted?' })]);
+  const sources = card.locator('.a-sources a');
+  await expect(sources).toHaveText(['transform - CSS | MDN', 'transform | CSS-Tricks']);
+  await expect(sources.first()).toHaveAttribute('href', 'https://developer.mozilla.org/en-US/docs/Web/CSS/transform');
+  await expect(sources.first()).toHaveAttribute('target', '_blank');
+  await expect(sources.first()).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+  await expect(card.locator('.a-sources small')).toHaveText(['developer.mozilla.org', 'css-tricks.com']);
+  await page.mouse.move(40, 800);
+  await answerShot(card, 'answer-perplexity.png');
+  await card.getByRole('button', { name: 'Copy answer' }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('Sources:\n1. [transform - CSS | MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/transform)\n2. [transform | CSS-Tricks](https://css-tricks.com/almanac/properties/t/transform/)');
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+});
+
+test('the chat tab the owner keeps open: reused, the chat continues, New chat starts another, and a closed tab opens again', async () => {
+  test.setTimeout(180000);
+  await clearCards();
+  await freshAI('ok');
+  await useDefault('claude');
+  // The owner's own Claude tab, signed in, on one of their conversations.
+  const own = await context.newPage();
+  await own.goto(`${aiClaude}/claude/chat/owner1`);
+  const ask = async (message, { newChat = false } = {}) => {
+    const card = await capture([440, 150], [760, 350]);
+    await card.getByLabel('Message').fill(message);
+    if (newChat) {
+      await card.getByRole('button', { name: 'More destinations' }).click();
+      await card.getByRole('menuitemcheckbox', { name: /New chat/ }).click();
+      await expect(card.getByRole('menuitemcheckbox', { name: /New chat/ })).toHaveAttribute('aria-checked', 'true');
+      await expect(card.locator('.send')).toHaveText('Send to Claude (new chat)');
+      await menuShot(card, 'card-new-chat.png');
+      await card.locator('.send').click();
+    } else await sendNow(card, 'Claude');
+    // This card's own answer (an earlier one's words may linger, hidden).
+    await expect(card.locator('.a-asked')).toHaveText(message);
+    await expect(card.locator('.a-status')).toHaveText('Claude answered', { timeout: 30000 });
+    expect(await activeTab()).toBe(`${base}/`);
+    return card;
+  };
+  // Sent in that tab, in that conversation: no tab of its own.
+  await ask('First');
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'First', path: '/claude/chat/owner1' });
+  expect(tabsOf(aiClaude)).toHaveLength(1);
+  // The next one continues there, without reloading it.
+  const loads = ai.state.pages.length;
+  await ask('Second');
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'Second', path: '/claude/chat/owner1' });
+  expect(ai.state.pages).toHaveLength(loads);
+  // New chat, for this send: the same tab starts a new conversation.
+  await ask('Third', { newChat: true });
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'Third', path: '/claude/new' });
+  expect(ai.state.pages.at(-1)).toEqual({ kind: 'claude', path: '/claude/new' });
+  expect(tabsOf(aiClaude)).toHaveLength(1);
+  await expect(own).toHaveURL(`${aiClaude}/claude/chat/7c1e`);
+  // Only for that send: the next card continues again.
+  const next = await capture([300, 120], [620, 320]);
+  await expect(next.locator('.send')).toHaveText('Send to Claude');
+  await next.getByRole('button', { name: 'Close this capture' }).click();
+  // Closed: it opens again behind the page, on the last conversation.
+  await own.close();
+  await ask('Fourth');
+  expect(tabsOf(aiClaude).map((p) => p.url())).toEqual([`${aiClaude}/claude/chat/7c1e`]);
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'Fourth', path: '/claude/chat/7c1e' });
+  await clearCards();
+});
+
+test('signed out: the sign-in page is left alone, the card asks to log in once, and Send again works after', async () => {
+  test.setTimeout(150000);
+  await clearCards();
+  await freshAI('login');
+  await useDefault('claude');
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('After I log in');
+  await sendNow(card, 'Claude');
+  await expect(card.locator('.result')).toContainText('Log in to Claude once, then keep the tab open. Your screenshot waits here; nothing was sent.', { timeout: 30000 });
+  await expect(card.getByRole('button', { name: 'Open Claude tab' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Send again' })).toBeVisible();
+  await answerShot(card, 'answer-login.png');
+  // The sign-in page was only looked at, and the owner stayed on their page.
+  const claudeTab = tabsOf(aiClaude)[0];
+  expect(await claudeTab.evaluate(() => ({ email: document.getElementById('email').value, focus: document.activeElement?.id || '' }))).toEqual({ email: '', focus: '' });
+  expect([ai.state.uploads, ai.state.sent]).toEqual([[], []]);
+  expect(await activeTab()).toBe(`${base}/`);
+  // The owner opens the tab and signs in there (here: the stand-in lets them in).
+  await card.getByRole('button', { name: 'Open Claude tab' }).click();
+  await expect.poll(activeTab).toContain(aiClaude);
+  ai.state.mode = 'ok';
+  await claudeTab.reload();
+  await page.bringToFront();
+  await card.getByRole('button', { name: 'Send again' }).click();
+  await expect(card.locator('.a-status')).toHaveText('Claude answered', { timeout: 30000 });
+  expect(ai.state.sent.at(-1).text).toBe('After I log in');
+  expect(tabsOf(aiClaude)).toHaveLength(1);
+  await clearCards();
+
+  // Gemini, signed out: the tab goes to a sign-in page on another site.
+  // Sending again uses that same tab rather than opening another.
+  await freshAI('login-redirect');
+  await useDefault('gemini');
+  const gemini = await capture([440, 150], [760, 350]);
+  await sendNow(gemini, 'Gemini');
+  await expect(gemini.locator('.result')).toContainText('Log in to Gemini once, then keep the tab open.', { timeout: 30000 });
+  await gemini.getByRole('button', { name: 'Send again' }).click();
+  await expect(gemini.locator('.result')).toContainText('Log in to Gemini once, then keep the tab open.', { timeout: 30000 });
+  expect(tabsOf(aiAccounts)).toHaveLength(1);
+  expect(tabsOf(aiGemini)).toHaveLength(0);
+  expect(ai.state.sent).toEqual([]);
+  await clearCards();
+});
+
+test('Perplexity refuses the upload: its words in the card, for a plan or a sign-in, and nothing sent', async () => {
+  test.setTimeout(120000);
+  await useDefault('perplexity');
+  for (const [mode, text] of [
+    ['plan', 'Perplexity did not take the screenshot: “Upgrade to Pro to attach more files today”. It may need a sign-in or a paid plan. Nothing was sent.'],
+    ['login-upload', 'Log in to Perplexity once, then keep the tab open. Your screenshot waits here; nothing was sent.'],
+  ]) {
+    await clearCards();
+    await freshAI(mode);
+    const card = await capture([440, 150], [760, 350]);
+    await card.getByLabel('Message').fill(`Case ${mode}`);
+    await sendNow(card, 'Perplexity');
+    await expect(card.locator('.result')).toContainText(text, { timeout: 45000 });
+    await expect(card.getByRole('button', { name: 'Open Perplexity tab' })).toBeVisible();
+    await expect(card.getByLabel('Message')).toHaveValue(`Case ${mode}`);
+    expect(ai.state.sent, mode).toEqual([]);
+    if (mode === 'plan') await answerShot(card, 'answer-plan.png');
+  }
+  await clearCards();
 });

@@ -17,7 +17,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   rebuildMenu();
   syncToolbar().catch(() => {});
   // Up from 0.3 or older, where ChatGPT and Claude only pasted: the first send
-  // to each says once more that it now goes automatically.
+  // to each known chat says once more that it now goes automatically.
   if (details.reason === 'update' && /^0\.[0-3]\./.test(details.previousVersion || '')) {
     chrome.storage.local.get('acknowledged').then(({ acknowledged = {} }) => {
       for (const p of PRESETS) delete acknowledged[origin(p.url)];
@@ -121,7 +121,7 @@ const handlers = {
   },
   'open-options': async () => { await chrome.runtime.openOptionsPage(); return { ok: true }; },
   // "Open Claude tab", "Continue in Claude".
-  'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination)?.url); return { ok: true }; },
+  'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination)); return { ok: true }; },
 };
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
