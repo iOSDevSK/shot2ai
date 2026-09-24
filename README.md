@@ -4,7 +4,7 @@ Shot2AI is a Chrome extension that sends screenshots or selected text to ChatGPT
 
 ## Install or update
 
-1. Download **shot2ai-0.5.18.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
+1. Download **shot2ai-0.5.19.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
 2. Extract the ZIP to a folder you will keep on your computer.
 3. Open `chrome://extensions` and enable **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
@@ -24,7 +24,7 @@ You can also clone this repository and load its root folder directly. No build s
 
 The preview card lets you choose a saved prompt, write a message, annotate, copy, save or send the capture. Multiple captures stay in a stack with a separate message for each. An automatically filled prompt clears when you click its message field; your own edits are preserved. Sending an empty field uses the first saved prompt.
 
-Click **Annotate** to add arrows, boxes, text, highlights or blur. You can also paste an image into the editor. Choose PNG or JPEG and a save location in Settings. Chat destinations receive the selected image format; the html2wp bridge uses PNG.
+Click **Annotate** to add arrows, boxes, text, highlights or blur. Click **Use in card** (or press Ctrl+Enter / ⌘Enter) to apply the annotations and return to the original preview card. Its prompt, model and effort remain selected; send the edited image and continue chatting there. The editor has no separate send panel. You can also paste an image into the editor; a standalone editor without an original card supports Copy and Save. Choose PNG or JPEG and a save location in Settings. Chat destinations receive the selected image format; the html2wp bridge uses PNG.
 
 ## Destinations, models and effort
 
@@ -53,7 +53,7 @@ Questions and answers stay in the same scrollable card. **Copy answer** copies t
 The **Share** button, a square with an upward arrow, offers **WhatsApp, Facebook, X, PDF and MD**. Exports include the screenshot or selected text, all saved questions and answers, and source links. Unsent drafts and private chat URLs are excluded.
 
 - **WhatsApp / Facebook / X**: create a public conversation link with a preview image, then open the selected service's share composer. Choose the recipient or audience and confirm sending there. WhatsApp attempts to open its native app, with a web fallback.
-- **PDF**: open a local preview and choose **Save as PDF** in the browser's print dialog.
+- **PDF**: open a local preview and choose **Save as PDF** in the browser's print dialog. The document uses A4 page margins and additional inner spacing to keep text clear of the edges.
 - **MD**: download a Markdown file with the image embedded as a data URL. Some Markdown readers block embedded images; PDF is the more portable option for image display.
 
 Public links use **https://share.shot2ai.com**. Complete browser verification before the first public upload. Links expire after 30 days; delete a copy earlier in **Settings → Privacy → Manage shared links**. Anyone with a link can read it. Clearing local extension data does not delete public copies, and deletion cannot remove copies recipients have already saved.
@@ -96,7 +96,7 @@ This repository tracks the files distributed in the extension: `manifest.json`, 
 
 Development scripts, tests, test reports, screenshots, dependency manifests, website hosting files and the sharing server are maintained outside Git tracking. They are not required to load the unpacked extension. Public sharing connects to the existing hosted service.
 
-Version **0.5.18** makes the repository match the distribution, updates this guide, and reads website registrations from the bundled registry's repository path. It includes the ChatGPT picker and sharing fixes from the previous version.
+Version **0.5.19** returns annotated images to their original cards with **Use in card**, removes the editor's send sidebar, improves PDF margins and source links, and refreshes the chat icon.
 
 ## Licence and credits
 

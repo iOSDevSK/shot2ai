@@ -37,7 +37,7 @@ async function start() {
   if (!snapshot) throw new Error('This export has expired or was cleared. Open Share again from your conversation card.');
   const main = $('conversation');
   main.append(element('h1', 'Shot2AI conversation'));
-  if (safeURL(snapshot.url)) { const source = element('p', 'Source: '); const link = element('a', safeURL(snapshot.url)); link.href = safeURL(snapshot.url); link.rel = 'noreferrer noopener'; link.target = '_blank'; source.append(link); main.append(source); }
+  if (safeURL(snapshot.url)) { const source = element('p', 'Source: '); const link = element('a', safeURL(snapshot.url), 'source-url'); link.href = safeURL(snapshot.url); link.rel = 'noreferrer noopener'; link.target = '_blank'; source.append(link); main.append(source); }
   if (snapshot.kind === 'text') main.append(element('h2', 'Selected text'), element('p', snapshot.selectedText, 'selection'));
   else if (snapshot.png) { imageURL = URL.createObjectURL(snapshot.png); const img = element('img'); img.alt = 'Original screenshot'; img.src = imageURL; main.append(img); await img.decode(); }
   for (const turn of snapshot.turns) {
@@ -46,7 +46,7 @@ async function start() {
     blocksTo(turn.answer.blocks, section);
     if (turn.answer.sources?.length) {
       const list = element('ul', undefined, 'sources');
-      for (const source of turn.answer.sources) { const url = safeURL(source.href); if (!url) continue; const li = element('li'); const link = element('a', `${source.title || url} — ${url}`); link.href = url; link.rel = 'noreferrer noopener'; link.target = '_blank'; li.append(link); list.append(li); }
+      for (const source of turn.answer.sources) { const url = safeURL(source.href); if (!url) continue; const li = element('li'); const link = element('a', source.title && source.title !== url ? `${source.title} — ${url}` : url, 'source-url'); link.href = url; link.rel = 'noreferrer noopener'; link.target = '_blank'; li.append(link); list.append(li); }
       if (list.childElementCount) section.append(element('h3', 'Sources'), list);
     }
     if (turn.answer.truncated || turn.answer.state !== 'done') section.append(element('p', 'This answer was incomplete when exported.', 'warning'));

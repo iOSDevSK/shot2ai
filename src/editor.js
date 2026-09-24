@@ -1,16 +1,13 @@
-// The screenshot editor: annotate the captured area, add a message and send
-// both into the chat of the project open in html2wp.
+// Annotate a screenshot, then return it to its original capture card.
+// Prompts, destinations and conversation stay in that card.
 //
 // Tools, colours, stroke sizes and the arrow's geometry follow better-shot
 // (https://github.com/iOSDevSK/better-shot, BSD-3-Clause, see
 // licenses/better-shot-LICENSE), adapted from SwiftUI to a 2D canvas.
-import { connect, pair, sendToApp, outcomeText } from './bridge.js';
-import { getCapture, deleteCapture } from './captures.js';
-import { icons, paint } from './icons.js';
-import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, promptText, chatOutcome, websiteNotice, autoSubmitOn } from './settings.js';
+import { getCapture } from './captures.js';
+import { paint } from './icons.js';
+import { isMac } from './settings.js';
 import { saveImage, savedText } from './save.js';
-import { pasteIntoChat, openChatTab } from './webchat.js';
-import { encode, EXTENSIONS } from './imaging.js';
 
 paint();
 document.getElementById('version').textContent = `v${chrome.runtime.getManifest().version}`;
@@ -36,7 +33,8 @@ let items = [];
 let undone = [];
 let draft = null;
 let editingText = null;  // { x, y } in image pixels while the text field is open
-let target = null;       // { port, project } once the app says the chat is open
+let returning = false;
+let canReturn = false;
 
 // ---- drawing ------------------------------------------------------------
 
@@ -144,7 +142,7 @@ function commit(item) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || !image) return;
+  if (e.button !== 0 || !image || returning) return;
   if (editingText) { finishText(true); return; }
   const p = point(e);
   if (tool === 'text') { e.preventDefault(); openText(p); return; }
@@ -193,8 +191,8 @@ textField.addEventListener('keydown', (e) => {
 });
 textField.addEventListener('blur', () => finishText(true));
 
-function undo() { if (items.length) { undone.push(items.pop()); render(); } }
-function redo() { if (undone.length) { items.push(undone.pop()); render(); } }
+function undo() { if (!returning && items.length) { undone.push(items.pop()); render(); } }
+function redo() { if (!returning && undone.length) { items.push(undone.pop()); render(); } }
 $('undo').addEventListener('click', undo);
 $('redo').addEventListener('click', redo);
 
@@ -242,7 +240,7 @@ document.addEventListener('keydown', (e) => {
     if (e.shiftKey) redo(); else undo();
     return;
   }
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void submit(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void useInCard(); return; }
   if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && TOOL_KEYS[e.key.toLowerCase()]) selectTool(TOOL_KEYS[e.key.toLowerCase()]);
 });
 
@@ -260,15 +258,13 @@ function toast(text) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2200);
 }
-async function toClipboard(withText) {
+async function toClipboard() {
   const items = { 'image/png': flattened() };
-  const text = $('message').value.trim();
-  if (withText && text) items['text/plain'] = new Blob([text], { type: 'text/plain' });
   try { await navigator.clipboard.write([new ClipboardItem(items)]); return true; } catch { return false; }
 }
 $('copy').addEventListener('click', async () => {
   if (!image) return;
-  toast((await toClipboard(false)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.');
+  toast((await toClipboard()) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.');
 });
 async function saveCopy() {
   if (!image) return;
@@ -276,161 +272,34 @@ async function saveCopy() {
 }
 $('save').addEventListener('click', () => void saveCopy());
 
-// ---- sending ------------------------------------------------------------
-
-function showResult(tone, text, actions = []) {
-  const box = $('result');
-  box.className = `notice ${tone}`;
-  box.textContent = text;
-  if (actions.length) {
-    const row = document.createElement('div');
-    row.className = 'actions';
-    for (const [name, run, primary] of actions) {
-      const b = document.createElement('button');
-      b.className = `button${primary ? ' primary' : ''}`;
-      b.textContent = name;
-      b.addEventListener('click', run);
-      row.append(b);
-    }
-    box.append(row);
-  }
-  box.hidden = !text;
-}
-function setTarget(name, note, state, tone = '') {
-  $('target-name').textContent = name;
-  $('target-note').textContent = note;
-  $('target-state').textContent = state;
-  $('target-state').className = `status ${tone}`;
-}
-function setSend(label, busy = false) {
-  $('send-label').textContent = label;
-  $('send').disabled = busy;
-  $('more').disabled = busy;
-  const icon = { 'Try again': 'retry', Sent: 'check', Copy: 'copy', Save: 'download' }[label] || 'send';
-  $('send').querySelector('svg').outerHTML = icons[icon];
-}
-
-// The main button's destination: the owner's default, or Copy while none is chosen.
-let destination = COPY_ONLY;
-function choose(next) {
-  destination = next;
-  setSend(actionLabel(next));
-  $('privacy').textContent = next.kind === 'chat'
-    ? `${next.name} is a website: the screenshot and message go to ${new URL(next.url).host}. Nothing is submitted until you press Enter there.`
-    : next.kind === 'html2wp' ? 'The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).'
-      : 'Nothing leaves this computer. Choose where screenshots go in Options.';
-  $('pair-form').hidden = true;
-  if (!image) $('send').disabled = $('more').disabled = true;
-  if (next.kind === 'chat') setTarget(next.name, new URL(next.url).host, 'Website', 'warn');
-  else if (next.kind === 'copy') setTarget('Clipboard', 'Paste it anywhere', 'Copy', 'ok');
-  else if (next.kind === 'save') setTarget('Save only', 'A copy on this computer', 'Save', 'ok');
-  else void check();
-}
-
-// Ask the app where the message would go and whether its chat is open now.
-async function check() {
-  const found = await connect();
-  if (destination.kind !== 'html2wp') return;
-  $('pair-form').hidden = true;
-  if (!found) { setTarget('html2wp', 'The app is not running', 'Offline', 'err'); return; }
-  const { status } = found;
-  if (!status.paired) { setTarget('html2wp', 'Not paired with this browser', 'Not paired', 'warn'); $('pair-form').hidden = false; return; }
-  const name = status.project?.name || 'No project open';
-  if (!status.chat?.available) setTarget(name, status.project ? 'Open project' : 'html2wp', 'Busy', 'warn');
-  else setTarget(name, 'Open project', 'Chat ready', 'ok');
-}
-
-let sending = false;
-async function submit(target = destination, confirmed = false) {
-  if (sending || !image) return;
-  $('menu').hidden = true;
-  if (target.kind === 'copy') { toast((await toClipboard(true)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.'); return; }
-  if (target.kind === 'save') { await saveCopy(); return; }
-  if (target !== destination) choose(target);
-  const rawText = $('message').value.trim();
-  if (target.kind === 'chat') {
-    // Asked during the click: Chrome shows its own prompt the first time.
-    const granted = await chrome.permissions.request({ origins: [sitePattern(target.url)] }).catch(() => false);
-    if (!granted) { showResult('warn', `Chrome did not allow the extension to use ${new URL(target.url).host}. Send again and choose Allow.`); return; }
-    const text = await promptText(rawText);
-    const s = await settings();
-    if (!confirmed && !s.acknowledged[target.origin]) {
-      showResult('warn', websiteNotice(target.name, new URL(target.url).host, false, autoSubmitOn(s, target.id)),
-        [['Continue', () => void submit(target, true), true], ['Cancel', () => showResult('', '')]]);
-      return;
-    }
-    await update({ acknowledged: { ...s.acknowledged, [target.origin]: true } });
-    sending = true;
-    setSend('Sending…', true);
+// ---- return to the source card ------------------------------------------
+async function useInCard() {
+  if (returning || !canReturn || !image) return;
+  returning = true;
+  document.querySelector('.toolbar').inert = true;
+  $('use-in-card').disabled = true;
+  $('use-in-card').querySelector('span').textContent = 'Applying…';
+  $('return-error').hidden = true;
+  try {
     const png = await flattened();
-    // Copied first, while this page has focus: the fallback if pasting fails.
-    const copied = await toClipboard(true);
-    const encoded = await encode(png, s);
-    const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]), { model: s.modelChoice?.[target.id] || null });
-    sending = false;
-    setSend(actionLabel(destination));
-    // Sent in the background, or stopped short: the chat's tab is one click away.
-    const open = r.tabId ? [[`Open ${target.name} tab`, () => void openChatTab(r.tabId, target), !r.submitted]] : [];
-    const outcome = r.needsPermission ? null : chatOutcome(target.name, r);
-    if (r.submitted) { showResult('ok', outcome.text, open); return; }
-    if (r.notAttached) { showResult('warn', copied ? `${target.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${modKey}V.` : `${target.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, open); return; }
-    if (outcome) { showResult(outcome.tone, outcome.text, outcome.open ? open : []); return; }
-    showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`, open);
-    return;
+    if (!png) throw new Error('The annotated image could not be created. Try again.');
+    const bytes = new Uint8Array(await png.arrayBuffer());
+    let data = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) data += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    const result = await chrome.runtime.sendMessage({ type: 'apply-annotations', id: captureId, png: btoa(data), scale });
+    if (!result?.ok) throw new Error(result?.text || 'The image could not be returned to the card. Your annotations are still here.');
+    window.close();
+  } catch (error) {
+    $('return-error').textContent = error.message;
+    $('return-error').hidden = false;
+  } finally {
+    returning = false;
+    document.querySelector('.toolbar').inert = false;
+    $('use-in-card').disabled = !canReturn;
+    $('use-in-card').querySelector('span').textContent = 'Use in card';
   }
-  sending = true;
-  setSend('Sending…', true);
-  showResult('', '');
-  const outcome = await sendToApp(await promptText(rawText), await flattened());
-  sending = false;
-  if (outcome.ok) {
-    showResult('ok', outcomeText(outcome));
-    setSend('Sent', true);
-    if (captureId) await deleteCapture(captureId).catch(() => {});
-    setTimeout(() => window.close(), 1800);
-    return;
-  }
-  // The app's own reason, shown as it is; the annotation stays.
-  showResult(outcome.reason !== undefined ? 'warn' : outcome.unpaired ? 'warn' : 'err', outcomeText(outcome));
-  setSend('Try again');
-  await check();
 }
-$('send').addEventListener('click', () => void submit());
-$('prompt').addEventListener('change', () => { $('message').value = $('prompt').value; $('prompt').selectedIndex = 0; $('message').focus(); });
-$('more').addEventListener('click', async () => {
-  const menu = $('menu');
-  if (!menu.hidden) { menu.hidden = true; return; }
-  menu.innerHTML = '<div class="head">Send to</div>';
-  for (const d of await destinations()) {
-    const b = document.createElement('button');
-    b.setAttribute('role', 'menuitem');
-    b.innerHTML = '<span></span><small></small>';
-    b.querySelector('span').textContent = d.name;
-    b.querySelector('small').textContent = d.kind === 'html2wp' ? 'this Mac' : new URL(d.url).host;
-    b.addEventListener('click', () => void submit(d));
-    menu.append(b);
-  }
-  menu.insertAdjacentHTML('beforeend', '<a href="options.html" target="_blank">Add a chat in Options…</a>');
-  menu.hidden = false;
-});
-document.addEventListener('click', (e) => { if (!e.target.closest('.split')) $('menu').hidden = true; });
-
-$('code').addEventListener('input', (e) => {
-  const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-  e.target.value = digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
-});
-$('pair-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const code = $('code').value.replace(/\D/g, '');
-  if (code.length !== 6) { showResult('warn', 'Enter all 6 digits of the code.'); return; }
-  $('pair').disabled = true;
-  const result = await pair(code);
-  $('pair').disabled = false;
-  if (result === 'paired') { $('code').value = ''; showResult('', ''); await check(); return; }
-  showResult('err', result === 'offline'
-    ? 'html2wp stopped answering. Open the app and try again.'
-    : 'That code did not match. Check Settings in html2wp; after five wrong codes, choose New code there.');
-});
+$('use-in-card').addEventListener('click', () => void useInCard());
 
 // ---- start --------------------------------------------------------------
 
@@ -439,7 +308,9 @@ const captureId = params.get('id');
 let source = { url: '', title: '' };
 
 async function load(png, meta, pixelScale) {
-  image = await createImageBitmap(png);
+  const next = await createImageBitmap(png);
+  image?.close();
+  image = next;
   scale = pixelScale || 1;
   items = [];
   undone = [];
@@ -451,25 +322,27 @@ async function load(png, meta, pixelScale) {
   document.title = `${meta.title || 'Screenshot'} · Shot2AI`;
   $('missing').hidden = true;
   $('frame').hidden = false;
-  $('send').disabled = $('more').disabled = false;
+  $('use-in-card').disabled = !canReturn;
   fit();
   render();
-  $('message').focus();
+
 }
 
 // A pasted image (a ⌘⇧4 screenshot, say) replaces the one being edited.
 document.addEventListener('paste', (e) => {
   const file = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith('image/'));
-  if (!file) return;
+  if (!file || returning) return;
   e.preventDefault();
   finishText(false);
   void load(file, { title: 'Pasted image', url: '' }, devicePixelRatio);
-  showResult('', '');
+  $('return-error').hidden = true;
 });
 
 async function start() {
   selectTool('arrow');
   const capture = captureId ? await getCapture(captureId).catch(() => null) : null;
+  canReturn = !!capture?.stack?.tabId;
+  if (!canReturn) $('use-in-card').title = 'Open Annotate from a capture card to return to it';
   const keys = isMac ? '<kbd>⌘V</kbd>' : '<kbd>Ctrl+V</kbd>';
   if (!capture?.png) {
     if (captureId) $('missing-title').textContent = 'This screenshot is no longer available';
@@ -477,16 +350,11 @@ async function start() {
       ? `Capture the area again, or paste an image with ${keys}.`
       : `Press ${keys} to paste an image${isMac ? ', for example a screenshot taken with <kbd>⌘⇧4</kbd>' : ''}.`;
     $('missing').hidden = false;
-    $('send').disabled = $('more').disabled = true;
+    $('use-in-card').disabled = true;
   } else {
     await load(capture.png, { title: capture.title, url: capture.url }, capture.scale);
   }
-  if (params.get('text')) $('message').value = params.get('text');
-  else if (!$('message').value) $('message').value = await defaultPromptText();
-  // A saved prompt fills the message; it can still be edited.
-  for (const p of await prompts()) $('prompt').append(new Option(p.name, p.text));
-  $('prompt').hidden = $('prompt').options.length < 2;
-  choose((await defaultDestination()) || COPY_ONLY);
+
 }
 addEventListener('resize', fit);
 await start();

@@ -5,7 +5,7 @@ import { acceptShareAuthorization } from './share-auth.js';
 import { deleteCapture, getCapture, updateCapture, putCapture } from './captures.js';
 import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
 import { syncToolbar } from './toolbar-setup.js';
-import { showCard, showStack, selectedTextCard, sendCaptures, openEditor, cardSend, cardFollowup, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
+import { showCard, showStack, selectedTextCard, sendCaptures, openEditor, applyAnnotations, cardSend, cardFollowup, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
 import { stackFor, clearStack, hideStack, stackHidden } from './stack.js';
 import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
@@ -139,6 +139,7 @@ const handlers = {
   'card-send': cardSend,
   'card-followup': cardFollowup,
   'card-send-many': cardSendMany,
+  'apply-annotations': applyAnnotations,
   annotate: async (m, sender) => { await openEditor(m.id, sender.tab?.id, m.text); return { ok: true }; },
   save: async (m) => {
     const capture = await getCapture(m.id);

@@ -1,5 +1,5 @@
 // The preview card and what its buttons do.
-import { getCapture, updateCapture, deleteCapture, putCapture } from './captures.js';
+import { getCapture, updateCapture, updateUnsentCapture, deleteCapture, putCapture } from './captures.js';
 import { addToStack, stackFor, unhideStack, STACK_CAP } from './stack.js';
 import { sendToApp, outcomeText } from './bridge.js';
 import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText, promptText, chatOutcome, autoSubmitOn, readsAnswers, modelView } from './settings.js';
@@ -142,9 +142,19 @@ export async function showStack(tabId, { currentId = null, fresh = null, autoSen
   return true;
 }
 
+// An image cannot be replaced while a send is reading or uploading it.
+const captureOperations = new Set();
+async function withCaptures(ids, run) {
+  if (ids.some(id => captureOperations.has(id))) return { ok: false, failed: true, text: 'This capture is being sent or updated. Wait for it to finish, then try again.' };
+  ids.forEach(id => captureOperations.add(id));
+  try { return await run(); }
+  finally { ids.forEach(id => captureOperations.delete(id)); }
+}
+
 // Several captures of the stack to the default destination at once. A web
 // chat gets them in one message; html2wp as many as it takes per message.
-export async function sendCaptures(message) {
+export const sendCaptures = (message) => withCaptures(message.ids, () => sendCapturesNow(message));
+async function sendCapturesNow(message) {
   message = { ...message, text: await promptText(message.text) };
   const s = await settings();
   const destination = await defaultDestination();
@@ -174,14 +184,50 @@ export async function sendCaptures(message) {
   return { ok: false, sentIds: [], text: chatOutcome(destination.name, r)?.text || `The screenshots could not be pasted into ${destination.name}.`, tabId: r.tabId, open: !!r.tabId };
 }
 
-export async function openEditor(id, near, text = '') {
+export async function openEditor(id, near, text) {
   const capture = await getCapture(id);
   const query = new URLSearchParams({ id });
-  if (text) query.set('text', text);
+  if (capture && typeof text === 'string' && text !== capture.message) await updateCapture(id, { message: text, messageDefault: false });
   await chrome.tabs.create({ url: chrome.runtime.getURL(`src/editor.html?${query}`), ...(capture?.tabIndex !== undefined ? { index: capture.tabIndex + 1 } : {}), ...(near ? { openerTabId: near } : {}) });
 }
 
-export async function cardSend(message, sender) {
+// Only the editor for this capture may replace its image. No message is sent;
+// the original card remains responsible for prompts, models and conversation.
+export const applyAnnotations = (message, sender) => withCaptures([message.id], () => applyAnnotationsNow(message, sender));
+async function applyAnnotationsNow(message, sender) {
+  const editorURL = new URL(chrome.runtime.getURL('src/editor.html'));
+  let from; try { from = new URL(sender.url); } catch { return { ok: false }; }
+  if (sender.id !== chrome.runtime.id || sender.frameId !== 0 || (from.protocol !== editorURL.protocol || from.host !== editorURL.host) ||
+      from.pathname !== editorURL.pathname || from.searchParams.get('id') !== message.id) return { ok: false, text: 'Open Annotate from the capture you want to edit.' };
+  const capture = await getCapture(message.id);
+  if (!capture?.png || !capture.stack?.tabId) return { ok: false, text: 'The original capture is no longer available. Your annotations remain here; use Copy or Save to keep them.' };
+  if (capture.sent || capture.answer) return { ok: false, text: 'This capture has already been sent. Make a new capture to annotate it.' };
+  const tab = await chrome.tabs.get(capture.stack.tabId).catch(() => null);
+  if (!tab) return { ok: false, text: 'The original page was closed. Your annotations remain here; use Copy or Save to keep them.' };
+  if (typeof message.png !== 'string' || message.png.length > 60 * 1024 * 1024) return { ok: false, text: 'The annotated image is too large to return. Use Save to keep it.' };
+  let png, bitmap;
+  try {
+    png = new Blob([Uint8Array.from(atob(message.png), c => c.charCodeAt(0))], { type: 'image/png' });
+    bitmap = await createImageBitmap(png);
+  } catch { return { ok: false, text: 'The annotated image could not be read. Try again.' }; }
+  const width = bitmap.width, height = bitmap.height; bitmap.close();
+  const s = await settings();
+  const changed = await updateUnsentCapture(message.id, {
+    png, width, height, scale: Number.isFinite(message.scale) && message.scale > 0 ? message.scale : capture.scale,
+    thumb: await thumbnail(png), meta: describe(await encode(png, s), s), metaFormat: formatSignature(s),
+    result: null, saved: null,
+  }, tab.id);
+  if (!changed) return { ok: false, text: 'This capture was closed or sent while you were editing. Your annotations remain here; use Copy or Save.' };
+  try {
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    if (!await showStack(tab.id, { currentId: message.id, focusMessage: true })) throw new Error('Missing card');
+  } catch { return { ok: false, text: 'Annotations saved. Reopen the source page and allow Shot2AI there, then try Use in card again.' }; }
+  return { ok: true };
+}
+
+export const cardSend = (message, sender) => withCaptures([message.id], () => cardSendNow(message, sender));
+async function cardSendNow(message, sender) {
   message = { ...message, text: await promptText(message.text) };
   const capture = await getCapture(message.id);
   if (!capture?.png && !capture?.selectedText) return { failed: true, text: 'This capture is no longer available. Capture it again.' };
@@ -302,7 +348,8 @@ export async function rememberRegion(message) {
 
 // Several destinations at once. html2wp goes through the bridge while the web
 // chats run one after another: each one's tab has to come to the front.
-export async function cardSendMany(message) {
+export const cardSendMany = (message) => withCaptures([message.id], () => cardSendManyNow(message));
+async function cardSendManyNow(message) {
   message = { ...message, text: await promptText(message.text) };
   const capture = await getCapture(message.id);
   if (!capture?.png && !capture?.selectedText) return { failed: true, text: 'This capture is no longer available. Capture it again.' };

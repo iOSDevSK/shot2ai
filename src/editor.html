@@ -13,6 +13,7 @@
   <div class="brand"><span class="brand-symbol" data-icon="capture"></span><span>Shot<span class="two">2</span>AI</span><span id="version" class="version"></span></div>
   <div class="source"><strong id="page-title">Screenshot</strong><span id="page-url"></span></div>
   <div class="top-actions">
+    <button id="use-in-card" class="button primary" data-icon="check" title="Apply annotations and return to the capture card" disabled><span>Use in card</span></button>
     <button id="copy" class="button" data-icon="copy" title="Copy the annotated image">Copy</button>
     <button id="save" class="button" data-icon="download" title="Save the annotated image">Save</button>
     <a class="button icon-only" href="options.html" target="_blank" data-icon="gear" title="Options" aria-label="Options"></a>
@@ -49,35 +50,11 @@
         <p id="missing-text"></p>
       </div>
     </div>
+    <div id="return-error" class="return-error" role="alert" hidden></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </main>
 
-  <aside class="send-panel" aria-label="Send to html2wp">
-    <div class="label" id="target-label">Send to</div>
-    <div class="target">
-      <div class="target-name"><strong id="target-name">html2wp</strong><small id="target-note">Checking the app…</small></div>
-      <span id="target-state" class="status">Checking</span>
-    </div>
 
-    <form id="pair-form" class="pair" hidden>
-      <p>Pair once: in html2wp open <b>Settings → Chrome extension</b> and enter the 6-digit code.</p>
-      <div class="pair-row">
-        <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" aria-label="Pairing code">
-        <button id="pair" class="button" type="submit">Pair</button>
-      </div>
-    </form>
-
-    <div class="label-row"><label class="label" for="message">Message</label><select id="prompt" class="prompt" aria-label="Prompts" title="Fill the message with a saved prompt"><option value="" selected disabled>Use a prompt…</option></select></div>
-    <textarea id="message" rows="7" placeholder="Describe what is wrong or what should change…"></textarea>
-
-    <div id="result" class="notice" role="status" hidden></div>
-    <div class="split">
-      <button id="send" class="button primary" data-icon="send"><span id="send-label">Send to html2wp</span></button>
-      <button id="more" class="button primary more" data-icon="chevron" aria-label="More destinations" aria-haspopup="menu" title="More destinations"></button>
-      <div id="menu" class="menu" role="menu" hidden></div>
-    </div>
-    <p id="privacy" class="privacy">The screenshot and message go only to the html2wp app on this Mac (127.0.0.1).</p>
-  </aside>
 </div>
 <script type="module" src="editor.js"></script>
 </body>

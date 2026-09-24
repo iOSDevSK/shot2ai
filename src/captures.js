@@ -58,6 +58,18 @@ export const updateCapture = (id, patch) => run('readwrite', (s) => {
   req.onsuccess = () => { if (req.result) s.put({ ...req.result, ...patch }, id); };
   return req;
 });
+// Apply an edited image only while this capture is still unsent. The check
+// and replacement share a transaction with card/answer state updates.
+export async function updateUnsentCapture(id, patch, tabId) {
+  const previous = await run('readwrite', store => {
+    const req = store.get(id);
+    req.onsuccess = () => {
+      if (req.result && !req.result.sent && !req.result.answer && req.result.stack?.tabId === tabId) store.put({ ...req.result, ...patch }, id);
+    };
+    return req;
+  });
+  return !!previous && !previous.sent && !previous.answer && previous.stack?.tabId === tabId;
+}
 export const deleteCapture = (id) => run('readwrite', (s) => s.delete(id));
 export const getHandle = (key) => run('readonly', (s) => s.get(key), HANDLES);
 export const putHandle = (key, handle) => run('readwrite', (s) => s.put(handle, key), HANDLES);

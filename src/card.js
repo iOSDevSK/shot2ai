@@ -401,7 +401,10 @@
         canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       };
       if (bitmaps.has(entry.id)) { paint(bitmaps.get(entry.id)); return; }
-      createImageBitmap(new Blob([bytesOf(entry.thumb)], { type: 'image/jpeg' })).then((b) => { bitmaps.set(entry.id, b); paint(b); });
+      createImageBitmap(new Blob([bytesOf(entry.thumb)], { type: 'image/jpeg' })).then((b) => {
+        if (!entries.includes(entry)) { b.close(); return; }
+        bitmaps.set(entry.id, b); paint(b);
+      });
     }
 
     function renderPeeks() {
@@ -1208,6 +1211,9 @@
         // An answer on its way here is newer than the one kept in storage.
         for (const e of p.entries) {
           const mine = entries.find((x) => x.id === e.id);
+          if (mine && mine.thumb !== e.thumb) {
+            bitmaps.get(e.id)?.close(); bitmaps.delete(e.id); pngs.delete(e.id);
+          }
           if (mine?.answer && !FINAL.includes(mine.answer.state) && (!e.answer?.turnId || e.answer.turnId === mine.answer.turnId)) { e.answer = mine.answer; e.asked = mine.asked; e.history = mine.history; e.chatOpen = mine.chatOpen; e.chatDraft = mine.chatDraft; }
         }
         entries = p.entries;

@@ -29,7 +29,7 @@ export const icons = {
   x: svg('<path d="m4 3 12 18h4L8 3zM20 3l-7 8M4 21l7-8"/>'),
   pdf: svg('<path d="M14 2H5v20h14V7zM14 2v5h5M8 12h8M8 16h8"/>'),
   md: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M5 15V9l3 3 3-3v6M17 9v6m-2-2 2 2 2-2"/>'),
-  chat: svg('<path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2v-10a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/>'),
+  chat: svg('<path d="M7 4.5h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H9l-5 3v-4a4 4 0 0 1-1-3v-6a4 4 0 0 1 4-4Z"/><circle cx="8" cy="11.5" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r=".8" fill="currentColor" stroke="none"/>'),
   grip: svg('<path d="M5 11 11 5M5 17 17 5M11 17l6-6" stroke-width="1.6"/>'),
 };
 export function paint(root = document) {
