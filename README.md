@@ -1,6 +1,6 @@
 # Shot2AI — Screenshot, Annotate & Send to AI
 
-Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also paste the screenshot into a web chat such as ChatGPT or Claude, or save a copy.
+Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also send the screenshot to a web chat such as ChatGPT or Claude, whose answer then appears in the card on your page, or save a copy.
 
 If the chat cannot take a message right now, for example while the assistant is still working, the extension shows the app's own reason and keeps your annotation. Choose **Try again** when the app is ready.
 
@@ -12,7 +12,7 @@ If the chat cannot take a message right now, for example while the assistant is 
 
 ## Where screenshots go
 
-Out of the box the default destination is **ChatGPT**. The popup shows it, and until chatgpt.com is allowed it offers an **Allow ChatGPT** button. Chrome asks for that one site on the click. Change the default in **Options → Default destination**: ChatGPT (default), Claude, html2wp (Mac app), your own chats, Copy only or Save only. The card's main button reads **Send to <default>** (or **Copy** / **Save**). Other chats you turn on stay in the card's menu.
+Out of the box the default destination is **ChatGPT**. The popup's **Screenshots go to** list shows it and changes it on the spot: ChatGPT, Claude, html2wp (Mac app), your own chats, Copy only or Save only, in the same order as **Options → Default destination**, and the two stay in step. Choosing a web chat there asks Chrome for that one site straight away; if you decline, the choice stays and the popup shows **Needs permission** with an **Allow <chat>** button. The card's main button reads **Send to <default>** (or **Copy** / **Save**). Other chats you turn on stay in the card's menu (the chevron), which sends one screenshot elsewhere without changing the default.
 
 The html2wp status (running, pairing, open project, chat ready) appears only when html2wp is the default. It also appears when you pick html2wp in the card's menu: the card then says whether the app is running, paired and ready.
 
@@ -43,7 +43,7 @@ Each code pairs one extension. After five wrong codes the code stops working; ch
 
 - Click the toolbar icon, then **Capture area**, or press **Alt+Shift+S** (⌥⇧S) on any page; see Keyboard shortcuts. Drag over the area; **Esc** cancels.
 - A **preview card** appears in the corner of the page. The screenshot is already on the clipboard, so you can paste it anywhere with **⌘V** (**Ctrl+V** on Windows and Linux). From the card:
-  - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**; for a web chat it says the screenshot was pasted in and you press Enter there. It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, and never while it shows an error.
+  - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**. For ChatGPT and Claude it becomes the answer card (see Answer card). It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, never while it shows an error, and never while it shows an answer.
   - **Annotate** opens the full editor. **Copy** copies the screenshot again. **Save** saves a copy (see Saving). The **chevron** lists the other destinations.
 - In the editor: **A** arrow, **R** rectangle, **T** text, **H** highlight, **B** blur, **⌘Z** / **⇧⌘Z** undo and redo (Ctrl on Windows and Linux). Pick a colour and a stroke size in the toolbar. **Send** has the same destination menu as the card. **⌘Enter** sends.
 - **Paste as input**: press ⌘V (or Ctrl+V) in the editor, the popup or the options page to open a pasted image, such as a macOS ⌘⇧4 screenshot, in the editor.
@@ -52,7 +52,7 @@ Each code pairs one extension. After five wrong codes the code stops working; ch
 
 ChatGPT is the default until you choose another. In **Options** you can also turn on **ChatGPT** and **Claude**, or add any other web chat by name and address (for example Gemini, or an internal chat). The card's main button uses your default destination; its menu lists ChatGPT and Claude when they are on, then html2wp, then your own chats.
 
-Sending to a web chat finds an open tab of that chat, or opens it. The extension then pastes the screenshot and your message into the chat's message box. **It never submits**: you check the message and press Enter in the chat yourself. If pasting does not work on that site, the screenshot and message are already on the clipboard; the card says "Copied. Paste with ⌘V in <chat>".
+Sending to a web chat finds an open tab of that chat, or opens it. The extension attaches the screenshot through the chat's own file input and puts your message into its message box. For ChatGPT and Claude it then sends the message itself (see Send automatically) while that tab stays in the background. For chats you add, the chat's tab comes to the front and you press Enter there, unless you turn Send automatically on for it. If the screenshot does not arrive, nothing is typed or sent: it is on the clipboard, and the card says "Copied. Paste with ⌘V in <chat>".
 
 Chrome asks you once per site to let the extension use it. The extension holds no permission for any site until you allow it.
 
@@ -86,9 +86,28 @@ Tick destinations in the card's menu (the chevron next to Send), or in **Options
 
 Saved messages to send with a screenshot. Four come built in: **Fix this bug**, **Explain this**, **Match this design** and **What's wrong here?**. In **Options → Prompts** you can add, edit, delete and reorder prompts and choose a **default prompt**, which fills the message of every new capture. The card and the editor have a **Prompt** picker next to the message: picking one fills the message, and you can still edit it. Right-click → Shot2AI → **Send with prompt ▸** captures the visible page and sends it with that prompt.
 
-## Send automatically (opt-in)
+## Send automatically
 
-Each web chat in **Options → Other destinations** has a **Send automatically** switch, off by default. The first time you turn one on, Shot2AI shows a notice: auto-submit presses the send button on a third-party website for you, and some services restrict automated use in their terms. With it on, Shot2AI presses the chat's send button after pasting, so the message goes without you reviewing it. ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. If none is found, the card says so and the text waits for you to press Enter. It is never used for html2wp, which has its own flow.
+Each web chat in **Options → Other destinations** has a **Send automatically** switch. It is **on for ChatGPT and Claude** and off for chats you add. The first send to each chat says, in the card, that the message will be sent automatically without you reviewing it, and that some services restrict automated use in their terms. Turning it on for a chat you added shows that notice once in Options.
+
+With it on, Shot2AI does everything in the chat's tab while that tab stays in the background: it attaches the screenshot, types your message, waits until the chat has uploaded the image (its send button turns on), presses the send button, and checks that the message went (a stop button, your message in the thread, a new address, or an empty message box). ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. It is never used for html2wp, which has its own flow.
+
+Nothing half-done is left unsaid. Each of these stops the send, and the card says so and offers **Open <chat> tab** so you can finish there:
+
+- the chat's message box is not there (for example, you are signed out);
+- the chat is still answering an earlier message (the card also offers **Try again**);
+- the screenshot did not attach, or its upload failed;
+- the message did not go into the message box (the image is there, nothing is sent);
+- the send button was not found ("press Enter there"), or Send was pressed but the message could not be seen going.
+
+## Answer card
+
+After a confirmed send to ChatGPT or Claude, the preview card on your page turns into an answer card. It shows **Sending to Claude…**, then **Claude is answering…** with the answer as it streams in, then **Claude answered**. The answer keeps its paragraphs, headings, lists, code blocks, tables and links. **Copy answer** copies it as Markdown, **Continue in Claude** brings the Claude tab to the front, and **Close** removes the card. Long answers scroll; drag the round grip at the card's top-left corner (or focus it and use the arrow keys) to make it wider or taller. An answer card never hides by itself; it comes back after you navigate within the tab until you close it.
+
+- **Where the answer comes from**: while the answer is being written, the service worker reads the newest answer on the chat's page in its tab, the text as the page shows it, and passes it to the card. It uses no private APIs and reads no cookies or tokens. It reads only the message list of that chat page, and only until the answer is finished.
+- **Safe to show**: the answer travels as a small tree of paragraphs, lists, code and links, not as the chat page's HTML, and the card builds it from text alone. Markup in an answer, such as `<script>`, shows as those characters; images, scripts, styles and event handlers are dropped, and only http and https links are kept.
+- **When it ends**: the answer is finished when the chat's stop button has gone and the text has stopped changing. If nothing happens for 45 seconds (no stop button, no new text; for example a usage limit or a sign-in), or after 6 minutes in all, the card says **No answer from <chat> yet** and offers **Open <chat> tab**. If the chat's tab is closed, the card says so.
+- A second screenshot sent to the same chat tab continues that conversation, and its own card shows the new answer.
 
 ## Saved region
 
@@ -115,7 +134,8 @@ Options → **Saving**:
 
 - **html2wp**: the screenshot and the message go **only to 127.0.0.1**, the html2wp app on this computer. The app listens on 127.0.0.1 only, on port 47811 (or the next free one up to 47815). It answers only the paired extension: every request needs the pairing token, and a request from a web page's origin is refused. Once it has the screenshot, html2wp handles it like any image you attach in its chat.
 - **A web chat** (ChatGPT, Claude, or one you added) **is a website**. A screenshot you send there goes to that site and is handled under its terms. The card and the editor say this the first time you send to each chat, and the Options page says it next to the destinations.
-- **Send automatically** and **Send to all selected** send to web chats too: with Send automatically on, the message goes to that site without you reviewing it first.
+- **Send automatically** (on for ChatGPT and Claude) and **Send to all selected** send to web chats too: with Send automatically on, the message goes to that site without you reviewing it first.
+- **The answer card** reads the chat's answer to your screenshot from that chat's page (the text it shows, nothing else) and shows it on the page you sent from. The answer is kept with the capture in the extension's storage until you close the card, a day at most, and goes nowhere else.
 - The **floating toolbar** needs access to all sites while it is on. It reads nothing on those pages: it draws itself and captures only when you click it.
 - Captures stay in the extension's own storage in this browser until you send, copy or save them. They are removed after sending to html2wp, or after a day.
 
@@ -126,9 +146,14 @@ npm install
 npm test
 ```
 
-The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on 127.0.0.1:47811) and a mock web chat page on another port. They cover:
+The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on a free 127.0.0.1 port), a mock web chat page on another port, and stand-ins for chatgpt.com and claude.ai (`tests/mock-ai.mjs`): a ProseMirror-like composer, an upload to the mock server, a send button that waits for it, a stop button and a streamed answer. The test copy points the ChatGPT and Claude presets at the stand-ins, so the real sites are never loaded. They cover:
 
-- out of the box: ChatGPT is the default, the popup shows ChatGPT (and **Allow ChatGPT** when the site is not allowed), and there is no html2wp status
+- out of the box: ChatGPT is the default, the popup's list shows ChatGPT (and **Allow ChatGPT** when the site is not allowed), and there is no html2wp status
+- the popup's destination list: the same destinations and order as Options, a change saved at once and followed by an open Options page (and the other way round), the focus ring, html2wp's status under it, and a declined site permission (the choice is kept, **Needs permission** and **Allow Claude** shown)
+- auto-send to Claude and to ChatGPT: the chat's tab stays behind the owner's page, the chat gets the image, the message and one press of Send; the answer card goes from Sending to answering to answered, shows bold text, a list, a code block and a safe link, copies the answer as Markdown, resizes with the keyboard, never hides by itself, reads the new answer after a second send to the same tab, and **Continue in Claude** brings that tab to the front
+- auto-send failures, with nothing sent and the message kept: a failed upload, no send button, a message box that refuses text, and a chat still answering (with **Try again**); each offers **Open Claude tab**
+- an answer that never comes: **No answer from Claude yet** and **Open Claude tab**
+- sanitisation: an answer with `<script>`, `onerror`, `onclick`, `onmouseover`, an `svg` with `onload`, an `iframe` and a `javascript:` link shows only inert text and the one https link
 - the right-click menu: its items and contexts, **Capture visible page**, **Send selection with a screenshot**, and **Send to ▸ Claude** changing the default. Playwright cannot open Chrome's context menu, so the test copy records the items the extension creates and calls the click handler directly. It also cannot check that a real menu click grants activeTab.
 - switching the default to html2wp brings up html2wp's status, then pairing
 - choosing ChatGPT, then a custom chat, as the default in Options
@@ -141,7 +166,7 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - a custom web chat receiving the pasted PNG file and the text
 - a copy saved through the Downloads fallback, in JPEG at 80 % (the chat gets a JPEG too, html2wp still gets PNG)
 - send to several at once: html2wp and a web chat from one click, with a result line for each
-- auto-submit: off never presses the chat's send button, on presses it once, and a missing button is reported
+- auto-submit: on for ChatGPT and Claude and off for an added chat out of the box; off never presses the chat's send button, on presses it once while the chat's tab stays in the background, and a missing button is reported
 - prompts: add, reorder, delete and a default prompt in Options; the picker in the card and the editor; Send with prompt from the right-click menu
 - saved region: remembered per site, captured again at the same size, and clamped to the window
 - keyboard shortcuts: the Options list from Chrome's bindings (and from a stubbed list with keys removed: **Not set**), **Change shortcuts** opening `chrome://extensions/shortcuts`, the keys in the popup and in the right-click menu titles. Real key presses cannot be automated, so the shortcuts themselves are not tested
@@ -149,7 +174,7 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 
 Screenshots go to `screenshots/`.
 
-The test loads a copy of the extension with a few changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's and the toolbar's shadow roots are opened so the test can reach inside them. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own permission prompts (a chat site, all sites for the toolbar), the folder picker, keyboard shortcuts and real ChatGPT and Claude pages cannot be driven by Playwright and are not covered.
+The test loads a copy of the extension with a few changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's and the toolbar's shadow roots are opened so the test can reach inside them. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own permission prompts (a chat site, all sites for the toolbar), the folder picker, keyboard shortcuts and real ChatGPT and Claude pages cannot be driven by Playwright and are not covered. The ChatGPT and Claude selectors in `src/settings.js` (message box, send and stop buttons, messages and answers) follow those sites' pages and are checked against the stand-ins only; check them on the real sites after a site changes.
 
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
 
@@ -169,7 +194,7 @@ Chrome manages the keys. **Options → Keyboard shortcuts** lists the current on
 
 ## Version
 
-The popup footer, the editor's header, the right-click menu and **Options** show the version of Shot2AI that is loaded (for example **Shot2AI v0.3.0**). Options links **What's new** to that version's release notes.
+The popup footer, the editor's header, the right-click menu and **Options** show the version of Shot2AI that is loaded (for example **Shot2AI v0.4.0**). Options links **What's new** to that version's release notes.
 
 ## Legal
 

@@ -29,19 +29,21 @@ What you can do:
 • Capture an area, the visible page, a whole scrolling page, or an image on the page. Or paste a screenshot you already took.
 • A small preview card appears in the corner. Send in one click, add a message, or pick a saved prompt such as "Fix this bug" or "Match this design".
 • Open the editor to add arrows, boxes, text and highlights, or blur anything private.
-• Send to your default destination, or to several at once. Web chats get the screenshot pasted into their message box; you press Enter. Automatic sending is available if you switch it on.
+• Pick where screenshots go right in the toolbar popup: ChatGPT, Claude, the html2wp app, your own chats, copy or save.
+• Send to ChatGPT or Claude without leaving your page: Shot2AI attaches the screenshot and your message in the chat's tab, sends it there while that tab stays in the background, and shows the answer in the card on your page. Copy the answer, or continue in the chat. If anything stops the send (you are signed out, the upload failed, the chat is still busy), the card says so and nothing half-done goes out. You can turn automatic sending off per chat.
+• Send to several destinations at once. Chats you add get the screenshot pasted into their message box; you press Enter, or switch automatic sending on for them.
 • Keep captures of a session as a stack, flip through them, and send them together.
 • Remember a region of a page and capture it again with one shortcut.
 • Save copies as PNG, JPEG or WebP to a folder you choose.
 • Use the right-click menu, keyboard shortcuts, or an optional floating toolbar.
 
-Private by design: Shot2AI has no server, no account, no analytics and no tracking. Screenshots go only where you send them: the html2wp app on your own computer, or the chat website you chose.
+Private by design: Shot2AI has no server, no account, no analytics and no tracking. Screenshots go only where you send them: the html2wp app on your own computer, or the chat website you chose. The chat's answer is read from that chat's page and shown only to you.
 
 ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI or Anthropic.
 
 ## Single purpose
 
-Shot2AI captures screenshots of web pages at the user's request, lets the user annotate them, and sends them where the user chooses: a web chat, the html2wp desktop app on the same computer, the clipboard or a file.
+Shot2AI captures screenshots of web pages at the user's request, lets the user annotate them, and sends them where the user chooses: a web chat, the html2wp desktop app on the same computer, the clipboard or a file. For ChatGPT and Claude it shows the chat's answer to the screenshot next to the page it came from.
 
 ## Permission justifications
 
@@ -49,20 +51,21 @@ Shot2AI captures screenshots of web pages at the user's request, lets the user a
 |---|---|
 | `activeTab` | Capture the tab the user is on when they click the toolbar button, use the shortcut or the right-click menu, and show the selection overlay and preview card on that tab. |
 | `storage` | Keep the user's settings, destinations, saved prompts, saved regions and the html2wp pairing token on their device. |
-| `scripting` | Draw the area-selection overlay, the preview card and the optional floating toolbar on the page, and paste the screenshot into the chat site the user chose. |
+| `scripting` | Draw the area-selection overlay, the preview card and the optional floating toolbar on the page; attach the screenshot and the message in the chat site the user chose and, when sending automatically, press its send button; for ChatGPT and Claude, read the chat's answer to that message on the chat's page to show it in the card. |
 | `downloads` | Save a copy of a screenshot to the Downloads folder when the user saves or has "Save a copy" switched on. |
 | `clipboardWrite` | Put the screenshot on the clipboard so the user can paste it anywhere, and as a fallback when pasting into a chat is not possible. |
 | `contextMenus` | Offer Shot2AI's capture and send actions in the right-click menu. |
 | Host permission `http://127.0.0.1/*` | Talk to the html2wp desktop app, which listens only on the user's own computer. |
-| Optional host permissions `https://*/*`, `http://*/*` | Asked for one site at a time, when the user adds or chooses a web chat (for example chatgpt.com), so the screenshot can be pasted into that site's message box. Nothing is asked for until the user picks a chat. |
+| Optional host permissions `https://*/*`, `http://*/*` | Asked for one site at a time, when the user adds or chooses a web chat (for example chatgpt.com, in the popup's list or in Options), so the screenshot can be attached in that site's message box and sent, and, for ChatGPT and Claude, so the chat's answer can be read from that site's page and shown in the card. Nothing is asked for until the user picks a chat. |
 | Optional host permission `<all_urls>` | Asked for only when the user switches on the floating toolbar, which appears on every page and captures from it. Switching the toolbar off gives this permission up. |
 | Remote code | None. All code is in the package. |
 
 ## Data usage disclosures (matching PRIVACY.md)
 
-- **Website content**: yes. Screenshots of pages, and text the user selected, when the user asks. They are handled on the device and sent only to the destination the user chooses.
+- **Website content**: yes. Screenshots of pages, and text the user selected, when the user asks. They are handled on the device and sent only to the destination the user chooses. After Shot2AI sends a screenshot to ChatGPT or Claude for the user, it reads that chat's answer from the chat's page (the text it shows) and shows it in the card; the answer stays on the device with the capture (deleted when the card is closed, a day at most) and is not sent anywhere.
 - **Web history**: the address and title of a captured page are kept with that capture on the device, to label it and name saved files. They are not collected or sent anywhere else.
-- **Personally identifiable information, health, financial, authentication, personal communications, location, user activity**: not collected. The html2wp pairing token stays on the device.
+- **Personal communications**: the AI chat's answer to a screenshot the user sent to ChatGPT or Claude is read from that chat's page to show it in the card. It stays on the device and is not transmitted anywhere; no other messages or conversations are read. Declare it under website content / personal communications as the form asks, marked as not sold, not transferred and used only for the single purpose.
+- **Personally identifiable information, health, financial, authentication, location, user activity**: not collected. The html2wp pairing token stays on the device.
 
 Certifications:
 - The developer does not sell or transfer user data to third parties, except to the destination the user chooses (the approved use case).
