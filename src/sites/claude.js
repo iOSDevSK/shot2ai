@@ -17,4 +17,15 @@ export default {
   streamingSelectors: ['[data-is-streaming="true"]'],
   loginUrls: ['/login', '/logout'],
   loginSelectors: ['[data-testid="login-with-google"]', 'a[href="/login"]'],
+  // The model picker by the message box: its button, the menu it opens
+  // (anywhere on the page), the menu's items and the name inside an item.
+  // `typical` is shown, labelled as such, only when no Claude tab has been
+  // read yet; the real list is read from the picker itself.
+  model: {
+    button: ['button[data-testid="model-selector-dropdown"]', 'button[aria-label*="model" i][aria-haspopup]'],
+    menu: ['[role="menu"]', '[role="listbox"]'],
+    items: ['[role="menuitemradio"]', '[role="menuitem"]', '[role="option"]'],
+    label: ['[data-testid="model-name"]'],
+    typical: ['Opus', 'Sonnet', 'Haiku'],
+  },
 };

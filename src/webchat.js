@@ -10,7 +10,7 @@
 // is the tab Shot2AI uses, so each screenshot continues the same conversation
 // unless the owner asks for a new chat. A closed tab opens again, in the
 // background, on the last conversation. Shot2AI never touches a sign-in page.
-import { sitePattern, settings, update, autoSubmitOn, origin } from './settings.js';
+import { sitePattern, settings, update, autoSubmitOn, origin, cacheModels } from './settings.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // The page gives up on its own by then (see `deadline`); this is the backstop.
@@ -99,6 +99,19 @@ async function pasteInPage(files, text, selectors, submit) {
   };
   // Still answering the last message: nothing is touched.
   if (submit.on && anyVisible(submit.stop)) return { ok: false, reason: 'busy' };
+  // The model the owner chose, switched in the chat's own picker (picker.js)
+  // before anything is attached, and checked. If it cannot be, nothing is
+  // sent. With the chat's current model, the picker is not touched at all.
+  let model = null;
+  if (submit.model) {
+    const picker = window.__shot2aiPicker;
+    const picked = picker ? await picker.choose(submit.model.picker, submit.model.want) : { ok: false, reason: 'modelPicker' };
+    if (!picked.ok) return { ok: false, reason: picked.reason, detail: picked.detail || null, names: picked.names || [] };
+    model = { name: picked.name, names: picked.names || [] };
+    // The picker is closed; the message box must still be there.
+    composer = find() || await until(find, 2000);
+    if (!composer) return { ok: false, reason: 'noComposer' };
+  }
   const baseline = { answers: count(submit.answers), user: count(submit.user), url: location.href };
   composer.focus();
   const makeFiles = () => files.map((f) => new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
@@ -206,7 +219,7 @@ async function pasteInPage(files, text, selectors, submit) {
   // new address, or empties its composer.
   const went = await until(() => anyVisible(submit.stop) || count(submit.user) > baseline.user || location.href !== baseline.url
     || (text ? !current() : previews() < attachedCount), 10000);
-  return went ? { ok: true, submitted: true, baseline, url: location.href } : { ok: true, submitted: false, reason: 'notConfirmed' };
+  return went ? { ok: true, submitted: true, baseline, url: location.href, model } : { ok: true, submitted: false, reason: 'notConfirmed' };
 }
 
 // The tab Shot2AI uses for each chat in this browser session, and whether it
@@ -238,7 +251,7 @@ export async function rememberConversation(destination, url) {
 // owner used last (for the owner's own chats, one on the chat's address
 // first). A remembered tab that went to another site is let go, unless it
 // went there to sign in.
-async function findTab(destination) {
+export async function findTab(destination) {
   const kept = await remembered(destination);
   if (kept && (onSite(kept.tab, destination) || kept.signIn)) return kept;
   const tabs = (await chrome.tabs.query({})).filter((t) => onSite(t, destination));
@@ -248,14 +261,17 @@ async function findTab(destination) {
 }
 
 // One screenshot or several (`blob` and `name` may be arrays). `newChat`
-// starts a new conversation in the chat's tab instead of continuing it.
-// Returns { ok, submitted, autoSubmit, tabId, baseline, reason } | { needsPermission } | { failed, reason, detail, tabId }.
-export async function pasteIntoChat(destination, blob, text, name, { newChat = false } = {}) {
+// starts a new conversation in the chat's tab instead of continuing it;
+// `model` is the name of the model to switch to first (none: the chat's
+// current model, and its picker is not touched).
+// Returns { ok, submitted, autoSubmit, tabId, baseline, reason, modelUsed } | { needsPermission } | { failed, reason, detail, names, tabId }.
+export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null } = {}) {
   const blobs = Array.isArray(blob) ? blob : [blob];
   const names = Array.isArray(name) ? name : [name];
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { needsPermission: true };
   // Never for html2wp: only web chats reach this function.
   const autoSubmit = autoSubmitOn(await settings(), destination.id);
+  const want = model && destination.model ? model : null;
   const found = await findTab(destination);
   let tab = found?.tab || null;
   // Loaded by Shot2AI just now: a page elsewhere means a sign-in page.
@@ -303,7 +319,9 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
       login: { urls: destination.loginUrls || [], selectors: destination.loginSelectors || [] }, area: destination.areaSelectors || [],
       // A page that is already there shows its message box at once.
       wait: loadedNow ? 20000 : 6000,
+      model: want ? { want, picker: destination.model } : null,
     };
+    if (want) await chrome.scripting.executeScript({ target: { tabId }, files: ['src/picker.js'] });
     const script = chrome.scripting.executeScript({ target: { tabId }, func: pasteInPage, args: [files, text, destination.selectors || [], submit] });
     const late = wait(SEND_LIMIT).then(() => [{ result: { ok: false, reason: 'notConfirmed' } }]);
     const [{ result }] = await Promise.race([script, late]);
@@ -321,10 +339,36 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
     }
     if (result?.reason === 'login') await remember(destination, tab.id, true);
     if (result?.submitted) await rememberConversation(destination, result.url);
-    if (!result?.ok) return { failed: true, reason: result?.reason || 'failed', detail: result?.detail || null, notAttached: result?.reason === 'notAttached', tabId: tab.id };
-    return { ok: true, submitted: !!result.submitted, autoSubmit, reason: result.reason || null, baseline: result.baseline || null, tabId: tab.id };
+    // Whatever the picker showed on the way is the chat's list now.
+    await cacheModels(destination, result?.model?.names || result?.names).catch(() => {});
+    const about = { model: want, names: result?.names || null, pickerNote: destination.model?.noPicker || null };
+    if (!result?.ok) return { failed: true, reason: result?.reason || 'failed', detail: result?.detail || null, notAttached: result?.reason === 'notAttached', tabId: tab.id, ...about };
+    return { ok: true, submitted: !!result.submitted, autoSubmit, reason: result.reason || null, baseline: result.baseline || null, tabId: tab.id, modelUsed: result.model?.name || null, ...about };
   } catch {
     return { failed: true, reason: 'failed', tabId: tab.id };
+  }
+}
+
+// The names in the chat's own model picker, read in the tab the owner keeps
+// (never one opened for it) and cached: open the picker, read, close it. Not
+// while the chat answers, and not in a tab the owner is looking at.
+export async function readModels(destination) {
+  if (!destination?.model) return { skipped: 'noPicker' };
+  if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { skipped: 'permission' };
+  const tab = (await findTab(destination))?.tab;
+  if (!tab || !onSite(tab, destination) || tab.discarded || tab.status !== 'complete') return { skipped: 'noTab' };
+  if (tab.active && (await chrome.windows.get(tab.windowId).catch(() => null))?.focused) return { skipped: 'inUse' };
+  try {
+    const target = { tabId: tab.id };
+    const [{ result: busy }] = await chrome.scripting.executeScript({ target, func: (stop) => stop.some((s) => [...document.querySelectorAll(s)].some((el) => el.getBoundingClientRect().width > 0)), args: [destination.stopSelectors || []] });
+    if (busy) return { skipped: 'busy' };
+    await chrome.scripting.executeScript({ target, files: ['src/picker.js'] });
+    const [{ result }] = await chrome.scripting.executeScript({ target, func: (m) => window.__shot2aiPicker.read(m), args: [destination.model] });
+    if (!result?.ok || !result.names.length) return { failed: true, reason: result?.reason || 'modelPicker' };
+    await cacheModels(destination, result.names);
+    return { ok: true, names: result.names, current: result.current };
+  } catch {
+    return { failed: true, reason: 'failed' };
   }
 }
 

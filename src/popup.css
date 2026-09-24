@@ -44,3 +44,7 @@ body{width:340px;background:var(--canvas)}
 .select-arrow{position:absolute;right:12px;top:50%;display:grid;place-items:center;width:16px;height:16px;margin-top:-8px;color:var(--muted);pointer-events:none;transform:rotate(180deg)}
 .select-arrow svg{width:14px;height:14px}
 .dest .notice{margin:0 0 12px}
+.model-row{margin:-2px 0 12px}
+.select.small{margin:6px 0 6px}
+.select.small select{height:38px;font-size:13px;font-weight:560}
+.model-note{margin:0;font-size:11px;line-height:1.4;color:var(--faint)}

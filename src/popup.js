@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { isMac, settings, choices, FIRST_DEFAULT, update, defaultPatch, sitePattern, cleanSubfolder } from './settings.js';
+import { isMac, settings, choices, FIRST_DEFAULT, update, defaultPatch, sitePattern, cleanSubfolder, modelView } from './settings.js';
 import { acceptPastedImages } from './paste.js';
 import { shortcuts } from './shortcuts.js';
 
@@ -50,6 +50,36 @@ const optionText = (d, s) => {
   if (d.kind === 'save') return `Save only — ${`Downloads/${cleanSubfolder(s.saveSubfolder) || ''}`.replace(/\/$/, '')}`;
   return 'Copy only — the clipboard';
 };
+// The model for the chosen chat: "Chat's current model" (nothing is
+// switched), or one of the names read from the chat's own picker in its tab,
+// else its typical names, labelled as such. Kept per chat.
+const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+const READ_EVERY = 10 * 60 * 1000;
+let asked = null;
+function renderModels(d) {
+  const view = modelView(loaded, d);
+  $('model-row').hidden = !view;
+  if (!view) return;
+  const options = [new Option("Chat's current model", '')];
+  const group = (label, names) => { const g = document.createElement('optgroup'); g.label = label; g.append(...names.map((n) => new Option(n, n))); return g; };
+  if (view.names.length) options.push(group(view.live ? `In ${d.name} now` : 'Typical names (may be out of date)', view.names));
+  if (view.choice && !view.names.includes(view.choice)) options.push(group('Your choice (not in the list now)', [view.choice]));
+  $('model-select').replaceChildren(...options);
+  $('model-select').value = view.choice;
+  $('model-note').textContent = view.live ? `Read from your ${d.name} tab ${ago(view.at)}.`
+    : view.note ? `${d.name}: ${view.note}. Keep ${d.name} open in a tab to read its list.`
+    : `Typical names. Keep ${d.name} open in a tab, signed in, to read its own list.`;
+  // Read again from the chat's own picker (in the tab kept open), now and then.
+  if (Date.now() - view.at > READ_EVERY && asked !== d.id) {
+    asked = d.id;
+    chrome.runtime.sendMessage({ type: 'read-models', destination: d.id }).catch(() => {});
+  }
+}
+$('model-select').addEventListener('change', () => {
+  const d = list.find((x) => x.id === $('dest-select').value);
+  if (d && loaded) update({ modelChoice: { ...loaded.modelChoice, [d.id]: $('model-select').value } });
+});
+
 let list = [];
 let loaded = null;
 async function refresh() {
@@ -58,6 +88,7 @@ async function refresh() {
   const select = $('dest-select');
   select.replaceChildren(...list.map((d) => new Option(optionText(d, loaded), d.id, false, d.id === destination.id)));
   select.value = destination.id;
+  renderModels(destination);
   if (destination.kind === 'html2wp') { destState(''); await html2wpStatus(); return; }
   show('none');
   setState('');
@@ -85,7 +116,7 @@ $('dest-select').addEventListener('change', () => {
 });
 // Changed in Options (or the right-click menu) while the popup is open.
 chrome.storage.onChanged.addListener((changes) => {
-  if (['defaultDestination', 'customChats', 'saveSubfolder'].some((k) => k in changes)) void refresh();
+  if (['defaultDestination', 'customChats', 'saveSubfolder', 'modelChoice', 'modelLists'].some((k) => k in changes)) void refresh();
 });
 $('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('recheck').addEventListener('click', refresh);

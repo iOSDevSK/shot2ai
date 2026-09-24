@@ -2,7 +2,7 @@
 import { getCapture, updateCapture, deleteCapture } from './captures.js';
 import { addToStack, stackFor, unhideStack, STACK_CAP } from './stack.js';
 import { sendToApp, outcomeText } from './bridge.js';
-import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatOutcome, autoSubmitOn, readsAnswers } from './settings.js';
+import { destinations, defaultDestination, settings, update, fileName, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatOutcome, autoSubmitOn, readsAnswers, modelView } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat } from './webchat.js';
 import { watchAnswer, TIMING } from './answer.js';
@@ -82,7 +82,7 @@ export async function showStack(tabId, { currentId = null, fresh = null, autoSen
   const chosen = await defaultDestination();
   const brief = (d) => {
     const auto = d.kind === 'chat' && autoSubmitOn(s, d.id);
-    return { id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null, url: d.url || null, auto, answers: auto && readsAnswers(d) };
+    return { id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null, url: d.url || null, auto, answers: auto && readsAnswers(d), models: modelView(s, d) };
   };
   const destinationsNow = (await destinations()).map(brief);
   const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry', 'region', 'open', 'spinner', 'grip'];
@@ -124,7 +124,7 @@ export async function sendCaptures(message) {
   const blobs = [];
   for (const c of captures) blobs.push(await encode(c.png, s));
   const names = captures.map((c, i) => fileName(s.filenamePattern, c.url, new Date(Date.now() + i * 1000), EXTENSIONS[blobs[i].type]));
-  const r = await pasteIntoChat(destination, blobs, message.text, names, { newChat: !!message.newChat });
+  const r = await pasteIntoChat(destination, blobs, message.text, names, { newChat: !!message.newChat, model: s.modelChoice?.[destination.id] || null });
   if (r.needsPermission) return { ok: false, sentIds: [], text: `Allow the extension to use ${new URL(destination.url).host} in Options first.` };
   if (r.submitted) return { ok: true, sentIds: captures.map((c) => c.id), text: `Sent ${captures.length} screenshots to ${destination.name}.`, tabId: r.tabId };
   if (r.ok && !r.autoSubmit) return { ok: true, sentIds: captures.map((c) => c.id), text: `Pasted ${captures.length} screenshots into ${destination.name}. Press Enter there to send.`, tabId: r.tabId };
@@ -155,7 +155,10 @@ export async function cardSend(message, sender) {
   }
   const s = await settings();
   const blob = await encode(capture.png, s);
-  const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]), { newChat: !!message.newChat });
+  // The model: the card's choice for this send ('' for the chat's current
+  // one), else the owner's choice for this chat.
+  const model = typeof message.model === 'string' ? message.model : s.modelChoice?.[destination.id] || '';
+  const r = await pasteIntoChat(destination, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]), { newChat: !!message.newChat, model: model || null });
   const outcome = chatOutcome(destination.name, r);
   // Sent to a chat whose answer Shot2AI reads (sites/): the card turns into the answer card.
   if (r.submitted && readsAnswers(destination) && sender?.tab && await getCapture(message.id)) {
@@ -208,7 +211,7 @@ export async function cardSendMany(message) {
   const results = [];
   for (const d of list.filter((x) => x.kind === 'chat')) {
     const blob = await encode(capture.png, s);
-    const r = await pasteIntoChat(d, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]));
+    const r = await pasteIntoChat(d, blob, message.text, fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]), { model: s.modelChoice?.[d.id] || null });
     results.push({ id: d.id, name: d.name, ok: !!(r.submitted || (r.ok && !r.autoSubmit)), text: manyText(r) });
   }
   if (app) {
@@ -227,6 +230,8 @@ function manyText(r) {
     login: 'Log in there once, keep the tab open; nothing sent', plan: 'It did not take the image (a plan or a sign-in?); nothing sent',
     noComposer: 'Message box not found; nothing sent', busy: 'Still answering; nothing sent', noText: 'The message did not go in; nothing sent',
     uploadFailed: 'The upload failed; nothing sent', notConfirmed: 'Send not confirmed; check its tab',
+    modelPicker: 'Its model could not be chosen; nothing sent', modelMissing: 'The chosen model is not there; nothing sent', modelAmbiguous: 'The chosen model matches several; nothing sent',
+    modelPlan: 'The chosen model needs another plan; nothing sent', modelNotSwitched: 'The model did not switch; nothing sent',
   }[r.reason];
   if (line) return line;
   return r.ok ? 'Pasted; press Enter there' : 'Could not paste; it is on the clipboard';

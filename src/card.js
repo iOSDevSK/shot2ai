@@ -75,6 +75,12 @@
     .menu .options{border-top:1px solid #eef0ea;margin-top:4px;border-radius:0 0 6px 6px;color:#547254}
     .menu .new-chat{justify-content:flex-start;gap:8px;margin-top:4px;border-top:1px solid #eef0ea;border-radius:0}
     .menu .new-chat small{margin-left:auto}
+    .menu .model{justify-content:flex-start;gap:8px}
+    .menu .model span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .menu .model small{flex:none;margin-left:auto}
+    .menu .model .dot{flex:none;width:14px;height:14px;border:1.5px solid #9fae94;border-radius:50%;background:#fff}
+    .menu .model[aria-checked="true"] .dot{border:4.5px solid #2f3c30}
+    .menu .hint{padding:0 8px 6px;font-size:10.5px;line-height:1.35;color:#969f88}
     .menu .new-chat .box{flex:none;width:15px;height:15px;border:1.5px solid #9fae94;border-radius:4px;background:#fff}
     .menu .new-chat[aria-checked="true"] .box{border-color:#2f3c30;background:#2f3c30 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/11px no-repeat}
     .tools{display:flex;gap:2px;margin-top:8px}
@@ -386,12 +392,16 @@
       }
     }
 
+    // The model for a send: the card's choice for this send, else the owner's
+    // for this chat; '' is the chat's current model (nothing is switched).
+    const modelFor = (d, entry) => (d?.models ? (typeof entry?.model === 'string' ? entry.model : d.models.choice) : '');
     function label() {
       const kind = o.main.kind;
       const svg = { copy: i.copy, save: i.download }[kind] || i.send;
       $('.send').innerHTML = `${svg}<span></span>`;
-      // "New chat" in the menu: the next send starts a new conversation.
-      $('.send span').textContent = kind === 'chat' && now()?.newChat ? `${o.main.label} (new chat)` : o.main.label;
+      // The model this send switches to, if any, and "New chat" from the menu.
+      const model = kind === 'chat' ? modelFor(o.main, now()) : '';
+      $('.send span').textContent = `${o.main.label}${model ? ` · ${model}` : ''}${kind === 'chat' && now()?.newChat ? ' (new chat)' : ''}`;
     }
 
     function showResult(tone, text, actions = [], lines = null) {
@@ -461,8 +471,10 @@
       if (r?.actions === 'retry') showResult(r.tone, r.text, [['Try again', () => void sendTo(o.main), true, 'retry']]);
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
       else if (r?.actions === 'open-chat') {
-        const again = r.retry && o.destinations.find((d) => d.id === r.chat.destination);
-        showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [[typeof r.retry === 'string' ? r.retry : 'Try again', () => void sendTo(again), false, 'retry']] : [])]);
+        const again = (r.retry || r.current) && o.destinations.find((d) => d.id === r.chat.destination);
+        // The chosen model could not be had: send with the chat's current one instead.
+        if (r.current && again) showResult(r.tone, r.text, [['Send with current model', () => void sendTo(again, true, { model: '' }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
+        else showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [[typeof r.retry === 'string' ? r.retry : 'Try again', () => void sendTo(again), false, 'retry']] : [])]);
       } else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
       else showResult('', '');
       label();
@@ -723,7 +735,7 @@
       scheduleHide();
     }
 
-    async function sendTo(destination, confirmed = false) {
+    async function sendTo(destination, confirmed = false, { model: forced } = {}) {
       const entry = now();
       if (busy || !entry) return;
       $('.menu').hidden = true;
@@ -752,7 +764,11 @@
         }
         const newChat = !!entry.newChat;
         entry.newChat = false;
-        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat });
+        // The card's model for this send (the menu's, or "Send with current
+        // model"); otherwise the service worker uses the owner's choice.
+        const model = typeof forced === 'string' ? forced : typeof entry.model === 'string' && destination.id === o.main.id ? entry.model : undefined;
+        entry.model = undefined;
+        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model });
         setBusy(false);
         chat.tabId = r?.tabId;
         if (r?.watching) {
@@ -767,7 +783,7 @@
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
         const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
         if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }
-        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: r.retry || false, ...(r.open ? open : {}) }); return; }
+        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: r.retry || false, current: !!r.current, ...(r.open ? open : {}) }); return; }
         setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
         return;
       }
@@ -883,6 +899,38 @@
           label();
         });
         menu.append(fresh);
+      }
+      // The model for this send, from the chat's own list (read from its
+      // picker), or its typical names until then; the popup keeps the choice.
+      const view = o.main.kind === 'chat' ? o.main.models : null;
+      if (view) {
+        const entry = now();
+        menu.insertAdjacentHTML('beforeend', '<div class="head later">Model for this send</div>');
+        const names = [...view.names];
+        if (view.choice && !names.includes(view.choice)) names.push(view.choice);
+        const rows = [];
+        for (const [value, text] of [['', "Chat's current model"], ...names.map((n) => [n, n])]) {
+          const b = document.createElement('button');
+          b.className = 'model';
+          b.setAttribute('role', 'menuitemradio');
+          b.innerHTML = '<span class="dot" aria-hidden="true"></span><span></span><small></small>';
+          b.querySelector('span:nth-child(2)').textContent = text;
+          b.querySelector('small').textContent = value === view.choice ? 'usual' : '';
+          b.dataset.value = value;
+          b.addEventListener('click', () => {
+            if (!entry) return;
+            entry.model = value;
+            for (const x of rows) x.setAttribute('aria-checked', String(x.dataset.value === value));
+            label();
+          });
+          rows.push(b);
+          menu.append(b);
+        }
+        for (const x of rows) x.setAttribute('aria-checked', String(x.dataset.value === modelFor(o.main, entry)));
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.textContent = view.live ? `Names from ${o.main.name}'s own list.` : view.note ? `${o.main.name}: ${view.note}.` : `Typical names; keep ${o.main.name} open in a tab to read its own list.`;
+        menu.append(hint);
       }
       const add = (text, run, cls = 'strong') => {
         const b = document.createElement('button');

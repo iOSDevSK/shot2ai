@@ -10,7 +10,7 @@ import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 import { stopAnswer, stopAnswersFor } from './answer.js';
-import { openChatTab } from './webchat.js';
+import { openChatTab, readModels } from './webchat.js';
 import { choices, PRESETS, origin } from './settings.js';
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -121,6 +121,8 @@ const handlers = {
   },
   'open-options': async () => { await chrome.runtime.openOptionsPage(); return { ok: true }; },
   // "Open Claude tab", "Continue in Claude".
+  // The popup asks for a chat's own list of models (read in its kept tab).
+  'read-models': async (m) => readModels((await choices()).find((d) => d.id === m.destination)),
   'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination)); return { ok: true }; },
 };
 

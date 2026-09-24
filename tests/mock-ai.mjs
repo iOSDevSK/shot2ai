@@ -24,7 +24,28 @@
 //   login-redirect the chat sends the tab to a sign-in page on another site
 //   login-upload   the message box is there, but the upload asks to sign in
 //   plan           the upload is refused: "Upgrade to Pro"
+//
+// Each stand-in also has a model picker, set by `state.models[kind]`: its
+// names and current model, names `locked` (shown disabled with the site's
+// words), names that open an `upsell` dialog when chosen, a "More models"
+// submenu (`more`), no picker at all (`picker: false`), or a picker that
+// does not switch (`stuck`). Claude's and ChatGPT's open on pointerdown and
+// put their menu at the end of the page (like Radix); Gemini's and
+// Perplexity's open on click.
 import http from 'node:http';
+
+export const MODELS = {
+  claude: { names: ['Opus 4.1', 'Sonnet 4.5', 'Haiku 4.5'], current: 'Sonnet 4.5', more: ['Opus 3'] },
+  chatgpt: { names: ['Auto', 'Instant', 'Thinking', 'Pro'], current: 'Auto' },
+  gemini: { names: ['Fast', 'Thinking', 'Pro'], current: 'Fast' },
+  perplexity: { names: ['Best', 'Sonar', 'Claude Sonnet 4.5', 'GPT-5'], current: 'Best' },
+};
+const PICKERS = {
+  claude: { button: '<button type="button" id="model-button" data-testid="model-selector-dropdown" aria-haspopup="menu"></button>', text: '{m}', openOn: 'pointerdown', menuRole: 'menu', menuClass: '', itemTag: 'div', itemRole: 'menuitemradio', item: '<div data-name></div><div class="desc" data-desc></div>' },
+  chatgpt: { button: '<button type="button" id="model-button" data-testid="model-switcher-dropdown-button" aria-haspopup="menu"></button>', text: 'ChatGPT {m}', openOn: 'pointerdown', menuRole: 'menu', menuClass: '', itemTag: 'div', itemRole: 'menuitemradio', item: '<div data-name></div><div class="desc" data-desc></div>' },
+  gemini: { button: '<button type="button" id="model-button" data-test-id="bard-mode-menu-button" aria-haspopup="true"></button>', text: '{m}', openOn: 'click', menuRole: 'menu', menuClass: 'mat-mdc-menu-panel', itemTag: 'button', itemRole: 'menuitemradio', item: '<span class="mode-title" data-name></span><span class="mode-desc" data-desc></span>' },
+  perplexity: { button: '<button type="button" id="model-button" aria-label="Choose a model" aria-haspopup="menu"></button>', text: '{m}', openOn: 'click', menuRole: 'listbox', menuClass: '', itemTag: 'div', itemRole: 'option', item: '<div data-name></div><div class="desc" data-desc></div>' },
+};
 
 // The answer, in chunks as the site would stream it. `{n}` is the answer's number.
 export const ANSWER = [
@@ -118,8 +139,9 @@ const LOGIN = (title) => `<!doctype html><html><head><meta charset="utf-8"><titl
 const ACCOUNTS = `<!doctype html><html><head><meta charset="utf-8"><title>Sign in – Accounts (test)</title></head><body style="font:15px sans-serif;padding:60px">
 <h1>Sign in</h1><input type="email" id="email" placeholder="Email or phone" style="width:280px;height:34px"> <button type="button">Next</button></body></html>`;
 
-function page(kind, mode) {
+function page(kind, mode, models) {
   const f = FLAVOURS[kind];
+  const picker = PICKERS[kind];
   const controls = mode === 'nosend' ? '' : mode === 'busy' ? f.stop : f.send;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${f.title} (test)</title><style>
 body{margin:0;font:15px/1.5 sans-serif;background:#faf9f5;color:#222}
@@ -131,8 +153,13 @@ main{max-width:720px;margin:0 auto;padding:24px}
 [data-composer]{display:block;width:100%;min-height:60px;outline:none;padding:4px;box-sizing:border-box}
 .controls{display:flex;justify-content:flex-end}.controls button{width:32px;height:32px}
 [role=dialog]{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);padding:20px;background:#fff;border:1px solid #999;border-radius:12px}
+.model-bar{margin:0 0 8px}#model-button{min-width:120px;height:30px}
+.picker{position:fixed;top:70px;left:40px;z-index:9;min-width:240px;padding:6px;background:#fff;border:1px solid #999;border-radius:10px}
+.picker>*{display:block;width:100%;padding:6px 8px;text-align:left;border:0;background:none;font:inherit}.picker [data-desc]{display:block;font-size:12px;color:#777}
+.picker [aria-disabled=true]{opacity:.5}
 </style></head><body>${f.header || ''}<main>
 <div id="thread"></div>
+${models.picker === false ? '' : `<div class="model-bar">${picker.button}</div>`}
 ${f.box(controls)}
 </main><script>
 const MODE = ${JSON.stringify(mode)};
@@ -147,6 +174,67 @@ let files = [];
 let uploading = 0;
 let failed = false;
 window.sent = 0;
+// The model picker (see MODELS above).
+const MODELS = ${JSON.stringify(models)};
+const P = ${JSON.stringify(picker)};
+const trigger = document.getElementById('model-button');
+const showModel = () => { if (trigger) trigger.textContent = P.text.replace('{m}', MODELS.current); };
+showModel();
+window.pickerOpened = 0;
+let menus = [];
+const closeMenus = () => { for (const m of menus) m.remove(); menus = []; };
+function menuEl(left) {
+  const m = document.createElement('div');
+  m.setAttribute('role', P.menuRole);
+  m.className = ('picker ' + P.menuClass).trim();
+  m.dataset.state = 'open';
+  m.style.left = left + 'px';
+  return m;
+}
+function itemEl(name) {
+  const el = document.createElement(P.itemTag);
+  el.setAttribute('role', P.itemRole);
+  el.setAttribute(P.itemRole === 'option' ? 'aria-selected' : 'aria-checked', String(name === MODELS.current));
+  if (P.itemTag === 'button') { el.type = 'button'; el.setAttribute('mat-menu-item', ''); }
+  el.innerHTML = P.item;
+  el.querySelector('[data-name]').textContent = name;
+  el.querySelector('[data-desc]').textContent = MODELS.locked?.[name] || 'A model';
+  if (MODELS.locked?.[name]) el.setAttribute('aria-disabled', 'true');
+  el.addEventListener('click', () => chooseModel(name));
+  return el;
+}
+function openPicker() {
+  if (menus.length) { closeMenus(); return; }
+  window.pickerOpened++;
+  fetch('/picker?kind=' + F.kind, { method: 'POST' });
+  const m = menuEl(40);
+  for (const n of MODELS.names) m.append(itemEl(n));
+  if (MODELS.more?.length) {
+    const more = document.createElement('div');
+    more.setAttribute('role', P.itemRole === 'option' ? 'option' : 'menuitem');
+    more.setAttribute('aria-haspopup', 'menu');
+    more.textContent = 'More models';
+    more.addEventListener('click', () => { const sub = menuEl(300); for (const n of MODELS.more) sub.append(itemEl(n)); document.body.append(sub); menus.push(sub); });
+    m.append(more);
+  }
+  document.body.append(m);
+  menus.push(m);
+}
+function chooseModel(name) {
+  if (MODELS.locked?.[name]) return;
+  closeMenus();
+  if (MODELS.upsell?.[name]) { const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.textContent = MODELS.upsell[name]; document.body.append(d); return; }
+  if (MODELS.stuck) return;
+  MODELS.current = name;
+  showModel();
+  fetch('/model?kind=' + F.kind + '&name=' + encodeURIComponent(name), { method: 'POST' });
+}
+if (trigger) {
+  if (P.openOn === 'pointerdown') trigger.addEventListener('pointerdown', (e) => { if (e.button === 0) openPicker(); });
+  else trigger.addEventListener('click', openPicker);
+  trigger.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); } });
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenus(); for (const d of document.querySelectorAll('[role=dialog]')) d.remove(); } });
 function refresh() {
   const send = document.getElementById('send');
   if (send) send.disabled = uploading > 0 || failed || (!files.length && !said());
@@ -201,7 +289,7 @@ async function send() {
   if (!button || button.disabled) return;
   const text = said();
   window.sent++;
-  const n = (await (await fetch('/sent', { method: 'POST', body: JSON.stringify({ kind: F.kind, text, files, path: location.pathname }) })).json()).n;
+  const n = (await (await fetch('/sent', { method: 'POST', body: JSON.stringify({ kind: F.kind, text, files, path: location.pathname, model: MODELS.current }) })).json()).n;
   const mine = make(F.user);
   (mine.matches('[data-slot]') ? mine : mine.querySelector('[data-slot]')).textContent = text + (files.length ? ' [' + files.length + ' image]' : '');
   thread.append(mine);
@@ -246,7 +334,7 @@ const read = (req) => new Promise((resolve) => { const parts = []; req.on('data'
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function startMockAI() {
-  const state = { mode: 'ok', uploads: [], sent: [], pages: [], chunkMs: 250 };
+  const state = { mode: 'ok', uploads: [], sent: [], pages: [], chunkMs: 250, models: structuredClone(MODELS), pickerOpens: {}, switches: [] };
   const ports = {};
   const handler = async (req, res) => {
     const url = new URL(req.url, 'http://mock');
@@ -267,6 +355,14 @@ export async function startMockAI() {
       res.end(JSON.stringify({ n: state.sent.length }));
       return;
     }
+    if (req.method === 'POST' && url.pathname === '/picker') { const k = url.searchParams.get('kind'); state.pickerOpens[k] = (state.pickerOpens[k] || 0) + 1; res.end('{}'); return; }
+    if (req.method === 'POST' && url.pathname === '/model') {
+      const k = url.searchParams.get('kind');
+      state.models[k].current = url.searchParams.get('name');
+      state.switches.push({ kind: k, name: state.models[k].current });
+      res.end('{}');
+      return;
+    }
     if (url.pathname === '/sources') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(SOURCES)); return; }
     if (url.pathname === '/stream') {
       const kind = url.searchParams.get('kind');
@@ -285,7 +381,7 @@ export async function startMockAI() {
     state.pages.push({ kind, path: url.pathname });
     if (state.mode === 'login-redirect') { res.writeHead(302, { location: `http://127.0.0.1:${ports.accounts}/accounts/signin?continue=${encodeURIComponent(url.pathname)}` }); res.end(); return; }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(state.mode === 'login' ? LOGIN(FLAVOURS[kind].title) : page(kind, state.mode));
+    res.end(state.mode === 'login' ? LOGIN(FLAVOURS[kind].title) : page(kind, state.mode, state.models[kind]));
   };
   // ChatGPT and Claude on one port, Gemini and Perplexity on a second, sign-in on a third.
   const servers = [];
@@ -300,7 +396,10 @@ export async function startMockAI() {
     port: ports.first,
     port2: ports.second,
     accountsPort: ports.accounts,
-    reset(mode = 'ok') { state.mode = mode; state.uploads.length = 0; state.sent.length = 0; state.pages.length = 0; },
+    reset(mode = 'ok') {
+      state.mode = mode; state.uploads.length = 0; state.sent.length = 0; state.pages.length = 0;
+      state.models = structuredClone(MODELS); state.pickerOpens = {}; state.switches.length = 0;
+    },
     close: () => Promise.all(servers.map((s) => new Promise((r) => s.close(r)))),
   };
 }

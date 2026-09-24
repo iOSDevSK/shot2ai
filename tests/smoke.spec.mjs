@@ -1639,3 +1639,160 @@ test('Perplexity refuses the upload: its words in the card, for a plan or a sign
   }
   await clearCards();
 });
+
+// ---- 0.5.0: the model ------------------------------------------------------
+
+const storage = (keys) => context.serviceWorkers()[0].evaluate((k) => chrome.storage.local.get(k), keys);
+const chooseModels = (choice) => context.serviceWorkers()[0].evaluate((c) => chrome.storage.local.set({ modelChoice: c }), choice);
+const openPopup = async () => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  return popup;
+};
+
+test('model: the popup reads the chat\'s own list from its tab, keeps it, and remembers the choice per chat', async () => {
+  test.setTimeout(90000);
+  await clearCards();
+  await freshAI('ok');
+  await context.serviceWorkers()[0].evaluate(() => chrome.storage.local.set({ modelChoice: {}, modelLists: {} }));
+  await useDefault('claude');
+  // No Claude tab yet: the typical names, labelled as such.
+  const first = await openPopup();
+  const model = first.getByLabel('Model');
+  await expect(model).toHaveValue('');
+  await expect(first.locator('#model-select option')).toHaveText(["Chat's current model", 'Opus', 'Sonnet', 'Haiku']);
+  await expect(first.locator('#model-select optgroup')).toHaveAttribute('label', 'Typical names (may be out of date)');
+  await expect(first.locator('#model-note')).toHaveText('Typical names. Keep Claude open in a tab, signed in, to read its own list.');
+  await first.close();
+  // The owner's Claude tab: the popup reads its picker (open, read, close), and changes nothing.
+  const own = await context.newPage();
+  await own.goto(`${aiClaude}/claude/chat/owner2`);
+  const popup = await openPopup();
+  await expect(popup.locator('#model-select option')).toHaveText(["Chat's current model", 'Opus 4.1', 'Sonnet 4.5', 'Haiku 4.5'], { timeout: 15000 });
+  await expect(popup.locator('#model-select optgroup')).toHaveAttribute('label', 'In Claude now');
+  await expect(popup.locator('#model-note')).toHaveText('Read from your Claude tab just now.');
+  expect(ai.state.pickerOpens.claude).toBe(1);
+  expect(ai.state.switches).toEqual([]);
+  expect(await own.evaluate(() => document.querySelectorAll('.picker').length)).toBe(0);
+  expect((await storage('modelLists')).modelLists.claude.names).toEqual(['Opus 4.1', 'Sonnet 4.5', 'Haiku 4.5']);
+  // Chosen for Claude, and kept for Claude only.
+  await popup.getByLabel('Model').selectOption('Opus 4.1');
+  await expect.poll(async () => (await storage('modelChoice')).modelChoice).toEqual({ claude: 'Opus 4.1' });
+  await popup.getByLabel('Model').focus();
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-model.png') });
+  await popup.getByLabel('Screenshots go to').selectOption('chatgpt');
+  await expect(popup.getByLabel('Model')).toHaveValue('');
+  await popup.getByLabel('Screenshots go to').selectOption('claude');
+  await expect(popup.getByLabel('Model')).toHaveValue('Opus 4.1');
+  // The tab closed: the list read before stays, and nothing is read again.
+  await own.close();
+  await popup.reload();
+  await expect(popup.locator('#model-select option')).toHaveText(["Chat's current model", 'Opus 4.1', 'Sonnet 4.5', 'Haiku 4.5']);
+  await expect(popup.getByLabel('Model')).toHaveValue('Opus 4.1');
+  expect(ai.state.pickerOpens.claude).toBe(1);
+  await popup.close();
+});
+
+test('model: sent with the chosen model, switched first; a card can choose another for one send; "current" touches nothing', async () => {
+  test.setTimeout(150000);
+  await clearCards();
+  await freshAI('ok');
+  await useDefault('claude');
+  await chooseModels({ claude: 'Opus 4.1' });
+  const send = async (card, message) => {
+    await expect(card.locator('.a-asked')).toHaveText(message, { timeout: 15000 });
+    await expect(card.locator('.a-status')).toHaveText('Claude answered', { timeout: 30000 });
+    expect(await activeTab()).toBe(`${base}/`);
+  };
+  const card = await capture([440, 150], [760, 350]);
+  await expect(card.locator('.send')).toHaveText('Send to Claude · Opus 4.1');
+  await card.getByLabel('Message').fill('With Opus');
+  await sendNow(card, 'Claude');
+  await send(card, 'With Opus');
+  expect(ai.state.switches).toEqual([{ kind: 'claude', name: 'Opus 4.1' }]);
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'With Opus', model: 'Opus 4.1' });
+
+  // Another model for one send, from the card's menu; the usual one stays.
+  const second = await capture([440, 150], [760, 350]);
+  await second.getByLabel('Message').fill('With Haiku');
+  await second.getByRole('button', { name: 'More destinations' }).click();
+  await expect(second.getByRole('menuitemradio', { name: /^Opus 4\.1/ })).toHaveAttribute('aria-checked', 'true');
+  await second.getByRole('menuitemradio', { name: /^Haiku 4\.5/ }).click();
+  await expect(second.locator('.send')).toHaveText('Send to Claude · Haiku 4.5');
+  await menuShot(second, 'card-model-menu.png');
+  await second.locator('.send').click();
+  await send(second, 'With Haiku');
+  expect(ai.state.switches.at(-1)).toEqual({ kind: 'claude', name: 'Haiku 4.5' });
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'With Haiku', model: 'Haiku 4.5' });
+  expect((await storage('modelChoice')).modelChoice).toEqual({ claude: 'Opus 4.1' });
+
+  // "Chat's current model": the picker is not opened at all.
+  const third = await capture([440, 150], [760, 350]);
+  await expect(third.locator('.send')).toHaveText('Send to Claude · Opus 4.1');
+  await third.getByLabel('Message').fill('As it is');
+  await third.getByRole('button', { name: 'More destinations' }).click();
+  await third.getByRole('menuitemradio', { name: /^Chat's current model/ }).click();
+  await expect(third.locator('.send')).toHaveText('Send to Claude');
+  const opened = ai.state.pickerOpens.claude;
+  const switched = ai.state.switches.length;
+  await third.locator('.send').click();
+  await send(third, 'As it is');
+  expect(ai.state.pickerOpens.claude).toBe(opened);
+  expect(ai.state.switches).toHaveLength(switched);
+  expect(ai.state.sent.at(-1)).toMatchObject({ text: 'As it is', model: 'Haiku 4.5' });
+  await clearCards();
+});
+
+test('model: each chat switches in its own picker, including a "More models" submenu', async () => {
+  test.setTimeout(150000);
+  for (const [id, name, choice, kind] of [['chatgpt', 'ChatGPT', 'Thinking', 'chatgpt'], ['gemini', 'Gemini', 'Pro', 'gemini'], ['perplexity', 'Perplexity', 'Sonar', 'perplexity'], ['claude', 'Claude', 'Opus 3', 'claude']]) {
+    await clearCards();
+    await freshAI('ok');
+    await useDefault(id);
+    await chooseModels({ [id]: choice });
+    const card = await capture([440, 150], [760, 350]);
+    await card.getByLabel('Message').fill(`${name} with ${choice}`);
+    await sendNow(card, name);
+    await expect(card.locator('.a-asked')).toHaveText(`${name} with ${choice}`, { timeout: 15000 });
+    await expect(card.locator('.a-status')).toHaveText(`${name} answered`, { timeout: 30000 });
+    expect(ai.state.switches, id).toEqual([{ kind, name: choice }]);
+    expect(ai.state.sent.at(-1), id).toMatchObject({ kind, model: choice });
+  }
+  await clearCards();
+});
+
+test('model: when it cannot be switched, nothing is sent, the card says why in the site\'s words, and "Send with current model" works', async () => {
+  test.setTimeout(240000);
+  const cases = [
+    ['claude', 'Claude', 'Opus 9', null, 'Claude has no model called “Opus 9” now. It lists: Opus 4.1, Sonnet 4.5, Haiku 4.5, Opus 3. Nothing was sent.'],
+    ['claude', 'Claude', 'Opus 4.1', (m) => { m.claude.locked = { 'Opus 4.1': 'Opus 4.1 is available on Max' }; }, 'Claude: “Opus 4.1 is available on Max”. Nothing was sent.', 'card-model-plan.png'],
+    ['claude', 'Claude', 'Sonnet', (m) => { m.claude.names = ['Sonnet 4.5', 'Sonnet 4', 'Haiku 4.5']; }, '“Sonnet” matches several of Claude\'s models (Sonnet 4.5, Sonnet 4); choose one in the popup. Nothing was sent.'],
+    ['chatgpt', 'ChatGPT', 'Pro', (m) => { m.chatgpt.upsell = { Pro: 'Upgrade to Pro to use ChatGPT Pro' }; }, 'ChatGPT: “Upgrade to Pro to use ChatGPT Pro”. Nothing was sent.'],
+    ['gemini', 'Gemini', 'Pro', (m) => { m.gemini.stuck = true; }, 'Gemini did not switch to Pro. Nothing was sent.'],
+    ['perplexity', 'Perplexity', 'Sonar', (m) => { m.perplexity.picker = false; }, 'Perplexity: choosing a model needs Perplexity Pro, and no model picker was found. Nothing was sent.'],
+  ];
+  for (const [id, name, choice, set, text, shot] of cases) {
+    await clearCards();
+    await freshAI('ok');
+    set?.(ai.state.models);
+    await useDefault(id);
+    await chooseModels({ [id]: choice });
+    const card = await capture([440, 150], [760, 350]);
+    await card.getByLabel('Message').fill(`Case ${choice}`);
+    await sendNow(card, name);
+    await expect(card.locator('.result')).toContainText(text, { timeout: 45000 });
+    await expect(card.getByRole('button', { name: 'Send with current model' })).toBeVisible();
+    await expect(card.getByRole('button', { name: `Open ${name} tab` })).toBeVisible();
+    await expect(card.getByLabel('Message')).toHaveValue(`Case ${choice}`);
+    expect(ai.state.sent, `${id} ${choice}`).toEqual([]);
+    expect(ai.state.uploads, `${id} ${choice}`).toEqual([]);
+    if (shot) await answerShot(card, shot);
+  }
+  // The last one, sent with the chat's current model instead: its picker is left alone.
+  const card = page.locator('#shot2ai-preview-card .card');
+  await card.getByRole('button', { name: 'Send with current model' }).click();
+  await expect(card.locator('.a-status')).toHaveText('Perplexity answered', { timeout: 30000 });
+  expect(ai.state.sent).toEqual([expect.objectContaining({ kind: 'perplexity', text: 'Case Sonar', model: 'Best' })]);
+  await chooseModels({});
+  await clearCards();
+});

@@ -45,6 +45,11 @@ const DEFAULTS = {
   defaultPrompt: null,
   // Web chats the owner has been told receive the screenshot (by origin).
   acknowledged: {},
+  // The model the owner chose per known chat, by the name the chat shows
+  // ('' or none: the chat's current model, nothing is switched).
+  modelChoice: {},
+  // The names last read from each known chat's own model picker: { names, at }.
+  modelLists: {},
 };
 
 export async function settings() {
@@ -58,11 +63,39 @@ export const autoSubmitOn = (s, id) => s.autoSubmit?.[id] ?? PRESETS.some((p) =>
 // The chats whose answer Shot2AI can read back into the card.
 export const readsAnswers = (d) => !!d?.answerSelectors?.length;
 
+// A known chat's models as the popup and the card show them: the owner's
+// choice, and the names read from the chat's picker (`live`), else the
+// site's typical names, labelled as such.
+export function modelView(s, d) {
+  if (!d?.model) return null;
+  const read = s.modelLists?.[d.id];
+  const live = !!read?.names?.length;
+  return { choice: s.modelChoice?.[d.id] || '', names: live ? read.names : d.model.typical || [], live, at: read?.at || 0, note: d.model.noPicker || null };
+}
+// Names read from a chat's picker, kept for the popup and the card.
+export async function cacheModels(d, names) {
+  const list = [...new Set((names || []).map((n) => String(n).trim()).filter(Boolean))].slice(0, 40);
+  if (!d?.model || !list.length) return;
+  const { modelLists = {} } = await chrome.storage.local.get('modelLists');
+  await update({ modelLists: { ...modelLists, [d.id]: { names: list, at: Date.now() } } });
+}
+
 // What the card or the editor says after a web-chat send, and whether it
 // offers the chat's tab. Anything short of a confirmed send says what is
 // left to do: `open` offers the tab, `retry` a second try.
 export function chatOutcome(name, r) {
-  if (r.submitted) return { tone: 'ok', text: `Sent to ${name}.` };
+  if (r.submitted) return { tone: 'ok', text: r.modelUsed ? `Sent to ${name} (${r.modelUsed}).` : `Sent to ${name}.` };
+  // The chosen model could not be switched to: nothing went, and the card
+  // offers to send with the chat's current model instead (`current`).
+  const lists = r.names?.length ? ` It lists: ${r.names.join(', ')}.` : '';
+  switch (r.reason) {
+    case 'modelPicker': return { tone: 'warn', open: true, current: true, text: r.pickerNote ? `${name}: ${r.pickerNote}. Nothing was sent.` : `${name}'s model picker was not found, so ${r.model} could not be chosen. Nothing was sent.` };
+    case 'modelMissing': return { tone: 'warn', open: true, current: true, text: `${name} has no model called “${r.model}” now.${lists} Nothing was sent.` };
+    case 'modelAmbiguous': return { tone: 'warn', open: true, current: true, text: `“${r.model}” matches several of ${name}'s models (${r.detail}); choose one in the popup. Nothing was sent.` };
+    case 'modelPlan': return { tone: 'warn', open: true, current: true, text: r.detail ? `${name}: “${r.detail.replace(/[\s.!]+$/, '')}”. Nothing was sent.` : `${name} did not switch to ${r.model}; it may need a paid plan. Nothing was sent.` };
+    case 'modelNotSwitched': return { tone: 'warn', open: true, current: true, text: `${name} did not switch to ${r.model}. Nothing was sent.` };
+    default: break;
+  }
   switch (r.reason) {
     case 'login': return { tone: 'warn', open: true, retry: 'Send again', text: `Log in to ${name} once, then keep the tab open. Your screenshot waits here; nothing was sent.` };
     case 'plan': return { tone: 'warn', open: true, text: `${name} did not take the screenshot${r.detail ? `: “${r.detail.replace(/[\s.!]+$/, '')}”` : ''}. It may need a sign-in or a paid plan. Nothing was sent.` };

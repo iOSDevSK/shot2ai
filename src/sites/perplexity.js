@@ -22,4 +22,17 @@ export default {
   sourceSelectors: ['[data-testid*="source" i] a[href]', 'a[data-testid*="citation" i]', 'a.citation', '.citation a'],
   loginUrls: ['/login', '/signin'],
   loginSelectors: [],
+  // The model picker by the message box, which Perplexity offers with Pro:
+  // its button, the menu it opens (anywhere on the page), the menu's items
+  // and the name inside an item. Without Pro there is no picker, and
+  // `noPicker` is what the card says. No typical names: the list depends on
+  // the plan, so it is only ever read from the picker itself.
+  model: {
+    button: ['button[aria-label="Choose a model"]', 'button[aria-label*="model" i][aria-haspopup]'],
+    menu: ['[role="menu"]', '[role="listbox"]'],
+    items: ['[role="menuitemradio"]', '[role="option"]', '[role="menuitem"]'],
+    label: [],
+    typical: [],
+    noPicker: 'choosing a model needs Perplexity Pro, and no model picker was found',
+  },
 };

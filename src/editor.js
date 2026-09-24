@@ -365,7 +365,7 @@ async function submit(target = destination, confirmed = false) {
     // Copied first, while this page has focus: the fallback if pasting fails.
     const copied = await toClipboard(true);
     const encoded = await encode(png, s);
-    const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]));
+    const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]), { model: s.modelChoice?.[target.id] || null });
     sending = false;
     setSend(actionLabel(destination));
     // Sent in the background, or stopped short: the chat's tab is one click away.

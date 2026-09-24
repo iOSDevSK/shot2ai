@@ -20,4 +20,15 @@ export default {
   streamingSelectors: [],
   loginUrls: [],
   loginSelectors: ['a[href*="accounts.google.com/ServiceLogin"]', 'a[href*="accounts.google.com/v3/signin"]'],
+  // The mode picker by the message box: its button, the menu it opens
+  // (anywhere on the page), the menu's items and the name inside an item.
+  // `typical` is shown, labelled as such, only when no Gemini tab has been
+  // read yet; the real list is read from the picker itself.
+  model: {
+    button: ['button[data-test-id="bard-mode-menu-button"]', 'bard-mode-switcher button', 'button[aria-label*="mode" i][aria-haspopup]'],
+    menu: ['[role="menu"]', '.mat-mdc-menu-panel'],
+    items: ['[role="menuitemradio"]', 'button[mat-menu-item]', '[role="menuitem"]'],
+    label: ['.mode-title', '.title-text'],
+    typical: ['Fast', 'Thinking', 'Pro'],
+  },
 };

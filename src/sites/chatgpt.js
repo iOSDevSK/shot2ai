@@ -17,4 +17,15 @@ export default {
   streamingSelectors: ['.result-streaming'],
   loginUrls: ['/auth/login', '/log-in'],
   loginSelectors: ['[data-testid="login-button"]'],
+  // The model picker at the top of the chat: its button, the menu it opens
+  // (anywhere on the page), the menu's items and the name inside an item.
+  // `typical` is shown, labelled as such, only when no ChatGPT tab has been
+  // read yet; the real list is read from the picker itself.
+  model: {
+    button: ['button[data-testid="model-switcher-dropdown-button"]', 'button[aria-label^="Model selector" i]', 'button[aria-label*="model" i][aria-haspopup]'],
+    menu: ['[role="menu"]'],
+    items: ['[role="menuitemradio"]', '[role="menuitem"]'],
+    label: [],
+    typical: ['Auto', 'Instant', 'Thinking', 'Pro'],
+  },
 };
