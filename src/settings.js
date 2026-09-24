@@ -27,8 +27,8 @@ export const PRESETS = [
     sendSelectors: ['button[aria-label="Send message"]', 'button[aria-label="Send Message"]'],
     stopSelectors: ['button[aria-label="Stop response"]', 'button[aria-label^="Stop" i]'],
     userSelectors: ['[data-testid="user-message"]'],
-    answerSelectors: ['[data-is-streaming]', '.font-claude-response', '.font-claude-message'],
-    contentSelectors: ['.font-claude-response', '.font-claude-message', '.standard-markdown', '.progressive-markdown'],
+    answerSelectors: ['.font-claude-response', '.font-claude-message', '[data-is-streaming]'],
+    contentSelectors: ['.font-claude-response', '.font-claude-message'],
     streamingSelectors: ['[data-is-streaming="true"]'],
   },
 ];

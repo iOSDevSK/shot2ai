@@ -7,9 +7,9 @@
 // as the page's HTML, and the card builds it with text only.
 //
 // Polling from here, rather than a script in the chat's page that reports
-// changes: the chat's tab is in the background, where the browser runs the
-// page's timers late, and each short read keeps this service worker awake
-// for as long as the answer takes.
+// changes over a port: each short read keeps this service worker awake for as
+// long as the answer takes (an open port alone does not), and the watch, its
+// timeouts and the relay stay in one place.
 import { updateCapture, getCapture } from './captures.js';
 
 // poll: between reads. settle: an answer that stopped changing, with no stop
@@ -18,12 +18,14 @@ import { updateCapture, getCapture } from './captures.js';
 // means the chat is not answering. total: the longest Shot2AI waits.
 export const TIMING = { poll: 800, settle: 1600, settleUnsure: 5000, quiet: 45000, total: 360000, heartbeat: 5000 };
 
-// Runs in the chat's page: the newest answer after the `baseline` count, as
-// blocks. Only these kinds survive: p, h (1–6), ul/ol (items of blocks), pre
-// (text), quote (blocks), hr, table (rows of cells); inside a block, text,
-// b, i, s, code, br and links to http(s) addresses. Images, scripts, buttons,
-// styles and hidden parts are left out; every attribute but a link's address
-// is dropped.
+// Runs in the chat's page: the answer to the owner's newest message, as
+// blocks. That is every answer element after the owner's message once it is
+// there (more of the owner's messages than at `baseline`), else the newest
+// answer once there are more than at `baseline`. Only these kinds survive:
+// p, h (1–6), ul/ol (items of blocks), pre (text), quote (blocks), hr, table
+// (rows of cells); inside a block, text, b, i, s, code, br and links to
+// http(s) addresses. Images, scripts, buttons, styles and hidden parts are
+// left out; every attribute but a link's address is dropped.
 export function readAnswer(sel, baseline) {
   const all = (list) => { for (const s of list) { const found = [...document.querySelectorAll(s)]; if (found.length) return found; } return []; };
   const shown = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
@@ -31,13 +33,18 @@ export function readAnswer(sel, baseline) {
   const streaming = sel.streaming.some((s) => document.querySelector(s));
   // Nested matches (a wrapper and its message both matching) count once.
   const messages = all(sel.answers).filter((el, i, list) => !list.some((other, j) => j !== i && other.contains(el) && other !== el));
-  const count = messages.length;
-  const out = { count, stop, streaming, blocks: [], truncated: false, url: location.href };
-  if (count <= baseline) return out;
-  const message = messages[count - 1];
-  let roots = [];
-  for (const s of sel.content) { roots = [...message.querySelectorAll(s)].filter((el, i, list) => !list.some((o) => o !== el && o.contains(el))); if (roots.length) break; }
-  if (!roots.length) roots = [message];
+  const mine = all(sel.user);
+  const asked = mine.length > baseline.user ? mine[mine.length - 1] : null;
+  const answer = asked ? messages.filter((m) => asked.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)
+    : messages.length > baseline.answers ? [messages[messages.length - 1]] : [];
+  const out = { started: answer.length > 0, stop, streaming, blocks: [], truncated: false, url: location.href };
+  if (!answer.length) return out;
+  const roots = [];
+  for (const message of answer) {
+    let found = [];
+    for (const s of sel.content) { found = [...message.querySelectorAll(s)].filter((el, i, list) => !list.some((o) => o !== el && o.contains(el))); if (found.length) break; }
+    roots.push(...(found.length ? found : [message]));
+  }
 
   let budget = 200000;
   const SKIP = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|SVG|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|IMG|PICTURE|SOURCE|VIDEO|AUDIO|CANVAS|IFRAME|OBJECT|EMBED|FORM|DIALOG|MATH)$/;
@@ -152,7 +159,7 @@ async function tick(job) {
   if (!jobs.has(job.captureId)) return;
   if (!snap) { job.timer = setTimeout(() => void tick(job), TIMING.poll); return; }
   const key = JSON.stringify(snap.blocks);
-  const started = snap.count > job.baseline && snap.blocks.length > 0;
+  const started = snap.started && snap.blocks.length > 0;
   if (key !== job.key) { job.key = key; job.changedAt = now; job.activeAt = now; job.blocks = snap.blocks; job.truncated = snap.truncated; }
   if (snap.stop || snap.streaming) { job.activeAt = now; job.sawStop = job.sawStop || snap.stop; }
   const still = now - job.changedAt;
@@ -171,8 +178,8 @@ export function watchAnswer({ captureId, originTabId, chatTabId, destination, ba
   stopAnswer(captureId);
   const now = Date.now();
   const job = {
-    captureId, originTabId, chatTabId, name: destination.name, destination: destination.id, baseline: baseline?.answers || 0,
-    selectors: { answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [] },
+    captureId, originTabId, chatTabId, name: destination.name, destination: destination.id, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
+    selectors: { answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [], user: destination.userSelectors || [] },
     startedAt: now, changedAt: now, activeAt: now, sentAt: 0, key: '[]', relayedKey: null, blocks: [], truncated: false, sawStop: false, timer: 0,
   };
   jobs.set(captureId, job);

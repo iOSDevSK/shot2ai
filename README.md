@@ -88,7 +88,7 @@ Saved messages to send with a screenshot. Four come built in: **Fix this bug**, 
 
 ## Send automatically
 
-Each web chat in **Options → Other destinations** has a **Send automatically** switch. It is **on for ChatGPT and Claude** and off for chats you add. The first send to each chat says, in the card, that the message will be sent automatically without you reviewing it, and that some services restrict automated use in their terms. Turning it on for a chat you added shows that notice once in Options.
+Each web chat in **Options → Other destinations** has a **Send automatically** switch. It is **on for ChatGPT and Claude** and off for chats you add. The first send to each chat says, in the card, that the message will be sent automatically without you reviewing it, and that some services restrict automated use in their terms. Turning it on for a chat you added shows that notice once in Options. After an update from 0.3 or older, where ChatGPT and Claude only pasted, the card shows the notice once more for each of them.
 
 With it on, Shot2AI does everything in the chat's tab while that tab stays in the background: it attaches the screenshot, types your message, waits until the chat has uploaded the image (its send button turns on), presses the send button, and checks that the message went (a stop button, your message in the thread, a new address, or an empty message box). ChatGPT and Claude have known send buttons. For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. It is never used for html2wp, which has its own flow.
 

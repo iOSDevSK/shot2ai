@@ -1345,6 +1345,15 @@ test('auto-send to Claude: sent in its tab behind the page, and the answer strea
   await second.getByRole('button', { name: 'Previous capture' }).click();
   await expect(card.locator('.a-body p').first()).toContainText('Answer 1:');
 
+  // Put away with Esc, the answers can be brought back from the popup.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await popup.getByRole('button', { name: 'Show 2 captures on this page' }).click();
+  await popup.close();
+  await page.bringToFront();
+  await expect(card.locator('.a-status')).toHaveText('Claude answered');
   // Continue in Claude brings its tab to the front; Close removes the answer.
   await card.getByRole('button', { name: 'Continue in Claude' }).click();
   await expect.poll(activeTab).toMatch(/\/claude\/chat\//);

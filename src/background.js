@@ -11,9 +11,20 @@ import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
 import { stopAnswer, stopAnswersFor } from './answer.js';
 import { openChatTab } from './webchat.js';
-import { choices } from './settings.js';
+import { choices, PRESETS, origin } from './settings.js';
 
-chrome.runtime.onInstalled.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
+chrome.runtime.onInstalled.addListener((details) => {
+  rebuildMenu();
+  syncToolbar().catch(() => {});
+  // Up from 0.3 or older, where ChatGPT and Claude only pasted: the first send
+  // to each says once more that it now goes automatically.
+  if (details.reason === 'update' && /^0\.[0-3]\./.test(details.previousVersion || '')) {
+    chrome.storage.local.get('acknowledged').then(({ acknowledged = {} }) => {
+      for (const p of PRESETS) delete acknowledged[origin(p.url)];
+      return chrome.storage.local.set({ acknowledged });
+    }).catch(() => {});
+  }
+});
 chrome.runtime.onStartup.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
 // All-site access taken away in Chrome's settings: the toolbar goes too.
 chrome.permissions.onRemoved.addListener(() => { syncToolbar().catch(() => {}); });
@@ -64,7 +75,7 @@ const handlers = {
   'stack-hide': async (m, sender) => { if (sender.tab) hideStack(sender.tab.id); return { ok: true }; },
   'stack-png': async (m) => { const c = await getCapture(m.id); return c?.png ? { png: await png64(c.png) } : {}; },
   'show-stack': async (m) => ({ ok: await showStack(m.tabId) }),
-  'stack-count': async (m) => ({ count: (await stackFor(m.tabId)).filter((c) => !c.sent).length }),
+  'stack-count': async (m) => ({ count: (await stackFor(m.tabId)).filter((c) => !c.sent || c.answer).length }),
   'send-captures': sendCaptures,
   // A pasted image (from the popup) joins the tab's stack like a capture.
   'import-image': async (m) => {
