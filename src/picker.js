@@ -148,8 +148,11 @@
     press(item.el);
     const outcome = await until(() => (upsell() && 'plan') || (shows(model, item.name) && 'shown') || (!menus.some((m) => m.isConnected && visible(m)) && 'closed'), 2500);
     if (outcome === 'plan' || upsell()) {
-      const said = flat(upsell()?.innerText || upsell()?.textContent).slice(0, 160);
-      key(document, 'Escape');
+      const dialog = upsell();
+      const said = flat(dialog?.innerText || dialog?.textContent).slice(0, 160);
+      // The dialog's own close button, else Escape (never its other buttons).
+      const shut = dialog && [...dialog.querySelectorAll('button[aria-label*="close" i], button[aria-label*="dismiss" i], [data-testid*="close" i]')].find(visible);
+      if (shut) press(shut); else if (dialog) key(dialog, 'Escape');
       return done({ ok: false, reason: 'modelPlan', detail: said || null });
     }
     await close(model, trigger, menus);

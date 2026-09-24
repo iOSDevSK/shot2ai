@@ -767,7 +767,8 @@
         // The card's model for this send (the menu's, or "Send with current
         // model"); otherwise the service worker uses the owner's choice.
         const model = typeof forced === 'string' ? forced : typeof entry.model === 'string' && destination.id === o.main.id ? entry.model : undefined;
-        entry.model = undefined;
+        entry.model = null;
+        persist(entry.id, { model: null, newChat: false });
         const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model });
         setBusy(false);
         chat.tabId = r?.tabId;
@@ -835,7 +836,7 @@
       setBusy(true, `Sending ${list.length}…`);
       const text = list.map((e) => (e.message || '').trim()).filter(Boolean).join('\n\n');
       const newChat = !!now()?.newChat;
-      if (now()) now().newChat = false;
+      if (now()) { now().newChat = false; persist(now().id, { newChat: false }); }
       const r = await ask({ type: 'send-captures', ids: list.map((e) => e.id), text, acknowledge: d.origin || null, newChat });
       setBusy(false);
       const sent = new Set(r?.sentIds || []);
@@ -895,6 +896,7 @@
         fresh.addEventListener('click', () => {
           if (!entry) return;
           entry.newChat = !entry.newChat;
+          persist(entry.id, { newChat: entry.newChat });
           fresh.setAttribute('aria-checked', String(entry.newChat));
           label();
         });
@@ -920,6 +922,7 @@
           b.addEventListener('click', () => {
             if (!entry) return;
             entry.model = value;
+            persist(entry.id, { model: value });
             for (const x of rows) x.setAttribute('aria-checked', String(x.dataset.value === value));
             label();
           });

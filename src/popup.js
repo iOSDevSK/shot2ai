@@ -55,7 +55,7 @@ const optionText = (d, s) => {
 // else its typical names, labelled as such. Kept per chat.
 const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
 const READ_EVERY = 10 * 60 * 1000;
-let asked = null;
+const asked = new Set();
 function renderModels(d) {
   const view = modelView(loaded, d);
   $('model-row').hidden = !view;
@@ -70,8 +70,8 @@ function renderModels(d) {
     : view.note ? `${d.name}: ${view.note}. Keep ${d.name} open in a tab to read its list.`
     : `Typical names. Keep ${d.name} open in a tab, signed in, to read its own list.`;
   // Read again from the chat's own picker (in the tab kept open), now and then.
-  if (Date.now() - view.at > READ_EVERY && asked !== d.id) {
-    asked = d.id;
+  if (Date.now() - view.at > READ_EVERY && !asked.has(d.id)) {
+    asked.add(d.id);
     chrome.runtime.sendMessage({ type: 'read-models', destination: d.id }).catch(() => {});
   }
 }

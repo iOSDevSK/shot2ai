@@ -66,7 +66,7 @@ chrome.tabs.onRemoved.addListener((tabId) => { stopAnswersFor(tabId); clearStack
 const handlers = {
   // The card keeps each capture's message, result and state here.
   'stack-update': async (m) => {
-    const allowed = ['message', 'result', 'sent', 'selected', 'saved'];
+    const allowed = ['message', 'result', 'sent', 'selected', 'saved', 'model', 'newChat'];
     await updateCapture(m.id, Object.fromEntries(Object.entries(m.patch || {}).filter(([k]) => allowed.includes(k))));
     return { ok: true };
   },

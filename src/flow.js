@@ -76,6 +76,8 @@ export async function showStack(tabId, { currentId = null, fresh = null, autoSen
     entries.push({
       id: c.id, thumb: await base64(c.thumb), meta: c.meta, note: c.note, message: c.message || '', result: c.result || null,
       sent: !!c.sent, selected: !!c.selected, saved: c.saved || null, answer: c.answer || null, asked: c.asked || '',
+      // The card's one-send choices: a model (null: the usual one) and New chat.
+      model: typeof c.model === 'string' ? c.model : null, newChat: !!c.newChat,
       region: { canRemember: !!(c.region && site), hasSaved: !!(site && s.regions[site]) },
     });
   }

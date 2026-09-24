@@ -1720,6 +1720,12 @@ test('model: sent with the chosen model, switched first; a card can choose anoth
   await second.getByRole('menuitemradio', { name: /^Haiku 4\.5/ }).click();
   await expect(second.locator('.send')).toHaveText('Send to Claude · Haiku 4.5');
   await menuShot(second, 'card-model-menu.png');
+  await second.getByRole('button', { name: 'More destinations' }).click();
+  // Kept with that card: another capture comes in front, and back again.
+  const other = await capture([300, 120], [620, 320]);
+  await expect(other.locator('.send')).toHaveText('Send to Claude · Opus 4.1');
+  await other.getByRole('button', { name: 'Previous capture' }).click();
+  await expect(second.locator('.send')).toHaveText('Send to Claude · Haiku 4.5');
   await second.locator('.send').click();
   await send(second, 'With Haiku');
   expect(ai.state.switches.at(-1)).toEqual({ kind: 'claude', name: 'Haiku 4.5' });
