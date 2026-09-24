@@ -13,6 +13,13 @@
     <div class="head-right"><span id="state" class="status" hidden></span><button id="options" class="icon-button" data-icon="gear" aria-label="Options" title="Options"></button></div>
   </header>
 
+  <section id="dest" class="panel dest">
+    <div class="dest-head"><label class="label" for="dest-select">Screenshots go to</label><span id="dest-state" class="status" hidden></span></div>
+    <div class="select"><select id="dest-select" aria-describedby="dest-state dest-note"></select><span class="select-arrow" data-icon="chevron"></span></div>
+    <p id="dest-note" class="notice warn" hidden></p>
+    <button id="allow" class="button wide allow" hidden></button>
+  </section>
+
   <section id="checking" class="panel center" hidden><span class="spinner spin" data-icon="spinner"></span><p>Looking for html2wp on this Mac…</p></section>
 
   <section id="offline" class="panel" hidden>
@@ -37,13 +44,6 @@
     <p id="chat-reason" class="notice warn" hidden></p>
   </section>
 
-  <section id="other" class="panel" hidden>
-    <div class="label">Screenshots go to</div>
-    <div class="project"><div class="dest-name"><strong id="dest-name"></strong><small id="dest-host"></small></div><span id="dest-state" class="status"></span></div>
-    <p id="dest-note" class="notice warn" hidden></p>
-    <button id="allow" class="button wide allow" hidden></button>
-  </section>
-
   <footer class="popup-foot">
     <button id="capture" class="button primary wide" data-icon="capture">Capture area<kbd class="key" id="key-area" hidden></kbd></button>
     <button id="capture-full" class="button wide" data-icon="fullpage">Capture full page<kbd class="key" id="key-full" hidden></kbd></button>
@@ -51,7 +51,7 @@
     <p id="capture-error" class="notice err" role="alert" hidden></p>
     <div class="hint"><span id="paste-hint"></span></div>
     <p class="publisher">Shot2AI by BELNEM s.r.o.</p>
-    <div class="links"><button id="change" class="link" type="button">Change default destination</button><span class="meta-links"><span id="version" class="version"></span> · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp.dev</a></span></div>
+    <div class="links"><span class="meta-links"><span id="version" class="version"></span> · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp.dev</a></span></div>
   </footer>
 </main>
 <script type="module" src="popup.js"></script>

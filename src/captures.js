@@ -43,10 +43,13 @@ export async function putCapture(id, value) {
   await run('readwrite', (s) => s.put({ ...value, createdAt: Date.now() }, id));
 }
 export const getCapture = (id) => run('readonly', (s) => s.get(id));
-export const updateCapture = async (id, patch) => {
-  const item = await getCapture(id);
-  if (item) await run('readwrite', (s) => s.put({ ...item, ...patch }, id));
-};
+// Read and written in one transaction, so two updates at once (the card's
+// state and the chat's answer) never undo each other.
+export const updateCapture = (id, patch) => run('readwrite', (s) => {
+  const req = s.get(id);
+  req.onsuccess = () => { if (req.result) s.put({ ...req.result, ...patch }, id); };
+  return req;
+});
 export const deleteCapture = (id) => run('readwrite', (s) => s.delete(id));
 export const getHandle = (key) => run('readonly', (s) => s.get(key), HANDLES);
 export const putHandle = (key, handle) => run('readwrite', (s) => s.put(handle, key), HANDLES);

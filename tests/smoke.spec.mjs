@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startMockBridge, pngSize, CODE, PROJECT } from './mock-bridge.mjs';
+import { startMockAI, CODE as ANSWER_CODE } from './mock-ai.mjs';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -48,7 +49,9 @@ let loading=false;addEventListener('scroll',()=>{if(!loading&&innerHeight+scroll
 const CHAT = `<!doctype html><html><head><title>Team chat</title></head><body style="font:15px sans-serif;padding:40px">
 <h1>Team chat</h1><form onsubmit="return false"><div id="previews"></div><input type="file" id="upload" accept="image/*" multiple hidden><div id="composer" contenteditable="true" style="width:640px;min-height:90px;padding:12px;border:1px solid #ccc;border-radius:12px"></div>
 <button id="send" type="submit" aria-label="Send message">Send</button></form>
-<script>window.received={files:[],text:null};window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});
+<script>window.received={files:[],text:null};window.sent=0;
+// Like any chat, a send empties the message box and the previews.
+document.getElementById('send').addEventListener('click',()=>{window.sent++;window.received.sentText=document.getElementById('composer').innerText.trim();document.getElementById('composer').replaceChildren();document.getElementById('previews').replaceChildren()});
 async function take(files){for(const f of files){const b=await createImageBitmap(f);window.received.files.push({name:f.name,type:f.type,size:f.size,width:b.width,height:b.height});const img=document.createElement('img');img.src=URL.createObjectURL(f);img.style.height='48px';document.getElementById('previews').append(img)}window.received.done=true}
 document.getElementById('upload').addEventListener('change',(e)=>take([...e.target.files]));
 document.getElementById('composer').addEventListener('paste',async(e)=>{const files=[...e.clipboardData.files];if(!files.length)return;window.received.text=e.clipboardData.getData('text/plain');e.preventDefault();take(files)});</script></body></html>`;
@@ -57,6 +60,9 @@ const DEAF_CHAT = `<!doctype html><html><head><title>Deaf chat</title></head><bo
 <script>window.sent=0;document.getElementById('send').addEventListener('click',()=>{window.sent++});document.getElementById('composer').addEventListener('paste',(e)=>e.preventDefault());</script></body></html>`;
 
 let bridge;
+let ai;
+let aiChatGPT;
+let aiClaude;
 let site;
 let chatSite;
 let chatBase;
@@ -69,6 +75,10 @@ let tabId;
 test.beforeAll(async () => {
   mkdirSync(shots, { recursive: true });
   bridge = await startMockBridge();
+  // Stand-ins for chatgpt.com and claude.ai, each on its own site (see mock-ai.mjs).
+  ai = await startMockAI();
+  aiChatGPT = `http://127.0.0.1:${ai.port}`;
+  aiClaude = `http://localhost:${ai.port}`;
   site = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(req.url === '/long' ? LONG(6000) : req.url === '/tall' ? LONG(9000) : req.url === '/feed' ? FEED : req.url === '/dark' ? DARK : PAGE);
@@ -103,6 +113,19 @@ test.beforeAll(async () => {
   const probing = readFileSync(bridgeJs, 'utf8');
   if (!probing.includes('export const PORTS = [47811, 47812, 47813, 47814, 47815];')) throw new Error('bridge.js ports changed; update the test');
   writeFileSync(bridgeJs, probing.replace('export const PORTS = [47811, 47812, 47813, 47814, 47815];', `export const PORTS = [${bridge.port}];`));
+  // ChatGPT and Claude point at the stand-ins; the real sites are never loaded.
+  const settingsJs = join(extension, 'src', 'settings.js');
+  let presets = readFileSync(settingsJs, 'utf8');
+  for (const [from, to] of [["url: 'https://chatgpt.com/'", `url: '${aiChatGPT}/chatgpt/'`], ["url: 'https://claude.ai/new'", `url: '${aiClaude}/claude/new'`]]) {
+    if (!presets.includes(from)) throw new Error(`settings.js presets changed (${from}); update the test`);
+    presets = presets.replace(from, to);
+  }
+  writeFileSync(settingsJs, presets);
+  // Shorter waits for the answer, so the timeout test takes seconds.
+  const answerJs = join(extension, 'src', 'answer.js');
+  const timing = 'export const TIMING = { poll: 800, settle: 1600, settleUnsure: 5000, quiet: 45000, total: 360000, heartbeat: 5000 };';
+  if (!readFileSync(answerJs, 'utf8').includes(timing)) throw new Error('answer.js TIMING changed; update the test');
+  writeFileSync(answerJs, readFileSync(answerJs, 'utf8').replace(timing, 'export const TIMING = { poll: 400, settle: 1200, settleUnsure: 3000, quiet: 5000, total: 30000, heartbeat: 1500 };'));
   const background = join(extension, 'src', 'background.js');
   writeFileSync(background, `self.__menu = new Map();
 const __create = chrome.contextMenus.create.bind(chrome.contextMenus);
@@ -131,6 +154,7 @@ self.__shot2ai = { onMenuClick, clearStack };
 test.afterAll(async () => {
   await context?.close();
   await bridge?.close();
+  await ai?.close();
   await new Promise((r) => site?.close(r));
   await new Promise((r) => chatSite?.close(r));
 });
@@ -177,7 +201,7 @@ async function capture(from = [440, 150], to = [760, 350]) {
 test('out of the box ChatGPT is the default; html2wp status stays hidden', async () => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
-  await expect(popup.locator('#dest-name')).toHaveText('ChatGPT');
+  await expect(popup.getByLabel('Screenshots go to')).toHaveValue('chatgpt');
   // The test copy holds <all_urls>, so chatgpt.com is already allowed here.
   await expect(popup.locator('#dest-state')).toHaveText('Site permission granted');
   await expect(popup.locator('#allow')).toBeHidden();
@@ -649,7 +673,7 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await expect(options.getByLabel('Use ChatGPT')).toBeChecked();
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
-  await expect(popup.locator('#dest-name')).toHaveText('ChatGPT');
+  await expect(popup.getByLabel('Screenshots go to')).toHaveValue('chatgpt');
   await expect(popup.locator('#dest-state')).toHaveText('Site permission granted');
   for (const id of ['checking', 'offline', 'pairing', 'ready']) await expect(popup.locator(`#${id}`)).toBeHidden();
   await popup.locator('.popup').screenshot({ path: join(shots, 'popup-chatgpt.png') });
@@ -760,27 +784,34 @@ test('options: a custom chat receives the pasted image and text; a copy is saved
   await auto.getByLabel('Send automatically to Team chat').click();
   await auto.getByRole('button', { name: 'I understand, turn it on' }).click();
   await expect(auto.getByLabel('Send automatically to Team chat')).toBeChecked();
-  // Only once: a second chat turns on without the notice, and back off.
-  await auto.getByLabel('Send automatically to Claude').click();
-  await expect(auto.locator('#terms-notice')).toBeHidden();
+  // ChatGPT and Claude send automatically out of the box; off and on again, without the notice.
+  await expect(auto.getByLabel('Send automatically to ChatGPT')).toBeChecked();
   await expect(auto.getByLabel('Send automatically to Claude')).toBeChecked();
   await auto.getByLabel('Send automatically to Claude').click();
   await expect(auto.getByLabel('Send automatically to Claude')).not.toBeChecked();
-  await expect(auto.getByLabel('Send automatically to ChatGPT')).not.toBeChecked();
+  await auto.getByLabel('Send automatically to Claude').click();
+  await expect(auto.locator('#terms-notice')).toBeHidden();
+  await expect(auto.getByLabel('Send automatically to Claude')).toBeChecked();
   await auto.locator('#dest-title').scrollIntoViewIfNeeded();
   await auto.locator('section[aria-labelledby="dest-title"]').screenshot({ path: join(shots, 'options-destinations.png') });
   await auto.close();
   const third = await capture([300, 120], [700, 380]);
   await third.getByLabel('Message').fill('Send it straight away.');
   await third.getByRole('button', { name: 'Send to Team chat' }).click();
-  await expect(third.locator('.result')).toHaveText('Sent to Team chat.', { timeout: 15000 });
+  await expect(third.locator('.result')).toContainText('Sent to Team chat.', { timeout: 15000 });
+  await expect(third.getByRole('button', { name: 'Open Team chat tab' })).toBeVisible();
   expect(await chat.evaluate(() => window.sent)).toBe(1);
+  // Typed in a background tab, the message went with it.
+  expect(await chat.evaluate(() => window.received.sentText)).toContain('Send it straight away.');
+  // Sent automatically, the chat's tab stayed behind the owner's page.
+  expect(await worker.evaluate(async () => (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.url)).toBe(`${base}/`);
   await page.keyboard.press('Escape');
   // No send button to be found: the card says so and leaves the text for Enter.
   await chat.evaluate(() => document.getElementById('send').remove());
   const fourth = await capture([300, 120], [700, 380]);
   await fourth.getByRole('button', { name: 'Send to Team chat' }).click();
-  await expect(fourth.locator('.result')).toHaveText('Pasted into Team chat. Its send button was not found; press Enter there.', { timeout: 15000 });
+  await expect(fourth.locator('.result')).toContainText('Pasted into Team chat. Its send button was not found; press Enter there.', { timeout: 15000 });
+  await expect(fourth.getByRole('button', { name: 'Open Team chat tab' })).toBeVisible();
   await fourth.screenshot({ path: join(shots, 'card-autosubmit-missing.png') });
   await page.keyboard.press('Escape');
 
@@ -1155,4 +1186,274 @@ test('web chat: a chat that takes no image gets nothing, and the card says why',
   await expect(card.locator('.result')).toContainText('Deaf chat did not take the image, so nothing was sent.', { timeout: 20000 });
   const deaf = context.pages().find((p) => p.url().startsWith(`${chatBase.replace('127.0.0.1', 'localhost')}/deaf`));
   expect(await deaf.evaluate(() => ({ sent: window.sent, text: document.getElementById('composer').innerText.trim() }))).toEqual({ sent: 0, text: '' });
+});
+
+// ---- 0.4.0: the destination list, auto-send and the answer card ------------
+
+const activeTab = () => context.serviceWorkers()[0].evaluate(async () => (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.url);
+// A fresh stand-in page for every case: the mode is read when it loads.
+async function freshAI(mode) {
+  for (const p of context.pages()) if (p.url().startsWith(aiChatGPT) || p.url().startsWith(aiClaude)) await p.close();
+  ai.reset(mode);
+}
+async function useDefault(id) {
+  await context.serviceWorkers()[0].evaluate(async (id) => {
+    const { presets = {} } = await chrome.storage.local.get('presets');
+    await chrome.storage.local.set({ defaultDestination: id, presets: { ...presets, [id]: true } });
+  }, id);
+}
+// Send, and pass the first-use notice if this chat was not sent to before.
+async function sendNow(card, name) {
+  await card.getByRole('button', { name: `Send to ${name}` }).click();
+  const notice = card.locator('.result').getByRole('button', { name: 'Continue' });
+  if (await notice.isVisible().catch(() => false)) await notice.click();
+}
+const answerShot = async (card, name) => {
+  await page.waitForTimeout(200);
+  const box = await card.boundingBox();
+  await page.screenshot({ path: join(shots, name), clip: { x: box.x - 14, y: box.y - 14, width: box.width + 28, height: box.height + 28 } });
+};
+
+test('popup: the destination list changes the default right there, in step with Options', async () => {
+  const worker = context.serviceWorkers()[0];
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options.html`);
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  const select = popup.getByLabel('Screenshots go to');
+  // The same destinations as Options, in the same order.
+  const listed = await select.locator('option').allTextContents();
+  const inOptions = await options.locator('#default-list strong').allTextContents();
+  expect(listed.map((t) => t.split(' — ')[0])).toEqual(inOptions.map((t) => t.replace(' (default)', '')));
+  expect(listed[0]).toBe(`ChatGPT — ${new URL(aiChatGPT).host}`);
+  expect(listed.slice(-2)).toEqual(['Copy only — the clipboard', 'Save only — Downloads/shot2ai']);
+  await expect(popup.getByRole('button', { name: 'Change default destination' })).toHaveCount(0);
+
+  // Picked in the popup: saved at once, with Claude turned on in the card's menu, and Options follows.
+  await select.selectOption('claude');
+  await expect.poll(() => worker.evaluate(() => chrome.storage.local.get(['defaultDestination', 'presets']))).toMatchObject({ defaultDestination: 'claude', presets: { claude: true } });
+  await expect(options.getByRole('radio', { name: /^Claude/ })).toBeChecked();
+  await expect(options.locator('#default-state')).toHaveText('Claude');
+  await expect(popup.locator('#dest-state')).toHaveText('Site permission granted');
+  // Reached with the keyboard, it shows a focus ring.
+  await popup.locator('#options').focus();
+  await popup.keyboard.press('Tab');
+  await expect(select).toBeFocused();
+  expect(await select.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe('none');
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-destination.png') });
+
+  // Picked in Options: the open popup follows.
+  await options.getByRole('radio', { name: /^ChatGPT/ }).check();
+  await expect(select).toHaveValue('chatgpt');
+  // html2wp: its own status appears under the list.
+  await select.selectOption('html2wp');
+  await expect(popup.getByRole('heading', { name: 'Pair with html2wp' })).toBeVisible();
+  await expect(popup.locator('#dest-state')).toBeHidden();
+  await popup.locator('.popup').screenshot({ path: join(shots, 'popup-destination-html2wp.png') });
+  await select.selectOption('copy');
+  await expect(popup.locator('#dest-state')).toHaveText('Ready');
+  await expect(popup.locator('#pairing')).toBeHidden();
+  await options.close();
+  await popup.close();
+
+  // A site not allowed yet: Chrome's prompt is asked from the change, the
+  // choice is kept even when it is declined, and the popup says what is missing.
+  const unallowed = await context.newPage();
+  await unallowed.addInitScript(() => { chrome.permissions.contains = async () => false; chrome.permissions.request = async () => { window.asked = (window.asked || 0) + 1; return false; }; });
+  await unallowed.goto(`chrome-extension://${extensionId}/src/popup.html?tabId=${tabId}`);
+  await unallowed.getByLabel('Screenshots go to').selectOption('claude');
+  await expect.poll(() => worker.evaluate(() => chrome.storage.local.get('defaultDestination').then((v) => v.defaultDestination))).toBe('claude');
+  expect(await unallowed.evaluate(() => window.asked)).toBe(1);
+  await expect(unallowed.locator('#dest-state')).toHaveText('Needs permission');
+  await expect(unallowed.getByRole('button', { name: 'Allow Claude' })).toBeVisible();
+  await unallowed.locator('.popup').screenshot({ path: join(shots, 'popup-destination-allow.png') });
+  await unallowed.close();
+});
+
+test('auto-send to Claude: sent in its tab behind the page, and the answer streams into the card', async () => {
+  test.setTimeout(120000);
+  await freshAI('ok');
+  await useDefault('claude');
+  // Slower chunks, so the answer can be seen while it streams.
+  ai.state.chunkMs = 700;
+  const dpr = await page.evaluate(() => devicePixelRatio);
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('Why is this button off?');
+  await card.getByRole('button', { name: 'Send to Claude' }).click();
+  // First use: the card says it goes to that site, is sent automatically, and the answer comes here.
+  await expect(card.locator('.result')).toContainText('Claude is a website.');
+  await expect(card.locator('.result')).toContainText('will be sent automatically, without you reviewing it; the answer then shows here.');
+  await card.screenshot({ path: join(shots, 'card-auto-notice.png') });
+  await card.locator('.result').getByRole('button', { name: 'Continue' }).click();
+  // At once the card turns into the answer card.
+  await expect(card.locator('.a-status')).toHaveText('Sending to Claude…');
+  await expect(card.locator('.a-asked')).toHaveText('Why is this button off?');
+  await answerShot(card, 'answer-sending.png');
+  await expect(card.locator('.a-status')).toHaveText('Claude is answering…', { timeout: 20000 });
+  await expect(card.locator('.a-body strong')).toHaveText('Book a consultation', { timeout: 10000 });
+  await answerShot(card, 'answer-streaming.png');
+  await expect(card.locator('.a-status')).toHaveText('Claude answered', { timeout: 20000 });
+  ai.state.chunkMs = 250;
+  // The owner never left the page; Claude's tab got the image, the message and one press of Send.
+  expect(await activeTab()).toBe(`${base}/`);
+  expect(ai.state.sent).toHaveLength(1);
+  expect(ai.state.sent[0]).toMatchObject({ kind: 'claude', text: 'Why is this button off?' });
+  expect(ai.state.uploads).toHaveLength(1);
+  expect(ai.state.uploads[0]).toMatchObject({ type: 'image/png', width: 320 * dpr, height: 200 * dpr });
+  // The answer, readable: bold, a list, a code block, a safe link.
+  const body = card.locator('.a-body');
+  await expect(body.locator('p').first()).toContainText('Answer 1: the Book a consultation button is pushed to the right by transform: translateX(38px).');
+  await expect(body.locator('li')).toHaveText(['Remove the transform', 'Or set it to none']);
+  await expect(body.locator('pre code')).toHaveText(ANSWER_CODE);
+  await expect(body.locator('pre .lang')).toHaveText('css');
+  const mdn = body.getByRole('link', { name: 'MDN' });
+  await expect(mdn).toHaveAttribute('href', 'https://developer.mozilla.org/en-US/docs/Web/CSS/transform');
+  await expect(mdn).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+  await expect(card.getByRole('button', { name: 'Copy answer' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Continue in Claude' })).toBeVisible();
+  await page.mouse.move(40, 800);
+  await answerShot(card, 'answer-done.png');
+  // Copy answer: the answer as Markdown.
+  await card.getByRole('button', { name: 'Copy answer' }).click();
+  await expect(card.getByRole('button', { name: 'Copied' })).toBeVisible();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('Answer 1: the **Book a consultation** button is pushed to the right by `transform: translateX(38px)`.');
+  expect(copied).toContain('- Remove the transform\n- Or set it to `none`');
+  expect(copied).toContain(`\`\`\`css\n${ANSWER_CODE}\n\`\`\``);
+  expect(copied).toContain('[MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/transform)');
+  // An answer never hides by itself.
+  await page.waitForTimeout(6500);
+  await expect(card).toBeVisible();
+  // Resized by its corner, with the keyboard.
+  const before = await card.boundingBox();
+  await card.getByRole('button', { name: 'Resize the answer' }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowUp');
+  const after = await card.boundingBox();
+  expect(Math.round(after.width - before.width)).toBe(24);
+  expect(Math.round(after.height - before.height)).toBe(24);
+
+  // A second screenshot to the same Claude tab: the answer read is the new one.
+  const second = await capture([300, 120], [620, 320]);
+  await second.getByLabel('Message').fill('And on mobile?');
+  await second.getByRole('button', { name: 'Send to Claude' }).click();
+  await expect(second.locator('.a-status')).toHaveText('Claude answered', { timeout: 30000 });
+  await expect(second.locator('.a-body p').first()).toContainText('Answer 2:');
+  expect(ai.state.sent).toHaveLength(2);
+  expect(context.pages().filter((p) => p.url().startsWith(aiClaude))).toHaveLength(1);
+  // The first answer is still in the stack, behind.
+  await second.getByRole('button', { name: 'Previous capture' }).click();
+  await expect(card.locator('.a-body p').first()).toContainText('Answer 1:');
+
+  // Continue in Claude brings its tab to the front; Close removes the answer.
+  await card.getByRole('button', { name: 'Continue in Claude' }).click();
+  await expect.poll(activeTab).toMatch(/\/claude\/chat\//);
+  await page.bringToFront();
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(card.locator('.count')).toBeHidden();
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+});
+
+test('auto-send to ChatGPT: its own page, the same answer card', async () => {
+  test.setTimeout(90000);
+  await freshAI('ok');
+  await useDefault('chatgpt');
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('What is wrong here?');
+  await sendNow(card, 'ChatGPT');
+  await expect(card.locator('.a-status')).toHaveText('ChatGPT answered', { timeout: 30000 });
+  expect(await activeTab()).toBe(`${base}/`);
+  expect(ai.state.sent).toEqual([expect.objectContaining({ kind: 'chatgpt', text: 'What is wrong here?' })]);
+  // ChatGPT's code block header (language, Copy code) is not part of the code.
+  await expect(card.locator('.a-body pre code')).toHaveText(ANSWER_CODE);
+  await expect(card.locator('.a-body')).not.toContainText('Copy code');
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+});
+
+test('auto-send failures: nothing half-done is sent, and the card says what happened and offers the tab', async () => {
+  test.setTimeout(150000);
+  const worker = context.serviceWorkers()[0];
+  await useDefault('claude');
+  const cases = [
+    ['upload-fail', 'The screenshot did not upload to Claude, so nothing was sent. See the Claude tab.', 'answer-failed-upload.png'],
+    ['nosend', 'Pasted into Claude. Its send button was not found; press Enter there.', null],
+    ['notext', 'Claude took the screenshot but not your message, so nothing was sent. Finish it in the Claude tab.', null],
+    ['busy', 'Claude is still answering in its tab, so nothing was sent. Send again when it finishes.', 'answer-failed-busy.png'],
+  ];
+  for (const [mode, text, shot] of cases) {
+    await freshAI(mode);
+    await worker.evaluate((id) => self.__shot2ai.clearStack(id), tabId);
+    await page.evaluate(() => document.getElementById('shot2ai-preview-card')?.remove());
+    const card = await capture([440, 150], [760, 350]);
+    await card.getByLabel('Message').fill(`Case ${mode}`);
+    await sendNow(card, 'Claude');
+    // Back from the answer card to the preview, with the reason and the way on.
+    await expect(card.locator('.result')).toContainText(text, { timeout: 45000 });
+    await expect(card.locator('.answer')).toBeHidden();
+    await expect(card.getByRole('button', { name: 'Open Claude tab' })).toBeVisible();
+    if (mode === 'busy') await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible();
+    // Nothing reached the chat, the message is kept, and the page stayed in front.
+    expect(ai.state.sent, mode).toEqual([]);
+    await expect(card.getByLabel('Message')).toHaveValue(`Case ${mode}`);
+    expect(await activeTab()).toBe(`${base}/`);
+    if (shot) await answerShot(card, shot);
+  }
+  // Open Claude tab: the owner finishes there.
+  await page.locator('#shot2ai-preview-card .card').getByRole('button', { name: 'Open Claude tab' }).click();
+  await expect.poll(activeTab).toMatch(/\/claude\/new$/);
+  await page.bringToFront();
+  await page.keyboard.press('Escape');
+});
+
+test('answer timeout: a chat that never answers falls back to Open Claude tab', async () => {
+  test.setTimeout(90000);
+  await freshAI('silent');
+  await useDefault('claude');
+  const card = await capture([440, 150], [760, 350]);
+  await card.getByLabel('Message').fill('Anyone there?');
+  await sendNow(card, 'Claude');
+  await expect(card.locator('.a-status')).toHaveText('Claude is answering…', { timeout: 20000 });
+  // The send itself went (it cannot be taken back); only the answer is missing.
+  expect(ai.state.sent).toHaveLength(1);
+  await expect(card.locator('.a-status')).toHaveText('No answer from Claude yet', { timeout: 20000 });
+  await expect(card.locator('.a-body')).toContainText('Claude has not answered, or something stopped it (a usage limit, a sign-in). See the Claude tab.');
+  await expect(card.locator('.a-actions button.primary')).toHaveText('Open Claude tab');
+  await answerShot(card, 'answer-timeout.png');
+  await card.getByRole('button', { name: 'Open Claude tab' }).click();
+  await expect.poll(activeTab).toMatch(/\/claude\/chat\//);
+  await page.bringToFront();
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#shot2ai-preview-card')).toHaveCount(0);
+});
+
+test('answer sanitization: script, event handlers and javascript: links arrive as inert text', async () => {
+  test.setTimeout(90000);
+  await freshAI('xss');
+  await useDefault('claude');
+  const card = await capture([440, 150], [760, 350]);
+  await sendNow(card, 'Claude');
+  await expect(card.locator('.a-status')).toHaveText('Claude answered', { timeout: 30000 });
+  const body = card.locator('.a-body');
+  // Markup written as text shows as those characters.
+  await expect(body).toContainText('Here is <script>alert(1)</script> as text.');
+  await expect(body).toContainText('An image that fails.');
+  await expect(body).toContainText('Hover text');
+  // No element or attribute from the chat's page survives.
+  const found = await page.evaluate(() => {
+    const root = document.getElementById('shot2ai-preview-card').shadowRoot.querySelector('.a-body');
+    const attributes = [...root.querySelectorAll('*')].flatMap((el) => [...el.attributes].map((a) => a.name));
+    return { tags: [...new Set([...root.querySelectorAll('*')].map((el) => el.tagName.toLowerCase()))].sort(), attributes: [...new Set(attributes)].sort(), hrefs: [...root.querySelectorAll('a')].map((a) => a.getAttribute('href')) };
+  });
+  expect(found.tags.filter((t) => ['script', 'img', 'svg', 'iframe', 'style'].includes(t))).toEqual([]);
+  expect(found.attributes.filter((a) => a.startsWith('on') || a === 'style' || a === 'src')).toEqual([]);
+  expect(found.hrefs).toEqual(['https://example.com/']);
+  await expect(body.getByRole('link', { name: 'a javascript: link' })).toHaveCount(0);
+  await expect(body).toContainText('a javascript: link and a real one');
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  await body.getByText('Hover text').hover();
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  await answerShot(card, 'answer-sanitized.png');
+  await card.getByRole('button', { name: 'Close', exact: true }).click();
 });

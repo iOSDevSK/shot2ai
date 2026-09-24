@@ -1,17 +1,17 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { isMac, settings, defaultDestination, sitePattern, cleanSubfolder } from './settings.js';
+import { isMac, settings, choices, FIRST_DEFAULT, update, defaultPatch, sitePattern, cleanSubfolder } from './settings.js';
 import { acceptPastedImages } from './paste.js';
 import { shortcuts } from './shortcuts.js';
 
 paint();
 const $ = (id) => document.getElementById(id);
-const panels = ['checking', 'offline', 'pairing', 'ready', 'other'];
+// html2wp's own panels; the destination list above them is always there.
+const panels = ['checking', 'offline', 'pairing', 'ready'];
 const show = (name) => panels.forEach((p) => { $(p).hidden = p !== name; });
 const setState = (text, tone = '') => { $('state').textContent = text; $('state').className = `status ${tone}`; $('state').hidden = !text; };
 // The page to capture: the active tab, or ?tabId= when this page runs in a tab of its own.
 const tabParam = Number(new URLSearchParams(location.search).get('tabId')) || null;
-const openOptions = (hash = '') => chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html${hash}`) });
 
 // html2wp's own status, shown only when html2wp is the chosen destination.
 async function html2wpStatus() {
@@ -32,39 +32,61 @@ async function html2wpStatus() {
   $('chat-reason').textContent = status.chat?.reason || '';
 }
 
-function other(name, host, state, tone, note = '', allow = null) {
-  show('other');
-  setState('');
+function destState(state, tone, note = '', allow = null) {
   $('allow').hidden = !allow;
   $('allow').textContent = allow?.label || '';
   $('allow').onclick = allow?.run || null;
-  $('dest-name').textContent = name;
-  $('dest-host').textContent = host;
   $('dest-state').textContent = state;
   $('dest-state').className = `status ${tone}`;
+  $('dest-state').hidden = !state;
   $('dest-note').textContent = note;
   $('dest-note').hidden = !note;
 }
 
+// The destinations, in the order Options lists them: "Claude — claude.ai".
+const optionText = (d, s) => {
+  if (d.kind === 'html2wp') return 'html2wp (Mac app) — this Mac';
+  if (d.kind === 'chat') return `${d.name} — ${new URL(d.url).host}`;
+  if (d.kind === 'save') return `Save only — ${`Downloads/${cleanSubfolder(s.saveSubfolder) || ''}`.replace(/\/$/, '')}`;
+  return 'Copy only — the clipboard';
+};
+let list = [];
+let loaded = null;
 async function refresh() {
-  const destination = await defaultDestination();
-  if (destination.kind === 'html2wp') { await html2wpStatus(); return; }
+  [list, loaded] = await Promise.all([choices(), settings()]);
+  const destination = list.find((d) => d.id === loaded.defaultDestination) || list.find((d) => d.id === FIRST_DEFAULT);
+  const select = $('dest-select');
+  select.replaceChildren(...list.map((d) => new Option(optionText(d, loaded), d.id, false, d.id === destination.id)));
+  select.value = destination.id;
+  if (destination.kind === 'html2wp') { destState(''); await html2wpStatus(); return; }
+  show('none');
+  setState('');
   if (destination.kind === 'chat') {
     const host = new URL(destination.url).host;
     const origins = [sitePattern(destination.url)];
     const granted = await chrome.permissions.contains({ origins });
     // Asked on this click: Chrome shows its prompt for this one site.
     const allow = { label: `Allow ${destination.name}`, run: async () => { await chrome.permissions.request({ origins }).catch(() => false); await refresh(); } };
-    other(destination.name, host, granted ? 'Site permission granted' : 'Needs permission', granted ? 'ok' : 'warn',
-      granted ? '' : `Shot2AI needs your permission to paste screenshots into ${host}.`, granted ? null : allow);
+    destState(granted ? 'Site permission granted' : 'Needs permission', granted ? 'ok' : 'warn',
+      granted ? '' : `Shot2AI needs your permission to send screenshots to ${host}.`, granted ? null : allow);
     return;
   }
-  const s = await settings();
-  if (destination.kind === 'save') other('Save only', `Downloads/${cleanSubfolder(s.saveSubfolder) || ''}`.replace(/\/$/, ''), 'Ready', 'ok');
-  else other('Copy only', 'The clipboard', 'Ready', 'ok');
+  destState('Ready', 'ok');
 }
-
-$('change').addEventListener('click', () => openOptions('#default'));
+// Changed right here. Saved first: Chrome's permission prompt can close the
+// popup, and the choice must not be lost with it. Then, for a web chat, the
+// prompt for its site, asked during this change.
+$('dest-select').addEventListener('change', () => {
+  const d = list.find((x) => x.id === $('dest-select').value);
+  if (!d || !loaded) return;
+  // The list redraws from storage.onChanged below.
+  update(defaultPatch(d.id, loaded));
+  if (d.kind === 'chat') chrome.permissions.request({ origins: [sitePattern(d.url)] }).catch(() => false).then(refresh);
+});
+// Changed in Options (or the right-click menu) while the popup is open.
+chrome.storage.onChanged.addListener((changes) => {
+  if (['defaultDestination', 'customChats', 'saveSubfolder'].some((k) => k in changes)) void refresh();
+});
 $('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('recheck').addEventListener('click', refresh);
 $('code').addEventListener('input', (e) => {

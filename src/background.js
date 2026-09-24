@@ -9,6 +9,9 @@ import { stackFor, clearStack, hideStack, stackHidden } from './stack.js';
 import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
 import { saveImage, savedText } from './save.js';
+import { stopAnswer, stopAnswersFor } from './answer.js';
+import { openChatTab } from './webchat.js';
+import { choices } from './settings.js';
 
 chrome.runtime.onInstalled.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
 chrome.runtime.onStartup.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
@@ -45,9 +48,9 @@ async function png64(blob) {
 // page has loaded (where Shot2AI may draw on it), unless it was put away.
 chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (info.status !== 'complete' || stackHidden(tabId)) return;
-  stackFor(tabId).then((list) => { if (list.some((c) => !c.sent)) return showStack(tabId); return null; }).catch(() => {});
+  stackFor(tabId).then((list) => { if (list.some((c) => !c.sent || c.answer)) return showStack(tabId); return null; }).catch(() => {});
 });
-chrome.tabs.onRemoved.addListener((tabId) => { clearStack(tabId).catch(() => {}); });
+chrome.tabs.onRemoved.addListener((tabId) => { stopAnswersFor(tabId); clearStack(tabId).catch(() => {}); });
 
 const handlers = {
   // The card keeps each capture's message, result and state here.
@@ -56,8 +59,8 @@ const handlers = {
     await updateCapture(m.id, Object.fromEntries(Object.entries(m.patch || {}).filter(([k]) => allowed.includes(k))));
     return { ok: true };
   },
-  'stack-remove': async (m) => { await deleteCapture(m.id); return { ok: true }; },
-  'stack-clear': async (m, sender) => { if (sender.tab) await clearStack(sender.tab.id); return { ok: true }; },
+  'stack-remove': async (m) => { stopAnswer(m.id); await deleteCapture(m.id); return { ok: true }; },
+  'stack-clear': async (m, sender) => { if (sender.tab) { stopAnswersFor(sender.tab.id); await clearStack(sender.tab.id); } return { ok: true }; },
   'stack-hide': async (m, sender) => { if (sender.tab) hideStack(sender.tab.id); return { ok: true }; },
   'stack-png': async (m) => { const c = await getCapture(m.id); return c?.png ? { png: await png64(c.png) } : {}; },
   'show-stack': async (m) => ({ ok: await showStack(m.tabId) }),
@@ -106,6 +109,8 @@ const handlers = {
     return saveImage(capture.png, capture.url).then((r) => ({ ok: true, text: savedText(r), ...r }), () => ({ text: 'The screenshot could not be saved.' }));
   },
   'open-options': async () => { await chrome.runtime.openOptionsPage(); return { ok: true }; },
+  // "Open Claude tab", "Continue in Claude".
+  'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination)?.url); return { ok: true }; },
 };
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {

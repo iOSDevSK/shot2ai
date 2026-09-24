@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT, prompts, destinations } from './settings.js';
+import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac, choices, FIRST_DEFAULT, prompts, destinations, autoSubmitOn, defaultPatch } from './settings.js';
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
@@ -75,9 +75,7 @@ async function renderDefault() {
       fail('');
       // A web chat needs its site's permission first; asked during this click.
       if (d.kind === 'chat' && !(await allow(d.url))) { await renderDefault(); return; }
-      const current = await settings();
-      const presets = PRESETS.some((p) => p.id === d.id) ? { ...current.presets, [d.id]: true } : current.presets;
-      await update({ defaultDestination: d.id, presets });
+      await update(defaultPatch(d.id, await settings()));
       await Promise.all([renderDefault(), renderDestinations()]);
     });
     return row;
@@ -108,9 +106,10 @@ async function renderMulti() {
     return label;
   }));
 }
-// Destinations change elsewhere too (the card's menu, the right-click menu).
+// Destinations change elsewhere too (the popup's list, the card's menu, the right-click menu).
 chrome.storage.onChanged.addListener((changes) => {
   if (['multiSend', 'presets', 'customChats', 'defaultDestination'].some((k) => k in changes)) void renderMulti();
+  if ('defaultDestination' in changes) void Promise.all([renderDefault(), renderDestinations()]);
 });
 
 // ---- destinations -------------------------------------------------------
@@ -122,8 +121,8 @@ async function allow(url) {
   if (!granted) fail(`Chrome did not allow the extension to use ${hostOf(url)}. Try again and choose Allow.`);
   return granted;
 }
-// Off by default: pressing the chat's send button means the message goes
-// without the owner reviewing it.
+// On for ChatGPT and Claude, off for the owner's own chats: pressing the
+// chat's send button means the message goes without the owner reviewing it.
 // The terms notice comes once, the first time any Send automatically is turned on.
 let pendingAutoSubmit = null;
 function askTerms(run) {
@@ -143,7 +142,7 @@ function autoSubmitToggle(id, name, s) {
   label.className = 'toggle auto';
   label.innerHTML = '<input type="checkbox"><span>Send automatically</span>';
   const box = label.querySelector('input');
-  box.checked = !!s.autoSubmit[id];
+  box.checked = autoSubmitOn(s, id);
   box.setAttribute('aria-label', `Send automatically to ${name}`);
   const set = async (on) => {
     const current = (await settings()).autoSubmit;

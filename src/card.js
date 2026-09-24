@@ -5,6 +5,12 @@
 // the editor. Everything else goes through the extension's service worker,
 // which keeps the stack, so it survives navigation within the tab. Only the
 // clipboard is written here, while the page has focus.
+//
+// Sent to ChatGPT or Claude, the card turns into an answer card: "Sending…",
+// then the chat's answer as the service worker reads it from the chat's tab.
+// The answer arrives as a tree of paragraphs, lists, code and links and is
+// built here from text only (createElement, textContent): nothing from the
+// chat's page is ever parsed as HTML on this page.
 (() => {
   // Injected again with every capture: the first copy on the page does the work.
   if (window.__shot2aiStack) return;
@@ -89,12 +95,151 @@
     .note{margin-top:8px;padding:7px 10px;border:1px solid #efe2c2;border-radius:8px;background:#faf3e3;color:#5f4a1f;font-size:11.5px;line-height:1.45}
     .toast{margin-top:8px;padding:6px 10px;border-radius:8px;background:#eef0ea;color:#4d5a47;font-size:11.5px}
     .saved{margin-top:6px;font-size:10.5px;color:#969f88;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .deck.wide{width:min(var(--answer-w,380px),calc(100vw - 40px))}
+    .card.answering .shot{height:84px}
+    .grip{position:absolute;left:-7px;top:-7px;z-index:7;display:grid;place-items:center;width:20px;height:20px;border:1px solid #d3d8cc;border-radius:50%;background:#fff;color:#6f7c64;cursor:nwse-resize;box-shadow:0 1px 3px rgba(35,42,35,.18);touch-action:none}
+    .grip svg{width:11px;height:11px}
+    .grip:hover,.grip:focus-visible{color:#2f3c30;border-color:#9fae94}
+    button:focus-visible,.message:focus-visible,.prompt:focus-visible{outline:2px solid rgba(84,114,84,.55);outline-offset:1px}
+    .a-head{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;font-weight:650;color:#2f3c30}
+    .a-icon{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#edf3e7;color:#557843}
+    .a-icon svg{width:11px;height:11px}
+    .a-head.busy .a-icon{background:none;color:#547254}
+    .a-head.busy .a-icon svg{width:15px;height:15px;animation:spin 1s linear infinite}
+    .a-head.warn{color:#6f5320}.a-head.warn .a-icon{background:#faf3e3;color:#8a6a2c}
+    .a-head.warn .a-icon::before{content:"!";font-size:11px;font-weight:800;line-height:1}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .a-asked{margin-top:6px;padding:5px 9px;border-radius:7px;background:#eef0ea;color:#4d5a47;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .a-body{margin-top:8px;max-height:min(46vh,420px);overflow:auto;padding:10px 12px;border:1px solid #e3e6dd;border-radius:9px;background:#fff;color:#232a23;font-size:13px;line-height:1.55;overscroll-behavior:contain;overflow-wrap:anywhere}
+    .deck.sized .a-body{height:var(--answer-h);max-height:none}
+    .a-body:focus-visible{outline:2px solid rgba(84,114,84,.45);outline-offset:1px}
+    .a-body>:first-child{margin-top:0}.a-body>:last-child{margin-bottom:0}
+    .a-body p{margin:0 0 .6em}
+    .a-body h1,.a-body h2,.a-body h3,.a-body h4,.a-body h5,.a-body h6{margin:.9em 0 .35em;font-size:13.5px;font-weight:680;line-height:1.3}
+    .a-body h1{font-size:15.5px}.a-body h2{font-size:14.5px}
+    .a-body ul,.a-body ol{margin:0 0 .6em;padding-left:1.35em}
+    .a-body li{margin:.18em 0}.a-body li>p{margin:0 0 .3em}.a-body li>:last-child{margin-bottom:0}
+    .a-body code{padding:1px 4px;border-radius:4px;background:#f1f3ee;color:#2f3c30;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .a-body pre{margin:0 0 .7em;padding:9px 11px;border-radius:8px;background:#1f2620;color:#e6ece2;overflow:auto;white-space:pre;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .a-body pre code{padding:0;background:none;color:inherit;font:inherit}
+    .a-body pre .lang{display:block;margin-bottom:5px;color:#9fb09a;font:650 9.5px/1 ui-sans-serif,-apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+    .a-body blockquote{margin:0 0 .6em;padding-left:10px;border-left:3px solid #d3d8cc;color:#4d5a47}
+    .a-body hr{margin:.8em 0;border:0;border-top:1px solid #e3e6dd}
+    .a-body a{color:#3d6a3d;text-decoration:underline;text-underline-offset:2px}
+    .a-body table{display:block;max-width:100%;overflow:auto;margin:0 0 .7em;border-collapse:collapse;font-size:12px}
+    .a-body th,.a-body td{padding:4px 7px;border:1px solid #e3e6dd;text-align:left;vertical-align:top}
+    .a-body th{background:#f5f7f2;font-weight:650}
+    .a-body .hint{color:#6f7c64;font-size:12px}
+    .a-body .caret{display:inline-block;width:7px;height:13px;margin-left:3px;border-radius:1px;background:#547254;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+    @keyframes blink{50%{opacity:0}}
+    .a-body .skeleton i{display:block;height:9px;margin:4px 0 10px;border-radius:5px;background:linear-gradient(90deg,#eef0ea 20%,#f8f9f5 50%,#eef0ea 80%);background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+    .a-body .skeleton i:nth-child(2){width:86%}.a-body .skeleton i:nth-child(3){width:58%}
+    @keyframes shimmer{to{background-position:-200% 0}}
+    .a-note{margin-top:6px;font-size:11px;color:#8a6a2c}
+    .a-actions{display:flex;align-items:center;gap:6px;margin-top:9px}
+    .a-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:0;height:30px;padding:0 10px;border:1px solid #dfe2d9;border-radius:7px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
+    .a-actions button:hover:not(:disabled){background:#f1f3ee}
+    .a-actions button.primary{border-color:#2f3c30;background:#2f3c30;color:#fff}
+    .a-actions button.primary:hover:not(:disabled){background:#465b43;border-color:#465b43}
+    .a-actions button.quiet{margin-left:auto;border-color:transparent;background:none;color:#6f7c64}
+    .a-actions svg{width:13px;height:13px}
+    @media (prefers-reduced-motion:reduce){.a-head.busy .a-icon svg,.a-body .caret,.a-body .skeleton i{animation:none}}
     [hidden]{display:none!important}
   `;
   // The first-use notice for web chats (settings.js websiteNotice, rebuilt here).
-  const notice = (names, hosts, many, auto) => `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${auto ? ', and will be sent automatically, without you reviewing it' : ''}.`;
+  const notice = (names, hosts, many, auto, answers = false) => {
+    const sent = auto ? ` and will be sent automatically, without you reviewing ${many ? 'them' : 'it'}${answers ? '; the answer then shows here' : ''}. Some services restrict automated use in their terms; turn Send automatically off in Options to review first` : '';
+    return `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${sent ? `,${sent}` : ''}.`;
+  };
   const bytesOf = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   const ask = (message) => chrome.runtime.sendMessage(message).catch(() => null);
+
+  // ---- the answer, from its tree ------------------------------------------
+  // Blocks: p, h, ul/ol, pre, quote, hr, table; inside them strings, b, i, s,
+  // code, br, span and a (http and https only). Anything else is dropped.
+  // Strings become text nodes: markup in an answer shows as the characters.
+  const INLINE = { b: 'strong', i: 'em', s: 's', code: 'code', a: 'a', span: 'span' };
+  function inlineTo(list, into, depth = 0) {
+    if (!Array.isArray(list) || depth > 24) return;
+    for (const x of list) {
+      if (typeof x === 'string') { into.append(document.createTextNode(x)); continue; }
+      if (x?.t === 'br') { into.append(document.createElement('br')); continue; }
+      let tag = INLINE[x?.t];
+      if (!tag) continue;
+      const safe = tag === 'a' && typeof x.href === 'string' && /^https?:\/\//i.test(x.href);
+      if (tag === 'a' && !safe) tag = 'span';
+      const el = document.createElement(tag);
+      if (safe) { el.href = x.href; el.target = '_blank'; el.rel = 'noopener noreferrer nofollow'; }
+      if (tag === 'code') el.textContent = (x.c || []).filter((c) => typeof c === 'string').join('');
+      else inlineTo(x.c, el, depth + 1);
+      into.append(el);
+    }
+  }
+  function blocksTo(list, into, depth = 0) {
+    if (!Array.isArray(list) || depth > 12) return;
+    for (const b of list) {
+      let el = null;
+      if (b?.t === 'p') { el = document.createElement('p'); inlineTo(b.c, el); }
+      else if (b?.t === 'h') { el = document.createElement(`h${Math.min(6, Math.max(1, Number(b.l) || 3))}`); inlineTo(b.c, el); }
+      else if (b?.t === 'pre') {
+        el = document.createElement('pre');
+        if (b.lang) { const lang = document.createElement('span'); lang.className = 'lang'; lang.textContent = String(b.lang).slice(0, 30); el.append(lang); }
+        const code = document.createElement('code');
+        code.textContent = String(b.text ?? '');
+        el.append(code);
+      } else if (b?.t === 'ul' || b?.t === 'ol') {
+        el = document.createElement(b.t);
+        if (b.t === 'ol' && Number(b.start) > 1) el.start = Number(b.start);
+        for (const item of Array.isArray(b.items) ? b.items : []) {
+          const li = document.createElement('li');
+          // A list item of one paragraph shows as a line, not a spaced paragraph.
+          if (item?.length === 1 && item[0]?.t === 'p') inlineTo(item[0].c, li); else blocksTo(item, li, depth + 1);
+          el.append(li);
+        }
+      } else if (b?.t === 'quote') { el = document.createElement('blockquote'); blocksTo(b.c, el, depth + 1); }
+      else if (b?.t === 'hr') el = document.createElement('hr');
+      else if (b?.t === 'table') {
+        el = document.createElement('table');
+        for (const [index, row] of (Array.isArray(b.rows) ? b.rows : []).entries()) {
+          const tr = document.createElement('tr');
+          for (const cell of Array.isArray(row) ? row : []) { const td = document.createElement(b.head && index === 0 ? 'th' : 'td'); inlineTo(cell, td); tr.append(td); }
+          el.append(tr);
+        }
+      }
+      if (el) into.append(el);
+    }
+  }
+  // The same tree as Markdown, for "Copy answer".
+  function inlineMd(list) {
+    return (Array.isArray(list) ? list : []).map((x) => {
+      if (typeof x === 'string') return x;
+      if (x?.t === 'br') return '  \n';
+      const inner = x?.t === 'code' ? (x.c || []).join('') : inlineMd(x?.c);
+      return { b: `**${inner}**`, i: `*${inner}*`, s: `~~${inner}~~`, code: `\`${inner}\``, a: `[${inner}](${x?.href})`, span: inner }[x?.t] ?? '';
+    }).join('');
+  }
+  function markdown(list, indent = '') {
+    const out = [];
+    for (const b of Array.isArray(list) ? list : []) {
+      if (b?.t === 'p') out.push(inlineMd(b.c));
+      else if (b?.t === 'h') out.push(`${'#'.repeat(Math.min(6, Math.max(1, Number(b.l) || 3)))} ${inlineMd(b.c)}`);
+      else if (b?.t === 'pre') out.push(`\`\`\`${b.lang || ''}\n${b.text || ''}\n\`\`\``);
+      else if (b?.t === 'ul' || b?.t === 'ol') {
+        out.push((b.items || []).map((item, n) => {
+          const mark = b.t === 'ol' ? `${(Number(b.start) || 1) + n}. ` : '- ';
+          const body = markdown(item, ' '.repeat(mark.length)).replace(/\n\n/g, '\n');
+          return `${mark}${body.trimStart()}`;
+        }).join('\n'));
+      } else if (b?.t === 'quote') out.push(markdown(b.c).split('\n').map((l) => `> ${l}`).join('\n'));
+      else if (b?.t === 'hr') out.push('---');
+      else if (b?.t === 'table') {
+        const rows = (b.rows || []).map((r) => `| ${(r || []).map((c) => inlineMd(c).replace(/\|/g, '\\|')).join(' | ')} |`);
+        if (b.head && rows.length) rows.splice(1, 0, `|${(b.rows[0] || []).map(() => ' --- ').join('|')}|`);
+        out.push(rows.join('\n'));
+      }
+    }
+    return out.join('\n\n').split('\n').map((l, n) => (n && l ? indent + l : l)).join('\n');
+  }
 
   let ui = null;
 
@@ -105,6 +250,9 @@
     ui.update(payload);
     return true;
   };
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === 'shot2ai-answer' && ui?.host.isConnected) ui.answer(message.id, message.answer);
+  });
 
   function build(first) {
     const i = first.icons;
@@ -119,7 +267,7 @@
     root.adoptedStyleSheets = [sheet];
     root.innerHTML = `<div class="deck">
       <div class="peeks"></div>
-      <div class="card" role="dialog" aria-label="Shot2AI screenshot preview" tabindex="-1"><div class="body">
+      <div class="card" role="dialog" aria-label="Shot2AI screenshot preview" tabindex="-1"><button class="grip" aria-label="Resize the answer" title="Drag to resize (or use the arrow keys)" hidden>${i.grip}</button><div class="body">
         <div class="shot"><canvas aria-label="Captured area"></canvas>
           <div class="nav" hidden><button class="prev" aria-label="Previous capture" title="Previous (←)">‹</button><span class="count" aria-live="polite"></span><button class="next" aria-label="Next capture" title="Next (→)">›</button></div>
           <label class="include" hidden><input type="checkbox" aria-label="Include in Send selected">Include</label>
@@ -137,6 +285,13 @@
         <div class="region-menu" role="menu" hidden>
           <button class="remember" role="menuitem">Remember this region</button>
           <button class="capture-saved" role="menuitem">Capture saved region</button>
+        </div>
+        <div class="answer" hidden>
+          <div class="a-head"><span class="a-icon"></span><span class="a-status" role="status"></span></div>
+          <div class="a-asked" hidden></div>
+          <div class="a-body" tabindex="0" role="region"></div>
+          <div class="a-note" hidden></div>
+          <div class="a-actions"></div>
         </div>
         <div class="note" role="note" hidden></div>
         <div class="toast" role="status" hidden></div>
@@ -158,6 +313,7 @@
     let saveTimer = 0;
     const bitmaps = new Map();
     const pngs = new Map();
+    const watchdogs = new Map();
     let chosenDestinations = [...(first.multi || [])];
 
     const now = () => entries[current];
@@ -170,7 +326,8 @@
       const canvas = $('canvas');
       const paint = (bitmap) => {
         if (now() !== entry) return;
-        const room = Math.min(260 / bitmap.width, 132 / bitmap.height, 1);
+        const small = card.classList.contains('answering');
+        const room = Math.min((small ? 340 : 260) / bitmap.width, (small ? 84 : 132) / bitmap.height, 1);
         canvas.width = Math.max(1, Math.round(bitmap.width * room * 2));
         canvas.height = Math.max(1, Math.round(bitmap.height * room * 2));
         canvas.style.width = `${canvas.width / 2}px`;
@@ -283,9 +440,13 @@
       const r = entry.result;
       if (r?.actions === 'retry') showResult(r.tone, r.text, [['Try again', () => void sendTo(o.main), true, 'retry']]);
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
-      else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
+      else if (r?.actions === 'open-chat') {
+        const again = r.retry && o.destinations.find((d) => d.id === r.chat.destination);
+        showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [['Try again', () => void sendTo(again), false, 'retry']] : [])]);
+      } else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
       else showResult('', '');
       label();
+      showAnswer(entry);
       drawThumb(entry);
       if (direction) {
         const body = $('.body');
@@ -295,6 +456,127 @@
       }
       requestAnimationFrame(renderPeeks);
     }
+
+    // ---- the answer card ---------------------------------------------------------
+
+    const openChat = (chat) => ask({ type: 'open-chat', tabId: chat.tabId, destination: chat.destination });
+    const FINAL = ['done', 'timeout', 'unreadable', 'gone', 'lost'];
+    // Status, body and actions of the front card when it holds an answer.
+    function showAnswer(entry) {
+      const a = entry.answer;
+      const on = !!a;
+      card.classList.toggle('answering', on);
+      deck.classList.toggle('wide', on);
+      $('.grip').hidden = !on;
+      $('.answer').hidden = !on;
+      for (const part of ['.compose', '.split', '.tools']) $(part).hidden = on;
+      if (!on) { card.setAttribute('aria-label', 'Shot2AI screenshot preview'); return; }
+      card.setAttribute('aria-label', `Shot2AI: ${a.name}'s answer`);
+      for (const part of ['.region-menu', '.result', '.meta', '.note', '.saved', '.sent-badge']) $(part).hidden = true;
+      const name = a.name;
+      const blocks = Array.isArray(a.blocks) ? a.blocks : [];
+      const [status, tone] = {
+        sending: [`Sending to ${name}…`, 'busy'],
+        answering: [`${name} is answering…`, 'busy'],
+        done: [`${name} answered`, 'ok'],
+        timeout: [blocks.length ? `${name} is still answering` : `No answer from ${name} yet`, 'warn'],
+        lost: [`No answer from ${name} yet`, 'warn'],
+        unreadable: [`${name} answered in its tab`, 'warn'],
+        gone: [`The ${name} tab was closed`, 'warn'],
+      }[a.state] || [name, 'ok'];
+      $('.a-head').className = `a-head ${tone}`;
+      $('.a-icon').innerHTML = tone === 'busy' ? i.spinner : tone === 'ok' ? i.check : '';
+      if ($('.a-status').textContent !== status) $('.a-status').textContent = status;
+      $('.a-asked').textContent = entry.asked || '';
+      $('.a-asked').title = entry.asked || '';
+      $('.a-asked').hidden = !entry.asked;
+      const body = $('.a-body');
+      body.setAttribute('aria-label', `${name}'s answer`);
+      body.setAttribute('aria-busy', String(!FINAL.includes(a.state)));
+      // Kept at the bottom while the answer grows, unless the owner scrolled up.
+      const atEnd = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+      const content = document.createDocumentFragment();
+      const hint = (text) => { const el = document.createElement('p'); el.className = 'hint'; el.textContent = text; content.append(el); };
+      blocksTo(blocks, content);
+      if (a.state === 'sending') hint(`Shot2AI attaches the screenshot in the ${name} tab and sends it. You can keep working here.`);
+      else if (a.state === 'answering' && !blocks.length) { const sk = document.createElement('div'); sk.className = 'skeleton'; sk.append(document.createElement('i'), document.createElement('i'), document.createElement('i')); content.append(sk); }
+      else if (a.state === 'answering') { const caret = document.createElement('span'); caret.className = 'caret'; (content.lastElementChild?.matches('p, ul, ol') ? content.lastElementChild.querySelector('li:last-child') || content.lastElementChild : content).append(caret); }
+      else if (a.state === 'timeout' || a.state === 'lost') hint(blocks.length ? `Shot2AI stopped waiting. The rest of the answer will be in the ${name} tab.` : `${name} has not answered, or something stopped it (a usage limit, a sign-in). See the ${name} tab.`);
+      else if (a.state === 'unreadable') hint(`Shot2AI could not read the answer on the ${name} page. Open the ${name} tab to see it.`);
+      else if (a.state === 'gone') hint('Shot2AI can no longer read the answer.');
+      body.replaceChildren(content);
+      if (atEnd) body.scrollTop = body.scrollHeight;
+      $('.a-note').textContent = a.truncated ? `The answer is longer than the card shows; see the rest in ${name}.` : '';
+      $('.a-note').hidden = !a.truncated;
+      // Actions.
+      const actions = [];
+      const button = (text, run, cls = '', icon = '') => {
+        const b = document.createElement('button');
+        if (cls) b.className = cls;
+        b.innerHTML = `${icon ? i[icon] : ''}<span></span>`;
+        b.querySelector('span').textContent = text;
+        b.addEventListener('click', run);
+        actions.push(b);
+        return b;
+      };
+      const chat = { tabId: a.tabId, destination: a.destination, name };
+      if (a.state === 'done') {
+        const copyButton = button('Copy answer', async () => {
+          let ok = false;
+          try { await navigator.clipboard.writeText(markdown(blocks)); ok = true; } catch { /* the page lost focus */ }
+          copyButton.querySelector('span').textContent = ok ? 'Copied' : 'Could not copy';
+          setTimeout(() => { if (copyButton.isConnected) copyButton.querySelector('span').textContent = 'Copy answer'; }, 1600);
+        }, 'primary', 'copy');
+        button(`Continue in ${name}`, () => openChat(chat), '', 'open');
+      } else if (a.state === 'answering') {
+        button(`Continue in ${name}`, () => openChat(chat), '', 'open');
+      } else if (a.state !== 'sending' && a.state !== 'gone') {
+        button(`Open ${name} tab`, () => openChat(chat), 'primary', 'open');
+        if (blocks.length) button('Copy answer', () => navigator.clipboard.writeText(markdown(blocks)).catch(() => {}), '', 'copy');
+      }
+      if (a.state !== 'sending') button('Close', () => removeEntry(entry), 'quiet');
+      $('.a-actions').replaceChildren(...actions);
+      $('.a-actions').hidden = !actions.length;
+    }
+    // Without a word from the service worker for a while, the card stops waiting.
+    function watch(entry) {
+      clearTimeout(watchdogs.get(entry.id));
+      if (entry.answer?.state !== 'answering') { watchdogs.delete(entry.id); return; }
+      watchdogs.set(entry.id, setTimeout(() => {
+        if (entry.answer?.state !== 'answering') return;
+        entry.answer = { ...entry.answer, state: 'lost' };
+        if (entry === now()) render();
+      }, o.watchdog || 20000));
+    }
+    // The owner resizes the answer by its top-left corner (the card sits in
+    // the bottom-right one), or with the arrow keys on that grip.
+    const grip = $('.grip');
+    function resizeTo(width, height) {
+      const w = Math.round(Math.min(Math.max(width, 300), Math.min(760, innerWidth - 40)));
+      const h = Math.round(Math.min(Math.max(height, 120), Math.max(140, innerHeight - 320)));
+      deck.style.setProperty('--answer-w', `${w}px`);
+      deck.style.setProperty('--answer-h', `${h}px`);
+      deck.classList.add('sized');
+      requestAnimationFrame(renderPeeks);
+    }
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      const start = { x: e.clientX, y: e.clientY, w: deck.offsetWidth, h: $('.a-body').offsetHeight };
+      const move = (ev) => resizeTo(start.w + start.x - ev.clientX, start.h + start.y - ev.clientY);
+      const up = () => { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 64 : 24;
+      const by = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+      if (!by) return;
+      e.preventDefault();
+      e.stopPropagation();
+      resizeTo(deck.offsetWidth + by[0], $('.a-body').offsetHeight + by[1]);
+    });
 
     function go(index, direction) {
       if (!entries.length) return;
@@ -327,6 +609,7 @@
       const at = entries.indexOf(entry);
       if (at < 0) return;
       entries.splice(at, 1);
+      clearTimeout(watchdogs.get(entry.id));
       if (tell) ask({ type: 'stack-remove', id: entry.id });
       if (!entries.length) { leave(); return; }
       current = Math.min(at, entries.length - 1);
@@ -335,9 +618,10 @@
     // After a send, only the sent cards leave; never while the owner is on the card.
     function scheduleHide() {
       clearTimeout(hideTimer);
-      if (!entries.some((e) => e.sent) || hovered || root.activeElement === input) return;
+      // An answer stays until the owner closes it.
+      if (!entries.some((e) => e.sent && !e.answer) || hovered || root.activeElement === input) return;
       hideTimer = setTimeout(() => {
-        for (const e of entries.filter((x) => x.sent)) removeEntry(e);
+        for (const e of entries.filter((x) => x.sent && !x.answer)) removeEntry(e);
       }, 6000);
     }
     card.addEventListener('mouseenter', () => { hovered = true; clearTimeout(hideTimer); });
@@ -355,7 +639,7 @@
     card.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter' && e.target === input) { e.preventDefault(); void sendTo(o.main); return; }
-      if (e.target === input || e.target.tagName === 'SELECT') return;
+      if (e.target === input || e.target.tagName === 'SELECT' || e.target === grip || e.target.closest?.('.a-body')) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1, -1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1, 1); }
     });
@@ -413,19 +697,40 @@
       if (destination.kind === 'chat') {
         // A web chat is a website: say so once, before anything goes there.
         if (!confirmed && !o.acknowledged[destination.origin]) {
-          showResult('warn', notice(destination.name, destination.host, false, destination.auto),
+          showResult('warn', notice(destination.name, destination.host, false, destination.auto, destination.answers),
             [['Continue', () => { o.acknowledged[destination.origin] = true; void sendTo(destination, true); }, true, 'send'], ['Cancel', () => showResult('', '')]]);
           return;
         }
         // Copied first, while this page has focus: the fallback if pasting fails.
         const copied = await copy(entry, true);
+        // Sent automatically to ChatGPT or Claude: the card becomes the answer card now.
+        const answering = !!destination.answers;
+        const chat = { destination: destination.id, name: destination.name };
         setBusy(true);
+        if (answering) {
+          entry.asked = text;
+          entry.answer = { state: 'sending', name: destination.name, destination: destination.id, blocks: [] };
+          const focused = root.activeElement && root.activeElement !== card;
+          if (entry === now()) render();
+          if (focused) card.focus({ preventScroll: true });
+        }
         const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin });
         setBusy(false);
-        if (r?.ok) { markSent(entry, { tone: r.submitted || !r.autoSubmit ? 'ok' : 'warn', text: r.text }); return; }
+        chat.tabId = r?.tabId;
+        if (r?.watching) {
+          // The service worker may have sent the first words already.
+          if (!entry.answer || entry.answer.state === 'sending') entry.answer = { state: 'answering', name: destination.name, destination: destination.id, tabId: r.tabId, blocks: [] };
+          watch(entry);
+          markSent(entry, { tone: 'ok', text: r.text });
+          return;
+        }
+        entry.answer = null;
+        if (r?.submitted || (r?.ok && !r.autoSubmit)) { markSent(entry, { tone: 'ok', text: r.text, ...(r.submitted && r.tabId ? { actions: 'open-chat', chat } : {}) }); return; }
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
-        if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.` }); return; }
-        setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.` });
+        const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
+        if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }
+        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: !!r.retry, ...(r.open ? open : {}) }); return; }
+        setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
         return;
       }
       setBusy(true);
@@ -590,7 +895,13 @@
       update(p) {
         o = p;
         chosenDestinations = [...(p.multi || [])];
+        // An answer on its way here is newer than the one kept in storage.
+        for (const e of p.entries) {
+          const mine = entries.find((x) => x.id === e.id);
+          if (mine?.answer && !FINAL.includes(e.answer?.state)) { e.answer = mine.answer; e.asked = e.asked || mine.asked; }
+        }
         entries = p.entries;
+        for (const e of entries) watch(e);
         const at = entries.findIndex((e) => e.id === p.currentId);
         current = at >= 0 ? at : entries.length - 1;
         picker.replaceChildren(new Option('Prompt', '', true, true));
@@ -612,6 +923,15 @@
         }
         // "Capture and send": no click needed; the card shows how it went.
         if (p.autoSend) void sendTo(o.main);
+      },
+      // The chat's answer, from the service worker.
+      answer(id, answer) {
+        const entry = entries.find((e) => e.id === id);
+        // A final answer stays; only the card's own "lost" gives way to news.
+        if (!entry || !answer || (entry.answer?.state !== 'lost' && FINAL.includes(entry.answer?.state))) return;
+        entry.answer = { ...answer, tabId: answer.tabId ?? entry.answer?.tabId };
+        watch(entry);
+        if (entry === now()) { if (card.classList.contains('answering')) showAnswer(entry); else render(); }
       },
     };
   }

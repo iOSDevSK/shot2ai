@@ -5,9 +5,32 @@ export const HTML2WP = { id: 'html2wp', name: 'html2wp', kind: 'html2wp' };
 export const SAVE_ONLY = { id: 'save', name: 'Save only', kind: 'save' };
 export const COPY_ONLY = { id: 'copy', name: 'Copy only', kind: 'copy' };
 // Web chats with a known composer. Any other chat uses the generic finder.
+// For ChatGPT and Claude Shot2AI also knows the stop button (shown while the
+// chat answers), the owner's messages and the chat's answers, so it can
+// confirm a send and read the answer back. These follow the sites' pages as
+// they are and may need updating when a site changes; every one has a
+// fallback, and a send that cannot be confirmed says so in the card.
 export const PRESETS = [
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', selectors: ['#prompt-textarea'], sendSelectors: ['button[data-testid="send-button"]', '#composer-submit-button'] },
-  { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', selectors: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'], sendSelectors: ['button[aria-label="Send message"]', 'button[aria-label="Send Message"]'] },
+  {
+    id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/',
+    selectors: ['#prompt-textarea', 'div[contenteditable="true"].ProseMirror'],
+    sendSelectors: ['button[data-testid="send-button"]', '#composer-submit-button', 'button[aria-label="Send prompt"]'],
+    stopSelectors: ['button[data-testid="stop-button"]', 'button[aria-label="Stop streaming"]', 'button[aria-label^="Stop" i]'],
+    userSelectors: ['[data-message-author-role="user"]'],
+    answerSelectors: ['[data-message-author-role="assistant"]'],
+    contentSelectors: ['.markdown'],
+    streamingSelectors: ['.result-streaming'],
+  },
+  {
+    id: 'claude', name: 'Claude', url: 'https://claude.ai/new',
+    selectors: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'],
+    sendSelectors: ['button[aria-label="Send message"]', 'button[aria-label="Send Message"]'],
+    stopSelectors: ['button[aria-label="Stop response"]', 'button[aria-label^="Stop" i]'],
+    userSelectors: ['[data-testid="user-message"]'],
+    answerSelectors: ['[data-is-streaming]', '.font-claude-response', '.font-claude-message'],
+    contentSelectors: ['.font-claude-response', '.font-claude-message', '.standard-markdown', '.progressive-markdown'],
+    streamingSelectors: ['[data-is-streaming="true"]'],
+  },
 ];
 const DEFAULTS = {
   saveCopy: false,
@@ -20,7 +43,8 @@ const DEFAULTS = {
   customChats: [],
   // The destination the card's main button uses.
   defaultDestination: 'chatgpt',
-  // Web chats whose send button Shot2AI presses after pasting (by id). Off unless turned on.
+  // Web chats whose send button Shot2AI presses after pasting (by id): on
+  // for ChatGPT and Claude, off for the owner's own chats, unless changed.
   autoSubmit: {},
   // The owner has read the terms notice for Send automatically (shown once).
   autoSubmitTermsAck: false,
@@ -45,15 +69,34 @@ export async function settings() {
 }
 export const update = (patch) => chrome.storage.local.set(patch);
 
-// What the card or the editor says after a web-chat send.
-export function chatResultText(name, r) {
-  if (r.submitted) return `Sent to ${name}.`;
-  if (r.autoSubmit) return `Pasted into ${name}. Its send button was not found; press Enter there.`;
-  return `Pasted into ${name}. Press Enter there to send.`;
+// Send automatically: ChatGPT and Claude unless the owner turned it off,
+// their own chats only when turned on.
+export const autoSubmitOn = (s, id) => s.autoSubmit?.[id] ?? PRESETS.some((p) => p.id === id);
+// The chats whose answer Shot2AI can read back into the card.
+export const readsAnswers = (d) => !!d?.answerSelectors?.length;
+
+// What the card or the editor says after a web-chat send, and whether it
+// offers the chat's tab. Anything short of a confirmed send says what is
+// left to do: `open` offers the tab, `retry` a second try.
+export function chatOutcome(name, r) {
+  if (r.submitted) return { tone: 'ok', text: `Sent to ${name}.` };
+  switch (r.reason) {
+    case 'noComposer': return { tone: 'warn', open: true, text: `${name}'s message box was not found, so nothing was sent. Are you signed in there?` };
+    case 'busy': return { tone: 'warn', open: true, retry: true, text: `${name} is still answering in its tab, so nothing was sent. Send again when it finishes.` };
+    case 'noText': return { tone: 'warn', open: true, text: `${name} took the screenshot but not your message, so nothing was sent. Finish it in the ${name} tab.` };
+    case 'uploadFailed': return { tone: 'warn', open: true, text: `The screenshot did not upload to ${name}, so nothing was sent. See the ${name} tab.` };
+    case 'noSendButton': return { tone: 'warn', open: true, text: `Pasted into ${name}. Its send button was not found; press Enter there.` };
+    case 'notConfirmed': return { tone: 'warn', open: true, text: `Shot2AI pressed Send in ${name} but could not confirm it went. Check the ${name} tab.` };
+    default: break;
+  }
+  if (r.ok) return { tone: 'ok', text: `Pasted into ${name}. Press Enter there to send.` };
+  return null;
 }
+export const chatResultText = (name, r) => chatOutcome(name, r)?.text || '';
 // The first-use notice for a web chat.
-export function websiteNotice(names, hosts, many, auto) {
-  return `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${auto ? ', and will be sent automatically, without you reviewing it' : ''}.`;
+export function websiteNotice(names, hosts, many, auto, answers = false) {
+  const sent = auto ? ` and will be sent automatically, without you reviewing ${many ? 'them' : 'it'}${answers ? '; the answer then shows here' : ''}. Some services restrict automated use in their terms; turn Send automatically off in Options to review first` : '';
+  return `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${sent ? `,${sent}` : ''}.`;
 }
 
 export function origin(url) {
@@ -92,6 +135,11 @@ export async function defaultPromptText() {
 export async function choices() {
   const s = await settings();
   return [...PRESETS.map(chat), HTML2WP, ...s.customChats.map(chat), COPY_ONLY, SAVE_ONLY];
+}
+// Choosing the default (the popup's list, Options): a preset chat chosen as
+// the default is also turned on in the card's menu.
+export function defaultPatch(id, s) {
+  return { defaultDestination: id, ...(PRESETS.some((p) => p.id === id) ? { presets: { ...s.presets, [id]: true } } : {}) };
 }
 // The send menu: the preset chats the owner turned on or chose, html2wp,
 // then their own chats.

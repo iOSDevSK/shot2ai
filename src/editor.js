@@ -7,9 +7,9 @@
 import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
-import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatResultText, websiteNotice } from './settings.js';
+import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatOutcome, websiteNotice, autoSubmitOn } from './settings.js';
 import { saveImage, savedText } from './save.js';
-import { pasteIntoChat } from './webchat.js';
+import { pasteIntoChat, openChatTab } from './webchat.js';
 import { encode, EXTENSIONS } from './imaging.js';
 
 paint();
@@ -354,7 +354,7 @@ async function submit(target = destination, confirmed = false) {
     if (!granted) { showResult('warn', `Chrome did not allow the extension to use ${new URL(target.url).host}. Send again and choose Allow.`); return; }
     const s = await settings();
     if (!confirmed && !s.acknowledged[target.origin]) {
-      showResult('warn', websiteNotice(target.name, new URL(target.url).host, false, !!s.autoSubmit[target.id]),
+      showResult('warn', websiteNotice(target.name, new URL(target.url).host, false, autoSubmitOn(s, target.id)),
         [['Continue', () => void submit(target, true), true], ['Cancel', () => showResult('', '')]]);
       return;
     }
@@ -368,9 +368,13 @@ async function submit(target = destination, confirmed = false) {
     const r = await pasteIntoChat(target, encoded, text, fileName(s.filenamePattern, source.url, new Date(), EXTENSIONS[encoded.type]));
     sending = false;
     setSend(actionLabel(destination));
-    if (r.ok) { showResult(r.submitted || !r.autoSubmit ? 'ok' : 'warn', chatResultText(target.name, r)); return; }
-    if (r.notAttached) { showResult('warn', copied ? `${target.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${modKey}V.` : `${target.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`); return; }
-    showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`);
+    // Sent in the background, or stopped short: the chat's tab is one click away.
+    const open = r.tabId ? [[`Open ${target.name} tab`, () => void openChatTab(r.tabId, target.url), !r.submitted]] : [];
+    const outcome = r.needsPermission ? null : chatOutcome(target.name, r);
+    if (r.submitted) { showResult('ok', outcome.text, open); return; }
+    if (r.notAttached) { showResult('warn', copied ? `${target.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${modKey}V.` : `${target.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, open); return; }
+    if (outcome) { showResult(outcome.tone, outcome.text, outcome.open ? open : []); return; }
+    showResult(copied ? 'warn' : 'err', copied ? `Copied. Paste with ${modKey}V in ${target.name}.` : `The screenshot could not be pasted into ${target.name}. Use Copy, then paste it there.`, open);
     return;
   }
   sending = true;
