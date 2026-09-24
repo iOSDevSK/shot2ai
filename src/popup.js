@@ -50,7 +50,7 @@ const optionText = (d, s) => {
   if (d.kind === 'save') return `Save only — ${`Downloads/${cleanSubfolder(s.saveSubfolder) || ''}`.replace(/\/$/, '')}`;
   return 'Copy only — the clipboard';
 };
-// The model for the chosen chat: "Chat's current model" (nothing is
+// The model for the chosen chat: "Use selected model in chat" (nothing is
 // switched), or one of the names read from the chat's own picker in its tab,
 // else its typical names, labelled as such. Kept per chat.
 const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
@@ -59,8 +59,13 @@ const asked = new Set();
 function renderModels(d) {
   const view = modelView(loaded, d);
   $('model-row').hidden = !view;
+  $('effort-row').hidden = !view?.effort;
+  if (view?.effort) {
+    $('effort-select').replaceChildren(new Option("Use selected effort in chat", ''), ...view.effort.options.map(([value, label]) => new Option(label, value)));
+    $('effort-select').value = view.effort.choice;
+  }
   if (!view) return;
-  const options = [new Option("Chat's current model", '')];
+  const options = [new Option("Use selected model in chat", '')];
   const group = (label, names) => { const g = document.createElement('optgroup'); g.label = label; g.append(...names.map((n) => new Option(n, n))); return g; };
   if (view.names.length) options.push(group(view.live ? `In ${d.name} now` : 'Typical names (may be out of date)', view.names));
   if (view.choice && !view.names.includes(view.choice)) options.push(group('Your choice (not in the list now)', [view.choice]));
@@ -69,6 +74,7 @@ function renderModels(d) {
   $('model-note').textContent = view.live ? `Read from your ${d.name} tab ${ago(view.at)}.`
     : view.note ? `${d.name}: ${view.note}. Keep ${d.name} open in a tab to read its list.`
     : `Typical names. Keep ${d.name} open in a tab, signed in, to read its own list.`;
+  if (!view.choice) $('model-note').textContent += ' The model already selected in your chat will be used.';
   // Read again from the chat's own picker (in the tab kept open), now and then.
   if (Date.now() - view.at > READ_EVERY && !asked.has(d.id)) {
     asked.add(d.id);
@@ -78,6 +84,10 @@ function renderModels(d) {
 $('model-select').addEventListener('change', () => {
   const d = list.find((x) => x.id === $('dest-select').value);
   if (d && loaded) update({ modelChoice: { ...loaded.modelChoice, [d.id]: $('model-select').value } });
+});
+$('effort-select').addEventListener('change', () => {
+  const d = list.find((x) => x.id === $('dest-select').value);
+  if (d?.model?.effort && loaded) update({ effortChoice: { ...loaded.effortChoice, [d.id]: $('effort-select').value } });
 });
 
 let list = [];
@@ -116,7 +126,7 @@ $('dest-select').addEventListener('change', () => {
 });
 // Changed in Options (or the right-click menu) while the popup is open.
 chrome.storage.onChanged.addListener((changes) => {
-  if (['defaultDestination', 'customChats', 'saveSubfolder', 'modelChoice', 'modelLists'].some((k) => k in changes)) void refresh();
+  if (['defaultDestination', 'customChats', 'saveSubfolder', 'modelChoice', 'modelLists', 'effortChoice'].some((k) => k in changes)) void refresh();
 });
 $('options').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('recheck').addEventListener('click', refresh);
@@ -149,12 +159,6 @@ async function stackButton() {
   $('show-stack').onclick = async () => { await chrome.runtime.sendMessage({ type: 'show-stack', tabId }); if (!tabParam) window.close(); };
 }
 stackButton();
-$('capture-full').addEventListener('click', async () => {
-  let tabId = tabParam;
-  if (!tabId) [{ id: tabId } = {}] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const result = await chrome.runtime.sendMessage({ type: 'full-page', tabId });
-  if (result?.ok && !tabParam) window.close();
-});
 $('capture').addEventListener('click', async () => {
   $('capture').disabled = true;
   $('capture-error').hidden = true;
@@ -174,7 +178,7 @@ $('paste-hint').innerHTML = `Or paste an image with <kbd>${isMac ? '⌘V' : 'Ctr
 })();
 // The keys Chrome has for these actions now (the owner may have changed them).
 shortcuts().then((keys) => {
-  for (const [id, command] of [['key-area', 'capture-area'], ['key-full', 'capture-full']]) {
+  for (const [id, command] of [['key-area', 'capture-area']]) {
     $(id).textContent = keys[command] || '';
     $(id).hidden = !keys[command];
     $(id).title = 'Keyboard shortcut';

@@ -14,17 +14,44 @@ export default {
   userSelectors: ['[data-message-author-role="user"]'],
   answerSelectors: ['[data-message-author-role="assistant"]'],
   contentSelectors: ['.markdown'],
+  backgroundFrames: true,
   streamingSelectors: ['.result-streaming'],
   loginUrls: ['/auth/login', '/log-in'],
   loginSelectors: ['[data-testid="login-button"]'],
-  // The model picker at the top of the chat: its button, the menu it opens
+  // The model picker in the header or composer: its button, the menu it opens
   // (anywhere on the page), the menu's items and the name inside an item.
   // `typical` is shown, labelled as such, only when no ChatGPT tab has been
   // read yet; the real list is read from the picker itself.
   model: {
+    readyTimeout: 6000,
     button: ['button[data-testid="model-switcher-dropdown-button"]', 'button[aria-label^="Model selector" i]', 'button[aria-label*="model" i][aria-haspopup]'],
-    menu: ['[role="menu"]'],
-    items: ['[role="menuitemradio"]', '[role="menuitem"]'],
+    buttonExclude: 'article, [data-message-author-role], [data-testid^="conversation-turn"]',
+    // The composer picker can show only "Instant" (no model test ID or
+    // accessible label). Match a mode or versioned GPT name in the composer,
+    // never a similarly named button in the conversation or sidebar.
+    buttonFallback: [':is(form, [data-type="unified-composer"], #thread-bottom-container):has(#prompt-textarea) :is(button, [role="button"])[aria-haspopup]'],
+    // Applied to normalized text, so GPT-5.5 and GPT 5.5 both identify the
+    // trigger. This does not add names to the menu or alias a model to a mode.
+    buttonNamePattern: /^(?:gpt ?\d+(?:\.\d+)*|\d+\.\d+(?:\.\d+)*)(?: ?sol)?(?: ?(?:auto|instant|thinking|pro|medium|high|extra high|light|standard|extended|heavy))?$/.source,
+    // The newer UI puts the model inside the Thinking effort popover.
+    // Effort positions are read from the slider's bounds, not model versions.
+    effort: {
+      buttons: [':is(form, [data-type="unified-composer"], #thread-bottom-container):has(#prompt-textarea) :is(button, [role="button"])'],
+      names: ['Thinking effort', 'Instant', 'Medium', 'High', 'Extra High', 'Pro'],
+      sliders: ['input[type="range"]', '[role="slider"]'],
+      keyboardTarget: '[role="menuitem"][aria-label="Power"]',
+      valueLabel: '[aria-label="Select model"] [data-max-effort]',
+    },
+    // The intelligence picker switches views inside one menu. The model
+    // radios remain mounted but inert until Select model is activated.
+    panel: {
+      root: '[data-testid="composer-intelligence-picker-content"]',
+      toggle: '[role="menuitem"][aria-label="Select model"]',
+      models: '[data-testid="composer-model-picker-slider-advanced-view"]',
+    },
+    namePrefix: /^gpt\s*/.source,
+    menu: ['[role="menu"]', '[role="listbox"]'],
+    items: ['[role="menuitemradio"]', '[role="menuitem"]', '[role="option"]'],
     label: [],
     typical: ['Auto', 'Instant', 'Thinking', 'Pro'],
   },

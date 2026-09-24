@@ -4,6 +4,7 @@ import { PRESETS, settings, update, sitePattern, fileName, cleanSubfolder, isMac
 import { getHandle, putHandle, deleteHandle } from './captures.js';
 import { FOLDER } from './save.js';
 import { acceptPastedImages } from './paste.js';
+const syncIntegrations = async () => !!(await chrome.runtime.sendMessage({ type: 'integration-sync' }))?.enabled;
 import { syncToolbar, ALL_SITES } from './toolbar-setup.js';
 import { formatOf } from './imaging.js';
 import { ACTIONS, SHORTCUTS_PAGE, shortcuts } from './shortcuts.js';
@@ -249,11 +250,12 @@ $('forget-folder').addEventListener('click', async () => { await deleteHandle(FO
 
 async function savePrompts(list) { await update({ prompts: list }); await renderPrompts(); }
 async function renderPrompts() {
-  const [list, s] = await Promise.all([prompts(), settings()]);
+  const list = await prompts();
   $('prompt-list').replaceChildren(...list.map((p, index) => {
     const row = document.createElement('div');
     row.className = 'prompt-row';
-    row.innerHTML = '<input aria-label="Prompt name" maxlength="60"><div class="moves"><button class="button up" type="button">Up</button><button class="button down" type="button">Down</button><button class="button text delete" type="button">Delete</button></div><textarea aria-label="Prompt text" maxlength="2000"></textarea>';
+    row.innerHTML = '<div class="prompt-heading"><input aria-label="Prompt name" maxlength="60"><span class="default-badge">Default</span></div><div class="moves"><button class="button up" type="button">Up</button><button class="button down" type="button">Down</button><button class="button text delete" type="button">Delete</button></div><textarea aria-label="Prompt text" maxlength="2000"></textarea>';
+    row.querySelector('.default-badge').hidden = index !== 0;
     const [name, text] = [row.querySelector('input'), row.querySelector('textarea')];
     name.value = p.name;
     text.value = p.text;
@@ -262,7 +264,6 @@ async function renderPrompts() {
     const edited = async () => {
       const current = await prompts();
       await update({ prompts: current.map((x) => x.id === p.id ? { ...x, name: name.value.trim() || 'Untitled', text: text.value } : x) });
-      await renderDefaultPrompt();
     };
     name.addEventListener('change', edited);
     text.addEventListener('change', edited);
@@ -280,19 +281,11 @@ async function renderPrompts() {
     row.querySelector('.down').addEventListener('click', () => move(1));
     row.querySelector('.delete').addEventListener('click', async () => {
       const current = await prompts();
-      if (s.defaultPrompt === p.id) await update({ defaultPrompt: null });
       await savePrompts(current.filter((x) => x.id !== p.id));
     });
     return row;
   }));
-  await renderDefaultPrompt();
 }
-async function renderDefaultPrompt() {
-  const [list, s] = await Promise.all([prompts(), settings()]);
-  $('default-prompt').replaceChildren(new Option('None', ''), ...list.map((p) => new Option(p.name, p.id)));
-  $('default-prompt').value = list.some((p) => p.id === s.defaultPrompt) ? s.defaultPrompt : '';
-}
-$('default-prompt').addEventListener('change', (e) => update({ defaultPrompt: e.target.value || null }));
 $('add-prompt').addEventListener('click', async () => {
   const current = await prompts();
   await savePrompts([...current, { id: `prompt-${crypto.randomUUID().slice(0, 8)}`, name: 'New prompt', text: '' }]);
@@ -354,10 +347,28 @@ $('toolbar-on').addEventListener('change', async (e) => {
     if (granted) await update({ toolbar: { ...s.toolbar, enabled: true } });
   } else {
     await update({ toolbar: { ...s.toolbar, enabled: false } });
-    await chrome.permissions.remove(ALL_SITES).catch(() => {});
+    if (!s.websiteIntegrations) await chrome.permissions.remove(ALL_SITES).catch(() => {});
   }
   await renderToolbar();
 });
+
+async function renderIntegrations() {
+  const on = await syncIntegrations();
+  $('integrations-on').checked = on;
+  $('integrations-state').textContent = on ? 'On' : 'Off';
+  $('integrations-state').className = `status ${on ? 'ok' : ''}`;
+}
+$('integrations-on').addEventListener('change', async e => {
+  if (e.target.checked) {
+    const granted = await chrome.permissions.request(ALL_SITES).catch(() => false);
+    if (granted) await update({ websiteIntegrations: true });
+  } else {
+    await update({ websiteIntegrations: false });
+    if (!(await settings()).toolbar.enabled) await chrome.permissions.remove(ALL_SITES).catch(() => {});
+  }
+  await renderIntegrations();
+});
+renderIntegrations();
 
 // ---- privacy ------------------------------------------------------------
 
@@ -366,8 +377,9 @@ $('clear-no').addEventListener('click', () => { $('clear-confirm').hidden = true
 $('clear-yes').addEventListener('click', async () => {
   await chrome.storage.local.clear();
   await chrome.storage.session?.clear?.().catch(() => {});
-  await new Promise((resolve) => { const req = indexedDB.deleteDatabase('shot2ai-captures'); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
+  for (const name of ['shot2ai-captures', 'shot2ai-exports']) await new Promise((resolve) => { const req = indexedDB.deleteDatabase(name); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
   await syncToolbar().catch(() => {});
+  await syncIntegrations().catch(() => {});
   // Sites allowed for web chats and the toolbar's all-site access go too.
   const { origins = [] } = await chrome.permissions.getAll();
   const optional = origins.filter((o) => o !== 'http://127.0.0.1/*');

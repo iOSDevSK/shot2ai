@@ -9,12 +9,17 @@ import perplexity from './sites/perplexity.js';
 export const HTML2WP = { id: 'html2wp', name: 'html2wp', kind: 'html2wp' };
 export const SAVE_ONLY = { id: 'save', name: 'Save only', kind: 'save' };
 export const COPY_ONLY = { id: 'copy', name: 'Copy only', kind: 'copy' };
+// Relative positions, snapped to the nearest step on ChatGPT's own slider.
+// These are not assumptions about model-specific effort names or token budgets.
+export const EFFORTS = [['0', 'Minimum'], ['25', 'Lower'], ['50', 'Middle'], ['75', 'Higher'], ['100', 'Maximum']];
 // Web chats with a known composer, each in its own file under sites/: the
 // message box, the send and stop buttons, the owner's messages and the chat's
 // answers, so Shot2AI can send there, confirm the send and read the answer
 // back. When one site changes its page, only its file needs updating. Any
 // other chat uses the generic finder.
-export const PRESETS = [chatgpt, claude, gemini, perplexity];
+// Keep Gemini's adapter for later testing; it is not offered in this release.
+export const HIDDEN_PRESETS = ['gemini'];
+export const PRESETS = [chatgpt, claude, gemini, perplexity].filter(p => !HIDDEN_PRESETS.includes(p.id));
 const DEFAULTS = {
   saveCopy: false,
   saveSubfolder: 'shot2ai',
@@ -33,6 +38,7 @@ const DEFAULTS = {
   autoSubmitTermsAck: false,
   // The floating toolbar: off unless switched on in Options.
   toolbar: { enabled: false, collapsed: false },
+  websiteIntegrations: false,
   toolbarHidden: {},
   toolbarPos: {},
   // Full-page capture stops at this height (CSS px), 5,000–50,000.
@@ -41,19 +47,21 @@ const DEFAULTS = {
   regions: {},
   // Destinations ticked for "Send to all selected".
   multiSend: [],
-  // The prompt that fills the message of every new capture, or null.
-  defaultPrompt: null,
   // Web chats the owner has been told receive the screenshot (by origin).
   acknowledged: {},
   // The model the owner chose per known chat, by the name the chat shows
   // ('' or none: the chat's current model, nothing is switched).
   modelChoice: {},
+  effortChoice: {},
   // The names last read from each known chat's own model picker: { names, at }.
   modelLists: {},
 };
 
 export async function settings() {
-  return { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
+  const s = { ...DEFAULTS, ...(await chrome.storage.local.get(Object.keys(DEFAULTS))) };
+  if (HIDDEN_PRESETS.includes(s.defaultDestination)) s.defaultDestination = FIRST_DEFAULT;
+  s.multiSend = s.multiSend.filter(id => !HIDDEN_PRESETS.includes(id));
+  return s;
 }
 export const update = (patch) => chrome.storage.local.set(patch);
 
@@ -69,26 +77,33 @@ export const readsAnswers = (d) => !!d?.answerSelectors?.length;
 export function modelView(s, d) {
   if (!d?.model) return null;
   const read = s.modelLists?.[d.id];
-  const live = !!read?.names?.length;
-  return { choice: s.modelChoice?.[d.id] || '', names: live ? read.names : d.model.typical || [], live, at: read?.at || 0, note: d.model.noPicker || null };
+  const live = read?.version === chrome.runtime.getManifest().version && !!read?.names?.length;
+  return { choice: s.modelChoice?.[d.id] || '', names: live ? read.names : d.model.typical || [], live, at: live ? read.at : 0, note: d.model.noPicker || null,
+    effort: d.model.effort ? { choice: s.effortChoice?.[d.id] || '', options: d.model.effort.options || EFFORTS } : null };
 }
 // Names read from a chat's picker, kept for the popup and the card.
 export async function cacheModels(d, names) {
   const list = [...new Set((names || []).map((n) => String(n).trim()).filter(Boolean))].slice(0, 40);
   if (!d?.model || !list.length) return;
   const { modelLists = {} } = await chrome.storage.local.get('modelLists');
-  await update({ modelLists: { ...modelLists, [d.id]: { names: list, at: Date.now() } } });
+  await update({ modelLists: { ...modelLists, [d.id]: { names: list, at: Date.now(), version: chrome.runtime.getManifest().version } } });
 }
 
 // What the card or the editor says after a web-chat send, and whether it
 // offers the chat's tab. Anything short of a confirmed send says what is
 // left to do: `open` offers the tab, `retry` a second try.
-export function chatOutcome(name, r) {
-  if (r.submitted) return { tone: 'ok', text: r.modelUsed ? `Sent to ${name} (${r.modelUsed}).` : `Sent to ${name}.` };
+export function chatOutcome(name, r, textOnly = false) {
+  if (r.submitted) {
+    const used = [r.modelUsed, r.effortUsed ? `effort: ${r.effortUsed}` : null].filter(Boolean).join(' · ');
+    return { tone: 'ok', text: `Sent to ${name}${used ? ` (${used})` : ''}.` };
+  }
   // The chosen model could not be switched to: nothing went, and the card
   // offers to send with the chat's current model instead (`current`).
   const lists = r.names?.length ? ` It lists: ${r.names.join(', ')}.` : '';
   switch (r.reason) {
+    case 'effortPicker': return { tone: 'warn', open: true, current: true, text: `${name}'s Thinking effort control was not found. Nothing was sent.` };
+    case 'effortUnsupported': return { tone: 'warn', open: true, current: true, text: `${name}'s Thinking effort control could not be adjusted reliably. Nothing was sent.` };
+    case 'effortNotSet': return { tone: 'warn', open: true, current: true, text: `${name} did not confirm the chosen Thinking effort. Nothing was sent.` };
     case 'modelPicker': return { tone: 'warn', open: true, current: true, text: r.pickerNote ? `${name}: ${r.pickerNote}. Nothing was sent.` : `${name}'s model picker was not found, so ${r.model} could not be chosen. Nothing was sent.` };
     case 'modelMissing': return { tone: 'warn', open: true, current: true, text: `${name} has no model called “${r.model}” now.${lists} Nothing was sent.` };
     case 'modelAmbiguous': return { tone: 'warn', open: true, current: true, text: `“${r.model}” matches several of ${name}'s models (${r.detail}); choose one in the popup. Nothing was sent.` };
@@ -97,11 +112,13 @@ export function chatOutcome(name, r) {
     default: break;
   }
   switch (r.reason) {
-    case 'login': return { tone: 'warn', open: true, retry: 'Send again', text: `Log in to ${name} once, then keep the tab open. Your screenshot waits here; nothing was sent.` };
+    case 'login': return { tone: 'warn', open: true, retry: 'Send again', text: `Log in to ${name} once, then keep the tab open. Your ${textOnly ? 'selected text' : 'screenshot'} waits here; nothing was sent.` };
     case 'plan': return { tone: 'warn', open: true, text: `${name} did not take the screenshot${r.detail ? `: “${r.detail.replace(/[\s.!]+$/, '')}”` : ''}. It may need a sign-in or a paid plan. Nothing was sent.` };
     case 'noComposer': return { tone: 'warn', open: true, text: `${name}'s message box was not found, so nothing was sent. Are you signed in there?` };
     case 'busy': return { tone: 'warn', open: true, retry: true, text: `${name} is still answering in its tab, so nothing was sent. Send again when it finishes.` };
-    case 'noText': return { tone: 'warn', open: true, text: `${name} took the screenshot but not your message, so nothing was sent. Finish it in the ${name} tab.` };
+    case 'draft': return { tone: 'warn', open: true, text: 'There is an unsent message or attachment in the chat. Send or clear it there first.' };
+    case 'noText': return { tone: 'warn', open: true, text: `${name} ${textOnly ? 'did not take your message' : 'took the screenshot but not your message'}, so nothing was sent. Finish it in the ${name} tab.` };
+    case 'uploadBlocked': return { tone: 'warn', open: true, text: `Remove the failed attachment in ${name}, then send again. Nothing was sent.` };
     case 'uploadFailed': return { tone: 'warn', open: true, text: `The screenshot did not upload to ${name}, so nothing was sent. See the ${name} tab.` };
     case 'noSendButton': return { tone: 'warn', open: true, text: `Pasted into ${name}. Its send button was not found; press Enter there.` };
     case 'notConfirmed': return { tone: 'warn', open: true, text: `Shot2AI pressed Send in ${name} but could not confirm it went. Check the ${name} tab.` };
@@ -145,10 +162,13 @@ export async function prompts() {
   await update({ prompts: BUILTIN_PROMPTS });
   return BUILTIN_PROMPTS;
 }
-// The text of the default prompt, or '' when none is set.
+// Order defines the default; legacy defaultPrompt IDs are intentionally ignored.
 export async function defaultPromptText() {
-  const [list, s] = await Promise.all([prompts(), settings()]);
-  return list.find((p) => p.id === s.defaultPrompt)?.text || '';
+  return (await prompts())[0]?.text || '';
+}
+// Resolve at send time too: clearing a message still uses the current default.
+export async function promptText(text) {
+  return typeof text === 'string' && text.trim() ? text : await defaultPromptText();
 }
 // Everything the owner can choose as the default: ChatGPT, Claude, Gemini, Perplexity, html2wp,
 // their own chats, then Copy only and Save only.

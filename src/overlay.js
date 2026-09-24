@@ -27,12 +27,17 @@
     const layer = root.querySelector('.layer');
     const box = root.querySelector('.box');
     const size = root.querySelector('.size');
+    const previousFocus = document.activeElement;
+    layer.tabIndex = -1;
+    for (const type of ['keydown', 'keypress', 'keyup']) root.addEventListener(type, (e) => e.stopPropagation());
     let start = null;
     let rect = null;
 
     const finish = (message) => {
       window.removeEventListener('keydown', onKey, true);
+      const restoreFocus = document.activeElement === host;
       host.remove();
+      if (restoreFocus && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
       chrome.runtime.sendMessage({ ...message, id: captureId });
     };
     const onKey = (e) => {
@@ -77,6 +82,7 @@
     host.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
     window.addEventListener('keydown', onKey, true);
     document.documentElement.appendChild(host);
+    layer.focus({ preventScroll: true });
     return true;
   };
 })();

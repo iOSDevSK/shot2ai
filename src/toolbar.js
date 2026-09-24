@@ -112,7 +112,7 @@
   $('.more').addEventListener('click', () => { menu.hidden = !menu.hidden; });
   root.querySelector('[data-menu="hide"]').addEventListener('click', () => { host.remove(); void save({ hide: true }); });
   root.querySelector('[data-menu="options"]').addEventListener('click', () => { menu.hidden = true; chrome.runtime.sendMessage({ type: 'open-options' }); });
-  root.addEventListener('keydown', (e) => e.stopPropagation());
+  for (const type of ['keydown', 'keypress', 'keyup']) root.addEventListener(type, (e) => e.stopPropagation());
 
   // Dragged by its grip (or the dot); the place is kept for this site.
   let drag = null;

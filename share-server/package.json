@@ -1,0 +1,14 @@
+{
+  "name": "shot2ai-sharing-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8791 --host 127.0.0.1:8791 --var PUBLIC_ORIGIN:http://127.0.0.1:8791",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.133.0"
+  }
+}

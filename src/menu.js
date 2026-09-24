@@ -2,7 +2,7 @@
 import { destinations, defaultDestination, update, prompts } from './settings.js';
 import { shortcuts } from './shortcuts.js';
 import { startCapture, captureVisible, captureImage, captureSavedRegion } from './capture.js';
-import { showCard, fullPageCard } from './flow.js';
+import { showCard, fullPageCard, selectedTextCard } from './flow.js';
 
 const CONTEXTS = ['page', 'selection', 'image', 'link'];
 export async function menuItems() {
@@ -26,6 +26,7 @@ export async function menuItems() {
     ...(saved.length ? [item('prompts', 'Send with prompt')] : []),
     ...saved.map((p) => ({ id: `prompt:${p.id}`, parentId: 'prompts', title: p.name.slice(0, 60), contexts: CONTEXTS })),
     item('send-image', to[1], { contexts: ['image'] }),
+    item('send-text', withKey('Send selected text…', 'send-text'), { contexts: ['selection'] }),
     item('send-selection', 'Send selection with a screenshot', { contexts: ['selection'] }),
     item('sep-2', '', { type: 'separator' }),
     item('options', 'Options'),
@@ -45,6 +46,7 @@ export async function onMenuClick(info, tab) {
   if (id === 'options') { await chrome.runtime.openOptionsPage(); return; }
   if (id.startsWith('dest:')) { await update({ defaultDestination: id.slice(5) }); return; }
   if (!tab?.id) return;
+  if (id === 'send-text') { await selectedTextCard(tab, { selectionText: info.selectionText }); return; }
   if (id === 'capture-area') { await startCapture(tab.id); return; }
   if (id === 'capture-full') { await fullPageCard(tab); return; }
   if (id === 'capture-saved') {

@@ -2,3 +2,11 @@ node_modules/
 test-results/
 playwright-report/
 dist/
+share-data/
+.wrangler/
+.astro/
+__pycache__/
+*.py[cod]
+.dev.vars*
+.env
+.env.*

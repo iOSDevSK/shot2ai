@@ -11,6 +11,7 @@
 // unless the owner asks for a new chat. A closed tab opens again, in the
 // background, on the last conversation. Shot2AI never touches a sign-in page.
 import { sitePattern, settings, update, autoSubmitOn, origin, cacheModels } from './settings.js';
+import { controlBackgroundFrames } from './background-frames.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // The page gives up on its own by then (see `deadline`); this is the backstop.
@@ -91,8 +92,13 @@ async function pasteInPage(files, text, selectors, submit) {
   const blocker = () => {
     for (const el of document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"], [role="alert"]')) {
       if (!visible(el)) continue;
-      const said = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (/\b(upgrade|subscribe|subscription|paid plan|pro plan|limit|quota)\b/i.test(said)) return { ok: false, reason: 'plan', detail: said.slice(0, 160) };
+      const raw = el.innerText || el.textContent || '';
+      const said = raw.replace(/\s+/g, ' ').trim();
+      const planWords = /\b(upgrade|subscribe|subscription|paid plan|pro plan|limit|quota)\b/i;
+      if (planWords.test(said)) {
+        const firstLine = raw.split('\n').map((s) => s.trim()).find(Boolean) || said;
+        return { ok: false, reason: 'plan', detail: (planWords.test(firstLine) ? firstLine : said).slice(0, 160) };
+      }
       if (/\b(log ?in|sign ?in|sign up)\b/i.test(said)) return { ok: false, reason: 'login' };
     }
     return null;
@@ -105,13 +111,19 @@ async function pasteInPage(files, text, selectors, submit) {
   let model = null;
   if (submit.model) {
     const picker = window.__shot2aiPicker;
-    const picked = picker ? await picker.choose(submit.model.picker, submit.model.want) : { ok: false, reason: 'modelPicker' };
+    const picked = !submit.model.want ? { ok: true } : picker ? await picker.choose(submit.model.picker, submit.model.want) : { ok: false, reason: 'modelPicker' };
     if (!picked.ok) return { ok: false, reason: picked.reason, detail: picked.detail || null, names: picked.names || [] };
     model = { name: picked.name, names: picked.names || [] };
+    if (submit.model.effort !== '') {
+      const adjusted = picker ? await picker.chooseEffort(submit.model.picker, submit.model.effort) : { ok: false, reason: 'effortPicker' };
+      if (!adjusted.ok) return { ok: false, reason: adjusted.reason, names: model.names };
+      model.effort = adjusted.name;
+    }
     // The picker is closed; the message box must still be there.
     composer = find() || await until(find, 2000);
     if (!composer) return { ok: false, reason: 'noComposer' };
   }
+  if (submit.conversationUrl && location.href !== submit.conversationUrl) return { ok: false, reason: 'conversationChanged' };
   const baseline = { answers: count(submit.answers), user: count(submit.user), url: location.href };
   composer.focus();
   const makeFiles = () => files.map((f) => new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
@@ -122,40 +134,75 @@ async function pasteInPage(files, text, selectors, submit) {
   const up = (test) => { let n = composer; for (let i = 0; i < 8 && n.parentElement; i++) { n = n.parentElement; if (test(n)) return n; } return null; };
   const area = () => submit.area.map((s) => composer.closest(s)).find(Boolean) || composer.closest('form')
     || up((n) => n.querySelector('input[type=file]')) || up(holdsSend) || composer.parentElement || document.body;
-  const previews = () => area().querySelectorAll('img, [style*="background-image"], [data-testid*="attachment" i], [data-testid*="file" i], [aria-label*="remove" i]').length;
+  const previews = () => area().querySelectorAll(submit.attachments?.length ? submit.attachments.join(',') : 'img, [style*="background-image"], [data-testid*="attachment" i], [data-testid*="file" i], [aria-label*="remove" i]').length;
+  const attachmentError = () => (submit.uploadErrors || []).some(s => [...area().querySelectorAll(s)].some(visible))
+    ? { ok: false, reason: 'uploadFailed' } : null;
+  // An earlier failed upload also disables Gemini's Send control. Leave it
+  // visible for the owner; do not append another file to a failed draft.
+  if (attachmentError()) return { ok: false, reason: 'uploadBlocked' };
   const alerts = () => [...area().querySelectorAll('[role="alert"], [data-testid*="error" i]')].filter((el) => visible(el) && el.textContent.trim()).length;
+  if (!files.length && (String(composer.value ?? composer.innerText ?? '').trim() || previews())) return { ok: false, reason: 'draft' };
   const before = previews();
   const alertsBefore = alerts();
-  const attached = () => until(() => previews() > before, 6000);
+  const attached = () => until(() => blocker() || attachmentError() || previews() > before, 6000);
   // 1. The chat's own file input: what its attach button uses, so it takes
   //    the image like a picked file. A synthetic paste is ignored by some
   //    chats (ChatGPT took only the text).
-  let ok = false;
-  const input = [...area().querySelectorAll('input[type=file]'), ...document.querySelectorAll('input[type=file]')].find((i) => !i.disabled && (!i.accept || /image|\*/.test(i.accept)));
-  if (input) {
-    const data = new DataTransfer();
-    for (const f of makeFiles()) data.items.add(f);
-    input.files = data.files;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    ok = await attached();
+  if (files.length) {
+    let ok = false;
+    const acceptsFiles = (input) => {
+      const types = input.accept.toLowerCase().split(',').map((s) => s.trim()).filter(Boolean);
+      return !types.length || files.every((f) => types.some((type) => type === '*/*' || type === '*'
+        || (type.startsWith('.') ? f.name.toLowerCase().endsWith(type)
+          : type.endsWith('/*') ? f.type.toLowerCase().startsWith(type.slice(0, -1)) : f.type.toLowerCase() === type)));
+    };
+    const findFileInput = () => [...area().querySelectorAll('input[type=file]'), ...document.querySelectorAll('input[type=file]')].find((i) => !i.disabled && acceptsFiles(i));
+    let input = findFileInput();
+    let openedUpload = null;
+    // Gemini creates its image input lazily when Upload and tools is opened.
+    // Use that input rather than relying on synthetic clipboard/drop support.
+    if (!input && submit.uploadButtons?.length) {
+      const button = submit.uploadButtons.flatMap(s => [...document.querySelectorAll(s)]).find(visible);
+      if (button && button.getAttribute('aria-expanded') !== 'true') {
+        button.click(); openedUpload = button;
+        input = await until(findFileInput, 2000);
+      }
+    }
+    const closeUpload = () => {
+      if (openedUpload?.isConnected && openedUpload.getAttribute('aria-expanded') === 'true') openedUpload.click();
+      openedUpload = null;
+    };
+    if (input) {
+      const data = new DataTransfer();
+      for (const f of makeFiles()) data.items.add(f);
+      try {
+        input.files = data.files;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        ok = await attached();
+      } finally { closeUpload(); }
+      if (ok?.reason) return ok;
+    }
+    closeUpload();
+    // 2. A paste of the files. 3. A drop on the composer.
+    if (!ok) {
+      const data = new DataTransfer();
+      for (const f of makeFiles()) data.items.add(f);
+      composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+      ok = await attached();
+      if (ok?.reason) return ok;
+    }
+    if (!ok) {
+      const data = new DataTransfer();
+      for (const f of makeFiles()) data.items.add(f);
+      for (const type of ['dragenter', 'dragover', 'drop']) composer.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true }));
+      ok = await attached();
+      if (ok?.reason) return ok;
+    }
+    // Without the image nothing is typed or sent: the owner pastes it (it is
+    // on the clipboard) and nothing half-done reaches the chat.
+    if (!ok) return (await until(blocker, 1500)) || { ok: false, reason: 'notAttached' };
   }
-  // 2. A paste of the files. 3. A drop on the composer.
-  if (!ok) {
-    const data = new DataTransfer();
-    for (const f of makeFiles()) data.items.add(f);
-    composer.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
-    ok = await attached();
-  }
-  if (!ok) {
-    const data = new DataTransfer();
-    for (const f of makeFiles()) data.items.add(f);
-    for (const type of ['dragenter', 'dragover', 'drop']) composer.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true }));
-    ok = await attached();
-  }
-  // Without the image nothing is typed or sent: the owner pastes it (it is
-  // on the clipboard) and nothing half-done reaches the chat.
-  if (!ok) return (await until(blocker, 1500)) || { ok: false, reason: 'notAttached' };
   const attachedCount = previews();
 
   // The message. A paste of the text is what ChatGPT's and Claude's editors
@@ -183,10 +230,18 @@ async function pasteInPage(files, text, selectors, submit) {
   // With the image but not the message, nothing is sent.
   if (!has()) return { ok: false, reason: 'noText' };
 
-  const usable = (b) => visible(b) && !b.disabled && b.getAttribute('aria-disabled') !== 'true';
-  const sendLike = (b) => b.type === 'submit' || /\b(send|submit)\b/i.test(`${b.getAttribute('aria-label') || ''} ${b.title || ''} ${b.textContent || ''}`);
+  const usable = (b) => visible(b) && !b.disabled && !b.closest('[aria-disabled="true"]');
+  const sendLike = (b) => (b.type === 'submit' && !!b.form) || /\b(send|submit)\b/i.test(`${b.getAttribute('aria-label') || ''} ${b.title || ''} ${b.textContent || ''}`);
   const findSend = () => {
-    for (const s of submit.selectors) { const b = [...document.querySelectorAll(s)].find(usable); if (b) return b; }
+    let known = false;
+    for (const s of submit.selectors) {
+      const buttons = [...document.querySelectorAll(s)].filter(visible);
+      const b = buttons.find(usable); if (b) return b;
+      known ||= buttons.length > 0;
+    }
+    // A known Send control may be disabled until uploading finishes. Do not
+    // mistake another nearby button (Upload, microphone) for its fallback.
+    if (known) return null;
     const box = composer.getBoundingClientRect();
     let scope = composer;
     for (let i = 0; i < 8 && scope.parentElement; i++) {
@@ -207,13 +262,14 @@ async function pasteInPage(files, text, selectors, submit) {
   if (!(await until(anySend, 3000))) return { ok: true, submitted: false, reason: 'noSendButton' };
   // A chat that drops the image may still send the text alone: its failure
   // is looked for before its send button, and once more before the click.
-  const failed = () => alerts() > alertsBefore || previews() < attachedCount;
+  const failed = () => attachmentError() || alerts() > alertsBefore || previews() < attachedCount;
   const ready = await until(() => (failed() && 'failed') || findSend(), 30000);
   if (ready === 'failed') return (await until(blocker, 1500)) || { ok: false, reason: 'uploadFailed' };
   if (!ready) return blocker() || { ok: true, submitted: false, reason: anySend() ? 'uploadFailed' : 'noSendButton' };
   // Past the service worker's patience: it has already told the owner.
   if (Date.now() > submit.deadline) return { ok: true, submitted: false, reason: 'notConfirmed' };
   if (failed()) return blocker() || { ok: false, reason: 'uploadFailed' };
+  if (submit.conversationUrl && location.href !== submit.conversationUrl) return { ok: false, reason: 'conversationChanged' };
   ready.click();
   // It went when the chat shows a stop button, the owner's new message or a
   // new address, or empties its composer.
@@ -265,14 +321,20 @@ export async function findTab(destination) {
 // `model` is the name of the model to switch to first (none: the chat's
 // current model, and its picker is not touched).
 // Returns { ok, submitted, autoSubmit, tabId, baseline, reason, modelUsed } | { needsPermission } | { failed, reason, detail, names, tabId }.
-export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null } = {}) {
+export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null, effort, backgroundAnswer = false, continuation = null } = {}) {
   const blobs = Array.isArray(blob) ? blob : [blob];
   const names = Array.isArray(name) ? name : [name];
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { needsPermission: true };
   // Never for html2wp: only web chats reach this function.
-  const autoSubmit = autoSubmitOn(await settings(), destination.id);
+  const saved = await settings();
+  const autoSubmit = !!continuation || autoSubmitOn(saved, destination.id);
   const want = model && destination.model ? model : null;
-  const found = await findTab(destination);
+  const effortWant = !continuation && destination.model?.effort ? (typeof effort === 'string' ? effort : saved.effortChoice?.[destination.id] || '') : '';
+  const found = continuation ? { tab: await chrome.tabs.get(continuation.tabId).catch(() => null) } : await findTab(destination);
+  if (continuation && found.tab?.url !== continuation.url) found.tab = (await chrome.tabs.query({})).find(t => t.url === continuation.url) || null;
+  if (continuation && (!found.tab || !onSite(found.tab, destination) || !continuation.url || found.tab.url !== continuation.url)) {
+    return { failed: true, reason: 'conversationChanged' };
+  }
   let tab = found?.tab || null;
   // Loaded by Shot2AI just now: a page elsewhere means a sign-in page.
   let fresh = false;
@@ -312,26 +374,48 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     files.push({ base64: btoa(binary), type: b.type || 'image/png', name: names[index] || names[0] });
   }
+  const frameToken = autoSubmit && destination.backgroundFrames ? crypto.randomUUID() : null;
+  let keepFrames = false;
   const run = async (tabId, loadedNow) => {
+    await controlBackgroundFrames(tabId, frameToken, 'start');
     const submit = {
+      conversationUrl: continuation?.url || null,
       on: autoSubmit, selectors: destination.sendSelectors || [], stop: destination.stopSelectors || [],
       user: destination.userSelectors || [], answers: destination.answerSelectors || [], deadline: Date.now() + SEND_LIMIT - 10000,
-      login: { urls: destination.loginUrls || [], selectors: destination.loginSelectors || [] }, area: destination.areaSelectors || [],
+      login: { urls: destination.loginUrls || [], selectors: destination.loginSelectors || [] }, area: destination.areaSelectors || [], attachments: destination.attachmentSelectors || [],
+      uploadButtons: destination.uploadButtonSelectors || [], uploadErrors: destination.uploadErrorSelectors || [],
       // A page that is already there shows its message box at once.
       wait: loadedNow ? 20000 : 6000,
-      model: want ? { want, picker: destination.model } : null,
+      model: want || effortWant !== '' ? { want, effort: effortWant, picker: destination.model } : null,
     };
-    if (want) await chrome.scripting.executeScript({ target: { tabId }, files: ['src/picker.js'] });
+    if (submit.model) await chrome.scripting.executeScript({ target: { tabId }, files: ['src/picker.js'] });
     const script = chrome.scripting.executeScript({ target: { tabId }, func: pasteInPage, args: [files, text, destination.selectors || [], submit] });
     const late = wait(SEND_LIMIT).then(() => [{ result: { ok: false, reason: 'notConfirmed' } }]);
-    const [{ result }] = await Promise.race([script, late]);
-    return result;
+    // A long-idle tab can suspend both animation frames and the page's
+    // fallback timers. Pulse from the extension while attaching, just as
+    // the answer watcher does after sending. Waiting until submission is
+    // too late when the attachment preview itself needs a frame.
+    let sending = true;
+    let pulseTimer;
+    const pulse = async () => {
+      if (!sending) return;
+      try { await controlBackgroundFrames(tabId, frameToken, 'pulse'); } catch { /* closed/navigated tab: the send reports the failure */ }
+      if (sending) pulseTimer = setTimeout(pulse, 400);
+    };
+    if (frameToken) pulseTimer = setTimeout(pulse, 400);
+    try {
+      const [{ result }] = await Promise.race([script, late]);
+      return result;
+    } finally {
+      sending = false;
+      clearTimeout(pulseTimer);
+    }
   };
   try {
     let result = await run(tab.id, fresh || tab.status !== 'complete');
     // A page of the chat without a message box (its settings, a list of
     // chats): the tab goes to the conversation, or a new chat, and tries again.
-    if (result?.reason === 'noComposer' && !fresh && destination.preset) {
+    if (!continuation && result?.reason === 'noComposer' && !fresh && destination.preset) {
       await navigate(tab.id, (!newChat && await lastConversation(destination)) || destination.url);
       const now = await chrome.tabs.get(tab.id).catch(() => null);
       if (!onSite(now, destination)) { await remember(destination, tab.id, true); return { failed: true, reason: 'login', tabId: tab.id }; }
@@ -343,9 +427,12 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
     await cacheModels(destination, result?.model?.names || result?.names).catch(() => {});
     const about = { model: want, names: result?.names || null, pickerNote: destination.model?.noPicker || null };
     if (!result?.ok) return { failed: true, reason: result?.reason || 'failed', detail: result?.detail || null, notAttached: result?.reason === 'notAttached', tabId: tab.id, ...about };
-    return { ok: true, submitted: !!result.submitted, autoSubmit, reason: result.reason || null, baseline: result.baseline || null, tabId: tab.id, modelUsed: result.model?.name || null, ...about };
+    keepFrames = backgroundAnswer && !!result.submitted;
+    return { ok: true, submitted: !!result.submitted, autoSubmit, reason: result.reason || null, baseline: result.baseline || null, url: result.url || tab.url, tabId: tab.id, frameToken: keepFrames ? frameToken : null, modelUsed: result.model?.name || null, effortUsed: result.model?.effort || null, ...about };
   } catch {
     return { failed: true, reason: 'failed', tabId: tab.id };
+  } finally {
+    if (!keepFrames) await controlBackgroundFrames(tab.id, frameToken, 'stop').catch(() => {});
   }
 }
 
@@ -374,11 +461,12 @@ export async function readModels(destination) {
 
 // "Open Claude tab", "Continue in Claude": the chat's tab to the front; when
 // that one was closed, the last conversation (or the chat) in a new tab.
-export async function openChatTab(tabId, destination) {
+export async function openChatTab(tabId, destination, conversationUrl = null) {
   const tab = tabId ? await chrome.tabs.get(tabId).catch(() => null) : null;
-  if (!tab) {
+  const pinned = conversationUrl && origin(conversationUrl) === destination?.origin ? conversationUrl : null;
+  if (!tab || (pinned && tab.url !== pinned)) {
     if (!destination?.url) return;
-    const opened = await chrome.tabs.create({ url: (await lastConversation(destination)) || destination.url, active: true });
+    const opened = await chrome.tabs.create({ url: pinned || (await lastConversation(destination)) || destination.url, active: true });
     await remember(destination, opened.id);
     return;
   }

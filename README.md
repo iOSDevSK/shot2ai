@@ -1,6 +1,6 @@
 # Shot2AI — Screenshot, Annotate & Send to AI
 
-Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also send the screenshot to ChatGPT, Claude, Gemini or Perplexity, whose answer then appears in the card on your page, or to any other web chat, or save a copy.
+Shot2AI is a Chrome extension for sending screenshots to AI. Its main job is reporting a problem in an html2wp conversion without leaving Chrome. Drag a rectangle over the part of the page that is wrong and send it, with a message, straight into the chat of the project you have open in the html2wp app. It takes one click from the preview card; you can open the editor first to add arrows, boxes, text, highlight or blur. You can also send the screenshot to ChatGPT, Claude or Perplexity, whose answer then appears in the card on your page, or to any other web chat, or save a copy.
 
 If the chat cannot take a message right now, for example while the assistant is still working, the extension shows the app's own reason and keeps your annotation. Choose **Try again** when the app is ready.
 
@@ -12,7 +12,7 @@ If the chat cannot take a message right now, for example while the assistant is 
 
 ## Where screenshots go
 
-Out of the box the default destination is **ChatGPT**. The popup's **Screenshots go to** list shows it and changes it on the spot: ChatGPT, Claude, Gemini, Perplexity, html2wp (Mac app), your own chats, Copy only or Save only, in the same order as **Options → Default destination**, and the two stay in step. Choosing a web chat there asks Chrome for that one site straight away; if you decline, the choice stays and the popup shows **Needs permission** with an **Allow <chat>** button. The card's main button reads **Send to <default>** (or **Copy** / **Save**). Other chats you turn on stay in the card's menu (the chevron), which sends one screenshot elsewhere without changing the default.
+Out of the box the default destination is **ChatGPT**. The popup's **Captures go to** list shows it and changes it on the spot: ChatGPT, Claude, Perplexity, html2wp (Mac app), your own chats, Copy only or Save only, in the same order as **Options → Default destination**, and the two stay in step. Choosing a web chat there asks Chrome for that one site straight away; if you decline, the choice stays and the popup shows **Needs permission** with an **Allow <chat>** button. The card's main button reads **Send to <default>** (or **Copy** / **Save**). Other chats you turn on stay in the card's menu (the chevron), which sends one screenshot elsewhere without changing the default.
 
 The html2wp status (running, pairing, open project, chat ready) appears only when html2wp is the default. It also appears when you pick html2wp in the card's menu: the card then says whether the app is running, paired and ready.
 
@@ -27,6 +27,7 @@ Right-click any page, selection, image or link and choose **Shot2AI**:
 - **Capture and send to <default>** captures the visible page and sends it at once. The card only shows the result; the first send to a web chat still asks you to confirm once.
 - **Send with prompt ▸** captures the visible page and sends it with one of your saved prompts.
 - **Send this image to <default>** (on an image) takes the image itself, or cuts it out of a capture of the page when the site does not allow reading it, and opens the card.
+- **Send selected text…** opens a text-only card with the selected text and your default prompt. No screenshot is captured or attached.
 - **Send selection with a screenshot** (on selected text) captures the visible page and puts the selected text in the message.
 - **Options**.
 
@@ -39,18 +40,26 @@ A click on the menu gives Shot2AI access to that tab for the capture, as the too
 
 Each code pairs one extension. After five wrong codes the code stops working; choose **New code** in Settings. **Unpair** in Settings revokes the extension.
 
+## Send selected text
+
+Select text on a page (including text selected with Shift + arrow keys), then press **Alt+Shift+T** (**⌥⇧T** on Mac). A card previews exactly that selection and prefills the first saved prompt. Choose another prompt or type your own, then press **Enter** or **Send**. An empty prompt field uses the first saved prompt. The outgoing message contains the prompt, a blank line and the selected text, with no image attachment.
+
+The same action is available as **Shot2AI → Send selected text…** in the selection's right-click menu. Plain-text inputs, textareas and editable page text are supported; password fields are excluded. Select up to 100,000 characters. If no text is selected, nothing is sent.
+
+Text-only sending supports the web chat destinations. The current html2wp Mac app bridge requires an image; a text-only card explains this and lets you choose a web chat. Answers and follow-up chat stay in the same card. **Copy** copies the selected text; **Save** saves a UTF-8 `.txt` file. The **Copy only** destination includes the prompt too. Text cards remain in the capture stack alongside screenshots, and survive page reloads under the same retention rules.
+
 ## Use it
 
 - Click the toolbar icon, then **Capture area**, or press **Alt+Shift+S** (⌥⇧S) on any page; see Keyboard shortcuts. Drag over the area; **Esc** cancels.
 - A **preview card** appears in the corner of the page. The screenshot is already on the clipboard, so you can paste it anywhere with **⌘V** (**Ctrl+V** on Windows and Linux). From the card:
-  - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**. For ChatGPT, Claude, Gemini and Perplexity it becomes the answer card (see Answer card). It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, never while it shows an error, and never while it shows an answer.
+  - **Send to <your destination>**: one click. You can add a one-line message first; **Enter** sends, **Esc** closes the card. For html2wp the card shows "Sent to <project>", or the app's own reason with **Try again**. For ChatGPT, Claude and Perplexity it becomes the answer card (see Answer card). It hides by itself about 6 seconds after a successful send, but not while you hover over it or type in it, never while it shows an error, and never while it shows an answer.
   - **Annotate** opens the full editor. **Copy** copies the screenshot again. **Save** saves a copy (see Saving). The **chevron** lists the other destinations.
 - In the editor: **A** arrow, **R** rectangle, **T** text, **H** highlight, **B** blur, **⌘Z** / **⇧⌘Z** undo and redo (Ctrl on Windows and Linux). Pick a colour and a stroke size in the toolbar. **Send** has the same destination menu as the card. **⌘Enter** sends.
 - **Paste as input**: press ⌘V (or Ctrl+V) in the editor, the popup or the options page to open a pasted image, such as a macOS ⌘⇧4 screenshot, in the editor.
 
 ## Destinations
 
-ChatGPT is the default until you choose another. Shot2AI knows four chats: **ChatGPT**, **Claude**, **Gemini** and **Perplexity**. Choose one in the popup's list or in **Options**, turn on the others you use, or add any other web chat by name and address (for example an internal chat). The card's main button uses your default destination; its menu lists the known chats that are on, then html2wp, then your own chats.
+ChatGPT is the default until you choose another. Shot2AI offers three chats: **ChatGPT**, **Claude** and **Perplexity**. Choose one in the popup's list or in **Options**, turn on the others you use, or add any other web chat by name and address (for example an internal chat). The card's main button uses your default destination; its menu lists the known chats that are on, then html2wp, then your own chats.
 
 Sending to a web chat attaches the screenshot through the chat's own file input (or pastes or drops it) and puts your message into its message box. For the four known chats it then sends the message itself (see Send automatically) while that chat's tab stays in the background. For chats you add, the chat's tab comes to the front and you press Enter there, unless you turn Send automatically on for it. If the screenshot does not arrive, nothing is typed or sent: it is on the clipboard, and the card says so.
 
@@ -62,12 +71,20 @@ Chrome asks you once per site to let the extension use it. The extension holds n
 
 ## Model
 
-For ChatGPT, Claude, Gemini and Perplexity you can choose the model. The popup has a **Model** list under **Screenshots go to**; its first entry, **Chat's current model**, is the default and switches nothing. The choice is kept per chat. The card's menu (the chevron) has the same list under **Model for this send**, for one send only, and the main button names the model: **Send to Claude · Opus 4.1**.
+For ChatGPT, Claude and Perplexity you can choose the model. The popup has a **Model** list under **Captures go to**; its first entry, **Chat's current model**, is the default and switches nothing. The choice is kept per chat. The card's menu (the chevron) has the same list under **Model for this send**, for one send only, and the main button names the model: **Send to Claude · Opus 4.1**.
 
 - **The list** is the chat's own: Shot2AI reads it from the model picker in the tab you keep open (it opens the picker, reads the names, closes it, and clicks nothing else), at most every 10 minutes when you open the popup, and whenever it switches a model. It keeps the list per chat. Until it has read one, the popup shows a few typical names, labelled **Typical names (may be out of date)**, and a line saying to keep that chat open. It never reads a tab you are looking at, or one that is answering. Perplexity offers a model choice with Perplexity Pro only, so it has no typical names.
 - **Switching**: before attaching anything, Shot2AI opens the chat's model picker in its background tab, chooses the model (a name the chat shows; a short name such as "Opus" matches "Opus 4.1" when only one model fits, and looks in one "More models" submenu), and checks the chat now shows it. With **Chat's current model**, the picker is not touched at all.
 - **If it cannot switch, nothing is sent**, and the card says why, in the chat's words when it has some: the model is not in the chat's list any more (the card lists what is), the name fits several models, the model needs another plan ("Claude: “Opus 4.1 is available on Max”"), the chat did not switch, or there is no picker (for Perplexity: choosing a model needs Perplexity Pro). The card offers **Send with current model** and **Open <chat> tab**. Shot2AI never changes the model without saying so.
 - Each chat's picker is described in its own adapter (`src/sites/<chat>.js`, `model`), and the picker is driven by `src/picker.js`.
+
+In **v0.5.1**, ChatGPT also has a separate **Thinking effort** choice in the popup and **Thinking effort for this send** in the card's menu. **Chat's current effort** is the default and leaves the slider alone. Minimum, Lower, Middle, Higher and Maximum select the nearest available step at 0%, 25%, 50%, 75% and 100% of the site's slider. These are slider positions, not fixed token budgets or claims about the model's own effort names. The bounds are read after selecting the model, so different models (including the 5.5 and 5.6 layouts) can have different ranges. The setting is checked again after reopening the panel; if it cannot be confirmed, no screenshot is attached or sent. **Send with current settings** bypasses both model and effort changes for that send.
+
+The model menu can be inside the Thinking effort popover, with a combined label such as **5.5 Instant**. Reading the model list leaves the effort unchanged.
+
+**v0.5.2** follows the intelligence picker verified in signed-in ChatGPT in Brave: it opens **Select model** before using the model radios, ignores inactive/inert views and response retry menus, and adjusts effort through the visible **Power** control. It supports both versioned composer labels and effort-only labels such as **Extra High**. Cached model lists are refreshed after an extension update, while saved choices remain. The browser fixtures cover this observed structure, including delayed updates, replaced controls, and ignored changes.
+
+**v0.5.3** lets ChatGPT render its answer while its tab stays in the background. While the preview card waits for an answer, suspended animation frames get a temporary timer fallback. The active tab and page visibility stay unchanged. The helper is removed after completion, failure, cancellation or timeout, and expires automatically if its watcher disappears.
 
 ## Capture stack
 
@@ -85,7 +102,7 @@ Every capture in a tab stays in the card's corner as a stack of cards. The newes
 
 ## Full-page capture
 
-**Capture full page** is in the popup, the card's menu, the right-click menu and the floating toolbar, or press **Alt+Shift+F**. Shot2AI scrolls the page one screen at a time and joins the screens into one image, which opens in the card like any capture.
+**Capture full page** is in the card's menu, the right-click menu and the floating toolbar, or press **Alt+Shift+F**. Shot2AI scrolls the page one screen at a time and joins the screens into one image, which opens in the card like any capture.
 
 - **Scrolling:** a page that does not scroll itself but has a large scrolling panel (an app, a chat) scrolls that panel. Sticky and fixed headers and footers appear once: they are hidden after the first screen and put back afterwards, and so is your scroll position.
 - **Progress** shows as **Capturing 3/8…** with **Cancel**; **Esc** cancels too.
@@ -97,11 +114,11 @@ Tick destinations in the card's menu (the chevron next to Send), or in **Options
 
 ## Prompts
 
-Saved messages to send with a screenshot. Four come built in: **Fix this bug**, **Explain this**, **Match this design** and **What's wrong here?**. In **Options → Prompts** you can add, edit, delete and reorder prompts and choose a **default prompt**, which fills the message of every new capture. The card and the editor have a **Prompt** picker next to the message: picking one fills the message, and you can still edit it. Right-click → Shot2AI → **Send with prompt ▸** captures the visible page and sends it with that prompt.
+Saved messages to send with a screenshot. Four come built in: **Fix this bug**, **Explain this**, **Match this design** and **What's wrong here?**. In **Options → Prompts** you can add, edit, delete and reorder prompts. The **first prompt is always the default**, marked **Default**. Move another prompt to the top to change it. It fills new captures, and a blank or whitespace-only message uses its current text when sent. Your own nonempty message takes precedence; deleting all prompts leaves no default. The card and the editor have a **Prompt** picker next to the message: picking one fills the message, and you can still edit it. Right-click → Shot2AI → **Send with prompt ▸** captures the visible page and sends it with that prompt.
 
 ## Send automatically
 
-Each web chat in **Options → Other destinations** has a **Send automatically** switch. It is **on for ChatGPT, Claude, Gemini and Perplexity** and off for chats you add. The first send to each chat says, in the card, that the message will be sent automatically without you reviewing it, and that some services restrict automated use in their terms. Turning it on for a chat you added shows that notice once in Options. After an update from 0.3 or older, where ChatGPT and Claude only pasted, the card shows the notice once more for each known chat.
+Each web chat in **Options → Other destinations** has a **Send automatically** switch. It is **on for ChatGPT, Claude and Perplexity** and off for chats you add. The first send to each chat says, in the card, that the message will be sent automatically without you reviewing it, and that some services restrict automated use in their terms. Turning it on for a chat you added shows that notice once in Options. After an update from 0.3 or older, where ChatGPT and Claude only pasted, the card shows the notice once more for each known chat.
 
 With it on, Shot2AI does everything in the chat's tab while that tab stays in the background: it attaches the screenshot, types your message, waits until the chat has uploaded the image (its send button turns on), presses the send button, and checks that the message went (a stop button, your message in the thread, a new address, or an empty message box). The four known chats have known send buttons (see `src/sites/`). For any other chat Shot2AI looks for the nearest enabled submit button, or a button labelled Send, next to the message box, and presses nothing else. It is never used for html2wp, which has its own flow.
 
@@ -116,7 +133,7 @@ Nothing half-done is left unsaid. Each of these stops the send, and the card say
 
 ## Answer card
 
-After a confirmed send to ChatGPT, Claude, Gemini or Perplexity, the preview card on your page turns into an answer card. It shows **Sending to Claude…**, then **Claude is answering…** with the answer as it streams in, then **Claude answered**. The answer keeps its paragraphs, headings, lists, code blocks, tables and links; for Perplexity, the sources it lists come under the answer as links (http and https only, opening in a new tab). **Copy answer** copies it as Markdown, with the sources, **Continue in Claude** brings the Claude tab to the front, and **Close** removes the card. Long answers scroll; drag the round grip at the card's top-left corner (or focus it and use the arrow keys) to make it wider or taller. An answer card never hides by itself; it comes back after you navigate within the tab until you close it.
+After a confirmed send to ChatGPT, Claude or Perplexity, the preview card on your page turns into an answer card. It shows **Sending to Claude…**, then **Claude is answering…** with the answer as it streams in, then **Claude answered**. The answer keeps its paragraphs, headings, lists, code blocks, tables and links; for Perplexity, the sources it lists come under the answer as links (http and https only, opening in a new tab). **Copy answer** copies it as Markdown, with the sources, **Continue in Claude** brings the Claude tab to the front, the **chat icon** opens a follow-up composer in the same card, and **Close** removes the card. Follow-ups keep the screenshot context in the same conversation; they send only the new text. **Enter** sends, **Shift+Enter** adds a line. The questions, answers and draft survive navigation in the source tab. Long answers scroll; drag the round grip at the card's top-left corner (or focus it and use the arrow keys) to make it wider or taller. An answer card never hides by itself; it comes back after you navigate within the tab until you close it.
 
 - **Where the answer comes from**: while the answer is being written, the service worker reads the newest answer on the chat's page in its tab, the text as the page shows it, and passes it to the card. It uses no private APIs and reads no cookies or tokens. It reads only the message list of that chat page, and only until the answer is finished.
 - **Safe to show**: the answer travels as a small tree of paragraphs, lists, code and links, not as the chat page's HTML, and the card builds it from text alone. Markup in an answer, such as `<script>`, shows as those characters; images, scripts, styles and event handlers are dropped, and only http and https links are kept.
@@ -125,7 +142,7 @@ After a confirmed send to ChatGPT, Claude, Gemini or Perplexity, the preview car
 
 ## Saved region
 
-After capturing an area, choose **Region → Remember this region** in the card. The region is kept for that site as a share of the window, not in pixels. **Capture saved region** (in the card's Region menu, the right-click menu, or **Alt+Shift+R**) captures that part of the visible page again in one step. It is cut to the window if the window is now smaller. On a site without a saved region, it starts the area selection.
+After capturing an area, choose **Region → Remember this region** in the card. The region is kept for that site as a share of the window, not in pixels. **Capture saved region** (in the card's Region menu, the right-click menu, or a shortcut you assign in Options) captures that part of the visible page again in one step. It is cut to the window if the window is now smaller. On a site without a saved region, it starts the area selection.
 
 ## Image format & quality
 
@@ -163,7 +180,7 @@ npm install
 npm test
 ```
 
-The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on a free 127.0.0.1 port), a mock web chat page on another port, and stand-ins for chatgpt.com, claude.ai, gemini.google.com and perplexity.ai (`tests/mock-ai.mjs`), each on its own site: a composer (ProseMirror-like, a Quill-like editor without a file input, or a textarea), a model picker (opening on pointerdown or on click, with locked models, an upgrade dialog, a submenu), an upload to the mock server, a send button that waits for it, a stop button, a streamed answer and, for Perplexity, sources; a sign-in page on another site. The test copy points the four adapters in `src/sites/` at the stand-ins, so the real sites are never loaded. The stand-ins are built to exercise Shot2AI's paths, not to copy the real pages. They cover:
+The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on a free 127.0.0.1 port), a mock web chat page on another port, and stand-ins for chatgpt.com, claude.ai, gemini.google.com and perplexity.ai (`tests/mock-ai.mjs`), each on its own site: a composer (ProseMirror-like, a Quill-like editor without a file input, or a textarea), a model picker (opening on pointerdown or on click, with locked models, an upgrade dialog, a submenu), an upload to the mock server, a send button that waits for it, a stop button, a streamed answer and, for Perplexity, sources; a sign-in page on another site. Gemini send scenarios are skipped while its preset is hidden; its standalone picker tests still run offline. The test copy points the adapters in `src/sites/` at the stand-ins, so the real sites are never loaded. The stand-ins are built to exercise Shot2AI's paths, not to copy the real pages. They cover:
 
 - out of the box: ChatGPT is the default, the popup's list shows ChatGPT (and **Allow ChatGPT** when the site is not allowed), and there is no html2wp status
 - the popup's destination list: the same destinations and order as Options, a change saved at once and followed by an open Options page (and the other way round), the focus ring, html2wp's status under it, and a declined site permission (the choice is kept, **Needs permission** and **Allow Claude** shown)
@@ -171,7 +188,7 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - auto-send failures, with nothing sent and the message kept: a failed upload, no send button, a message box that refuses text, and a chat still answering (with **Try again**); each offers **Open Claude tab**
 - an answer that never comes: **No answer from Claude yet** and **Open Claude tab**
 - sanitisation: an answer with `<script>`, `onerror`, `onclick`, `onmouseover`, an `svg` with `onload`, an `iframe` and a `javascript:` link shows only inert text and the one https link
-- Gemini (the image goes in by paste) and Perplexity (a textarea, the answer and its sources, a `javascript:` source left out, sources in Copy answer)
+- Perplexity (a textarea, the answer and its sources, a `javascript:` source left out, sources in Copy answer)
 - the chat's own tab: the owner's open tab is used and the conversation continues without a reload; **New chat** starts a new conversation in the same tab, for one send; a closed tab opens again, behind the page, on the last conversation
 - signed out: a sign-in page is left alone (its email field untouched), the card asks to log in once, **Send again** works after signing in; a tab sent to a sign-in page on another site is reused, not doubled
 - Perplexity refusing the upload for a plan ("Upgrade to Pro", in its words) or a sign-in, with its send button left on for the text alone: nothing is sent
@@ -196,25 +213,36 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - keyboard shortcuts: the Options list from Chrome's bindings (and from a stubbed list with keys removed: **Not set**), **Change shortcuts** opening `chrome://extensions/shortcuts`, the keys in the popup and in the right-click menu titles. Real key presses cannot be automated, so the shortcuts themselves are not tested
 - floating toolbar: off by default, registered when switched on, the Visible button, dragging (the place is kept after a reload), collapsing, hiding per site and showing again, and switching off
 
-Screenshots go to `screenshots/`.
+Screenshots go to `screenshots/`, or to the directory set by `SHOT2AI_SHOTS`. Live ChatGPT checks for version 0.5.2 and the deferred Claude test plan are recorded in `TESTING-0.5.2.md` in the source repository.
 
-The test loads a copy of the extension with a few changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's and the toolbar's shadow roots are opened so the test can reach inside them. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own permission prompts (a chat site, all sites for the toolbar), the folder picker, keyboard shortcuts and real ChatGPT and Claude pages cannot be driven by Playwright and are not covered. Each known chat has its own adapter in `src/sites/` (`chatgpt.js`, `claude.js`, `gemini.js`, `perplexity.js`): its message box, send and stop buttons, messages, answers, sign-in pages and, for Perplexity, sources. They follow those sites' pages and are checked against the stand-ins only; when a site changes, only its file needs updating. Check them on the real sites, signed in, after a site changes.
+The test loads a copy of the extension with a few changes. Its manifest also holds `<all_urls>`, which stands in for the toolbar click that grants `activeTab`; Playwright cannot perform that click. The card's and the toolbar's shadow roots are opened so the test can reach inside them. The service worker records the context-menu items it creates and exposes its click handler. The shipped files have none of these changes. Chrome's own permission prompts (a chat site, all sites for the toolbar), the folder picker, keyboard shortcuts are not covered by this suite. Real chat pages are exercised separately through opt-in live tests. Each known chat has its own adapter in `src/sites/` (`chatgpt.js`, `claude.js`, `gemini.js`, `perplexity.js`): its message box, send and stop buttons, messages, answers, sign-in pages and, for Perplexity, sources. The automated suite checks these adapters against stand-ins; live checks are recorded separately. When a site changes, its adapter or the shared picker may need updating. Check them on the real sites, signed in, after a site changes.
 
 To build the release ZIP (manifest.json, src, icons, licenses and README.md), run `python3 scripts/package.py`. It writes `dist/shot2ai-<version>.zip` and fails if any file referenced by the manifest, a page, a module import or an injected script is missing from the ZIP. `python3 scripts/icons.py` redraws the icons, and `python3 scripts/toolbar-preview.py` shows them on light and dark toolbars.
+
+Version **0.5.7** reads Gemini’s current model menu, including `aria-haspopup="false"` items, and separates model names from Standard/High thinking. The extension no longer supplies outdated Gemini model names before reading the live menu. Background animation scheduling now also covers Gemini uploads and answers; its animation-only `aria-busy` state does not prevent completion. An obsolete saved model such as “Fast” must be replaced with a name from the live list or “Chat's current model”.
+
+Version **0.5.6** clears an automatically prefilled prompt when the screenshot card's message field is clicked. User edits and prompts explicitly chosen from the menu stay intact, including after a page reload. An empty message still uses the current default when sent. Claude model lists now include the “More models” submenu, without confusing it with “Effort”. Claude effort uses its named Low, Medium, High, Extra and Max options; a missing or unconfirmed choice prevents sending.
+
+Version **0.5.5** also fixes Claude attachment detection in its deeply nested composer and file pickers that list image extensions, as Perplexity does. An explicit upload limit or sign-in refusal stops further attachment attempts. Live checks and their limitations are recorded in `TESTING-0.5.5.md`; Perplexity's account-level document-analysis restriction still applies.
+
+Every delivered extension change gets a new version. Keep `manifest.json`, `package.json` and the root entries in `package-lock.json` in sync; packaging checks this. The unpacked development build is linked at `~/Downloads/test/shot2ai`. Reload it in Chrome and check the version in the popup footer.
 
 html2wp converts any website to WordPress: https://html2wp.dev/
 
 ## Keyboard shortcuts
+
+In **v0.5.5**, typing in the screenshot card stays inside the extension, including on X.com, whose shortcuts also listen to `keypress` and `keyup`. Select all, copy, paste, undo and caret movement retain their native behavior. Area selection takes keyboard focus until it finishes or is cancelled; composition keys do not accidentally submit or close the card.
 
 | Action | Default key |
 |---|---|
 | Capture area | Alt+Shift+S (⌥⇧S on a Mac) |
 | Capture visible page | Alt+Shift+V (⌥⇧V) |
 | Capture full page | Alt+Shift+F (⌥⇧F) |
-| Capture saved region | Alt+Shift+R (⌥⇧R) |
+| Capture saved region | Assign in Chrome’s shortcut settings |
+| Send selected text (no image) | Alt+Shift+T (⌥⇧T) |
 | Show this tab's captures | none; set one if you like |
 
-Chrome manages the keys. **Options → Keyboard shortcuts** lists the current ones (a key another extension already uses stays **Not set**), and **Change shortcuts** opens `chrome://extensions/shortcuts`, where you set them: an extension cannot set keys itself. The popup, the card's menu and the right-click menu show the current keys next to their actions. The right-click menu puts the key in the title, for example "Capture area…  (⌥⇧S)", because Chrome's context menus show no shortcuts of their own.
+Chrome allows four suggested shortcuts. Since v0.5.12, selected text takes the fourth default slot; saved-region capture remains available with a manually assigned shortcut. Chrome manages the keys. **Options → Keyboard shortcuts** lists the current ones (a key another extension already uses stays **Not set**), and **Change shortcuts** opens `chrome://extensions/shortcuts`, where you set them: an extension cannot set keys itself. The popup, the card's menu and the right-click menu show the current keys next to their actions. The right-click menu puts the key in the title, for example "Capture area…  (⌥⇧S)", because Chrome's context menus show no shortcuts of their own.
 
 ## Version
 
@@ -224,7 +252,7 @@ The popup footer, the editor's header, the right-click menu and **Options** show
 
 - `LICENSE`: proprietary, all rights reserved, © 2026 BELNEM s.r.o. Shot2AI is a product of BELNEM s.r.o., Beckovska 5, Bratislava, Slovakia (IČO 53713486).
 - `THIRD-PARTY-NOTICES.md`: better-shot (BSD 3-Clause), the only third-party code.
-- `PRIVACY.md`: the privacy policy, published at https://html2wp.dev/shot2ai/privacy (the page is `site/shot2ai/privacy/index.html`). Options → Privacy summarises it, links to it, and has **Clear all captures and settings**. Contact: hello@html2wp.dev.
+- `PRIVACY.md`: the privacy policy, published at https://share.shot2ai.com/privacy (the page is `site/shot2ai/privacy/index.html`). Options → Privacy summarises it, links to it, and has **Clear all captures and settings**. Contact: hello@html2wp.dev.
 - `STORE-LISTING.md`: the Chrome Web Store listing, the single-purpose statement and the permission justifications.
 
 ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Gemini is a trademark of Google LLC. Perplexity is a trademark of Perplexity AI, Inc. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI, Anthropic, Google or Perplexity AI.
@@ -232,3 +260,34 @@ ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Gemini is 
 ## Credits
 
 The editor's tools, colours, stroke sizes and arrow geometry follow [better-shot](https://github.com/iOSDevSK/better-shot) (BSD-3-Clause, © 2026 Kartik Labhshetwar), adapted from SwiftUI to a web canvas. Its licence is in `licenses/better-shot-LICENSE`.
+
+Version **0.5.8** pulses background rendering from the extension during image attachment and submission, including sends without an answer watcher. This avoids depending only on a hidden page’s delayed timer to reveal the attachment preview. The helper is released after a send unless the answer watcher takes it over.
+
+The retained Gemini live harness is paused while Gemini is hidden. For a future development test, re-enable its preset locally first. Then, for an opt-in Playwright test against signed-in Gemini, run `node tests/live-gemini.mjs`. Sign in manually in the dedicated browser. It captures a local test page through the popup and card, sends it to real Gemini, checks the returned answer without activating Gemini, waits six minutes in the background, and repeats in the same conversation. `SHOT2AI_LIVE_PROFILE` selects a dedicated test profile; `SHOT2AI_SHOTS` selects the report directory. The test keeps a JSON result, source screenshots and a Playwright trace after sign-in. Its test copy grants all-site capture permission and opens the card’s shadow root; the release does neither. The normal `npm test` suite uses local service stand-ins and does not consume chat quotas.
+
+Version **0.5.9** uses Gemini’s image file input, created by opening Upload and tools, before trying paste/drop. It recognizes failed attachment chips and respects disabled Send components while files upload. A failed file already left in Gemini must be removed there before retrying; the extension explains this and does not duplicate or silently remove it. Live Gemini checks and service-side failures are distinguished in `TESTING-0.5.9.md`.
+
+Version **0.5.10** adds **Chat in this card** to completed answers. Click the chat icon to ask a follow-up; Enter sends and Shift+Enter adds a line. Questions and answers stay in the same scrollable card, including after navigating or reloading the source page. Follow-ups use the original conversation without uploading the screenshot again, and leave existing chat drafts untouched.
+
+Gemini is temporarily hidden from destination lists and menus. Its adapter and offline tests are retained for later verification, including with a paid account; this release does not establish whether a paid plan resolves the live-service failures. A saved Gemini default falls back to ChatGPT, and Gemini is excluded from multi-send. Saved Gemini preferences remain available for future reinstatement.
+
+Version **0.5.11** renders the chat icon even when an older running worker omits it, refreshes icons on restored cards, and explains when a follow-up needs an extension reload. Answers saved before 0.5.10 can continue after verifying that their original tab still contains the same question and answer.
+
+
+## Share a conversation (0.5.15)
+
+The answer card keeps its top-right close button. Its bottom **Share** button (square with an upward arrow) opens **WhatsApp, Facebook, X, PDF, MD**. Every export includes the original screenshot (or selected text), all saved questions and answers, and source links. Unsent drafts and private chat URLs are omitted. If a captured answer was incomplete, the export says so.
+
+- **PDF** opens a local preview and the browser print dialog: choose **Save as PDF**. Long conversations paginate and retain Unicode text.
+- **MD** downloads one UTF-8 Markdown file, with the original PNG embedded as a data URL. Some Markdown readers block embedded images; use PDF for portable image display.
+- **WhatsApp / Facebook / X** create a public link containing the original image and every saved exchange, then open the selected share composer with that link. WhatsApp attempts to open the native app; Chrome may ask permission, and WhatsApp Web is available as a fallback. Choose a recipient or audience and confirm sending in the selected service. No clipboard/paste step is required. Before the first public upload, complete the browser verification on `share.shot2ai.com`; authorization lasts 30 days. Links have a branded image preview. Public links expire after 30 days; **Settings → Privacy → Manage shared links** can delete them earlier. Clearing local data does not remove public copies.
+
+Public conversation copies are hosted at **https://share.shot2ai.com** on Cloudflare Workers and private R2 storage. Each link is random and unlisted; anyone who receives it can read the copy. See [hosting and deployment](share-server/README.md).
+
+Export snapshots expire after one hour and are removed on the next export access or by **Clear all captures and settings**. The local preview is a snapshot; later replies are included by opening Share again.
+
+## Website buttons (0.5.14)
+
+Enable **Settings → Website integrations** to use Shot2AI buttons on approved websites, including Agentmods. This optional feature shares the toolbar's optional all-site permission; disabling one feature keeps that permission while the other is enabled. It reads only explicit Shot2AI markers, and a click sends the approved prompt and page URL. See [the integration guide](integrations/README.md) to propose a URL + prompt by pull request and embed the assigned tag.
+
+The popup keeps Capture area and the existing capture-stack control. Full-page capture, selected text, and website-integration setup are not extra popup buttons: use shortcuts/context menus for captures, and **Settings** for shortcut assignments and website integration setup. The model/effort option **Use selected … in chat** leaves the chat's own selection unchanged; it is not a model or effort name sent to the provider.

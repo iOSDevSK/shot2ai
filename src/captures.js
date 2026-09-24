@@ -10,12 +10,20 @@ const KEEP_MS = 24 * 60 * 60 * 1000;
 
 function open() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 2);
-    req.onupgradeneeded = () => {
-      for (const name of [STORE, HANDLES]) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
+    // Upgrade legacy databases to our minimum schema, but accept a newer
+    // schema created by another open extension tab without downgrading it.
+    const attempt = version => {
+      const req = version ? indexedDB.open(DB, version) : indexedDB.open(DB);
+      req.onupgradeneeded = () => {
+        for (const name of [STORE, HANDLES]) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = event => {
+        if (version && req.error?.name === 'VersionError') { event.preventDefault(); attempt(); }
+        else reject(req.error);
+      };
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    attempt(2);
   });
 }
 

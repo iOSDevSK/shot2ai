@@ -7,7 +7,7 @@
 import { connect, pair, sendToApp, outcomeText } from './bridge.js';
 import { getCapture, deleteCapture } from './captures.js';
 import { icons, paint } from './icons.js';
-import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, chatOutcome, websiteNotice, autoSubmitOn } from './settings.js';
+import { destinations, defaultDestination, settings, update, sitePattern, fileName, modKey, isMac, actionLabel, COPY_ONLY, prompts, defaultPromptText, promptText, chatOutcome, websiteNotice, autoSubmitOn } from './settings.js';
 import { saveImage, savedText } from './save.js';
 import { pasteIntoChat, openChatTab } from './webchat.js';
 import { encode, EXTENSIONS } from './imaging.js';
@@ -347,11 +347,12 @@ async function submit(target = destination, confirmed = false) {
   if (target.kind === 'copy') { toast((await toClipboard(true)) ? 'Copied to clipboard' : 'Chrome did not allow copying. Use Save instead.'); return; }
   if (target.kind === 'save') { await saveCopy(); return; }
   if (target !== destination) choose(target);
-  const text = $('message').value.trim();
+  const rawText = $('message').value.trim();
   if (target.kind === 'chat') {
     // Asked during the click: Chrome shows its own prompt the first time.
     const granted = await chrome.permissions.request({ origins: [sitePattern(target.url)] }).catch(() => false);
     if (!granted) { showResult('warn', `Chrome did not allow the extension to use ${new URL(target.url).host}. Send again and choose Allow.`); return; }
+    const text = await promptText(rawText);
     const s = await settings();
     if (!confirmed && !s.acknowledged[target.origin]) {
       showResult('warn', websiteNotice(target.name, new URL(target.url).host, false, autoSubmitOn(s, target.id)),
@@ -380,7 +381,7 @@ async function submit(target = destination, confirmed = false) {
   sending = true;
   setSend('Sending…', true);
   showResult('', '');
-  const outcome = await sendToApp(text, await flattened());
+  const outcome = await sendToApp(await promptText(rawText), await flattened());
   sending = false;
   if (outcome.ok) {
     showResult('ok', outcomeText(outcome));

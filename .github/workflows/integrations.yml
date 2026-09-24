@@ -1,0 +1,49 @@
+name: Website integrations
+on:
+  pull_request:
+    paths: ['integrations/requests/**', 'scripts/integrations.py', '.github/workflows/integrations.yml']
+  push:
+    branches: [main]
+    paths: ['integrations/requests/**', 'scripts/integrations.py']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Validate registrations and preview stable tags
+        run: python3 scripts/integrations.py --validate
+
+  publish-registry:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: shot2ai-integration-registry
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Generate approved registry and assigned tags
+        run: python3 scripts/integrations.py
+      - name: Commit registry after approval and merge
+        run: |
+          git add integrations/registry.json src/integration-registry.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update approved Shot2AI website registry"
+          git push origin HEAD:main

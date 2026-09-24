@@ -39,6 +39,15 @@ export async function saveImage(png, pageUrl, { ask = false } = {}) {
   const s = await settings();
   const blob = await encode(png, s);
   const name = fileName(s.filenamePattern, pageUrl, new Date(), EXTENSIONS[blob.type] || 'png');
+  return saveBlob(blob, name, s, ask);
+}
+
+export async function saveText(text, pageUrl) {
+  const s = await settings();
+  return saveBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), fileName(s.filenamePattern, pageUrl, new Date(), 'txt'), s, false);
+}
+
+async function saveBlob(blob, name, s, ask) {
   const folder = await folderAccess(ask);
   if (folder?.granted) {
     try {

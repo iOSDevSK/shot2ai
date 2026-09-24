@@ -108,7 +108,7 @@ const FLAVOURS = {
     stop: '<button type="button" id="stop" aria-label="Stop response">■</button>',
     user: '<user-query><div class="query-text" data-slot></div></user-query>',
     answer: '<model-response class="answer"><message-content><div class="markdown" data-content></div></message-content></model-response>',
-    streaming: () => {},
+    streaming: (wrap, on) => wrap.querySelector('.markdown').setAttribute('aria-busy', String(on || MODE === 'frames')),
     code: (text) => `<code class="language-css">${text}</code>`,
     fresh: /\/gemini\/app$/,
     after: '/gemini/app/9f2c',
@@ -141,7 +141,8 @@ const ACCOUNTS = `<!doctype html><html><head><meta charset="utf-8"><title>Sign i
 
 function page(kind, mode, models) {
   const f = FLAVOURS[kind];
-  const picker = PICKERS[kind];
+  const composerPicker = kind === 'chatgpt' && models.layout === 'composer';
+  const picker = composerPicker ? { ...PICKERS[kind], button: '<button type="button" id="model-button" aria-haspopup="menu"></button>', text: '{m}' } : PICKERS[kind];
   const controls = mode === 'nosend' ? '' : mode === 'busy' ? f.stop : f.send;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${f.title} (test)</title><style>
 body{margin:0;font:15px/1.5 sans-serif;background:#faf9f5;color:#222}
@@ -178,6 +179,7 @@ window.sent = 0;
 const MODELS = ${JSON.stringify(models)};
 const P = ${JSON.stringify(picker)};
 const trigger = document.getElementById('model-button');
+if (trigger && ${composerPicker}) box.closest('form').append(trigger);
 const showModel = () => { if (trigger) trigger.textContent = P.text.replace('{m}', MODELS.current); };
 showModel();
 window.pickerOpened = 0;
@@ -261,15 +263,21 @@ async function take(list) {
   for (const file of list) {
     const tile = document.createElement('div');
     tile.className = 'tile';
+    if (F.kind === 'claude') tile.setAttribute('data-testid', 'file-thumbnail');
     const img = document.createElement('img');
     img.src = URL.createObjectURL(file);
     tile.append(img);
+    const uploadingBadge = document.createElement('span');
+    if (F.kind === 'claude') { uploadingBadge.setAttribute('data-testid', 'attachment-uploading'); tile.append(uploadingBadge); }
+    // Background UI work may wait for a frame before the preview exists.
+    if (MODE === 'frames') await new Promise((resolve) => requestAnimationFrame(resolve));
     previews.append(tile);
     uploading++;
     refresh();
     const bitmap = await createImageBitmap(file);
     const r = await fetch('/upload?mode=' + MODE, { method: 'POST', body: file, headers: { 'content-type': file.type, 'x-name': file.name, 'x-width': bitmap.width, 'x-height': bitmap.height } });
     uploading--;
+    uploadingBadge.remove();
     if (r.ok) files.push(await r.json());
     else if (r.status === 402 || r.status === 401) {
       // The site's own words, in a dialog; the image is dropped.
@@ -277,6 +285,11 @@ async function take(list) {
       dialog.setAttribute('role', 'dialog');
       dialog.setAttribute('aria-modal', 'true');
       dialog.textContent = r.status === 402 ? 'Upgrade to Pro to attach more files today.' : 'Sign in or create an account to attach files.';
+      if (r.status === 402) {
+        const marketing = document.createElement('p');
+        marketing.textContent = 'Personal Education Business. Compare plans and premium models.';
+        dialog.append(marketing);
+      }
       document.body.append(dialog);
       tile.remove();
     } else { failed = true; const alert = document.createElement('div'); alert.setAttribute('role', 'alert'); alert.textContent = 'Upload failed'; tile.append(alert); }
@@ -289,7 +302,7 @@ async function send() {
   if (!button || button.disabled) return;
   const text = said();
   window.sent++;
-  const n = (await (await fetch('/sent', { method: 'POST', body: JSON.stringify({ kind: F.kind, text, files, path: location.pathname, model: MODELS.current }) })).json()).n;
+  const n = (await (await fetch('/sent', { method: 'POST', body: JSON.stringify({ kind: F.kind, text, files, path: location.pathname, model: MODELS.current, effort: window.effortState?.value }) })).json()).n;
   const mine = make(F.user);
   (mine.matches('[data-slot]') ? mine : mine.querySelector('[data-slot]')).textContent = text + (files.length ? ' [' + files.length + ' image]' : '');
   thread.append(mine);
@@ -321,6 +334,7 @@ async function send() {
     const { value, done } = await reader.read();
     if (done) break;
     html += decoder.decode(value, { stream: true });
+    if (MODE === 'frames') await new Promise((resolve) => requestAnimationFrame(resolve));
     content.innerHTML = html;
   }
   streaming(answer, false);

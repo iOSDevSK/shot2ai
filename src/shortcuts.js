@@ -6,6 +6,7 @@ export const ACTIONS = [
   { command: 'capture-visible', label: 'Capture visible page' },
   { command: 'capture-full', label: 'Capture full page' },
   { command: 'capture-saved', label: 'Capture saved region' },
+  { command: 'send-text', label: 'Send selected text (no image)' },
   { command: 'show-stack', label: "Show this tab's captures" },
 ];
 export const SHORTCUTS_PAGE = 'chrome://extensions/shortcuts';

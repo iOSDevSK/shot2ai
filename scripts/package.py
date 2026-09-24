@@ -6,7 +6,7 @@ import json, posixpath, re, sys, zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PARTS = ['manifest.json', 'src', 'icons', 'licenses', 'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'PRIVACY.md']
+PARTS = ['manifest.json', 'src', 'icons', 'licenses', 'README.md', 'integrations/README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'PRIVACY.md']
 
 def files():
     for part in PARTS:
@@ -33,13 +33,18 @@ def references(names):
             for url in re.findall(r"""(?:from|import)\s*\(?\s*['"](\.[^'"]+)['"]""", text):
                 refs.append((name, posixpath.normpath(posixpath.join(here, url))))
             # Extension-root paths: injected scripts and runtime URLs.
-            for url in re.findall(r"""['"`]((?:src|icons)/[\w./-]+\.(?:js|html|png|css))""", text):
+            for url in re.findall(r"""['"`]((?:src|icons)/[\w./-]+\.(?:json|js|html|png|css))""", text):
                 refs.append((name, url))
     return refs
 
 def main():
     manifest = json.loads((ROOT / 'manifest.json').read_text())
     version = manifest['version']
+    package = json.loads((ROOT / 'package.json').read_text())
+    lock = json.loads((ROOT / 'package-lock.json').read_text())
+    if any(v != version for v in [package['version'], lock['version'], lock['packages']['']['version']]):
+        print('manifest.json, package.json and package-lock.json must have the same version')
+        sys.exit(1)
     # Chrome Web Store limits: a 75-character name, a 132-character description.
     for field, limit in (('name', 75), ('short_name', 12), ('description', 132)):
         if len(manifest[field]) > limit:

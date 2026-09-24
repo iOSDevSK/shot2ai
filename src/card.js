@@ -33,6 +33,8 @@
     button:disabled{cursor:default;opacity:.5}
     svg{width:16px;height:16px;display:block}
     .shot{position:relative;display:grid;place-items:center;height:132px;border-radius:9px;background:#eef0ea;overflow:hidden}
+    .text-preview{width:100%;height:100%;box-sizing:border-box;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:36px 16px 32px;text-align:left;font:13px/1.5 system-ui;user-select:text}
+    .card.answering .text-preview{padding:10px 40px 10px 12px}
     .shot canvas{display:block;max-width:100%;max-height:132px;border-radius:4px;box-shadow:0 0 0 1px rgba(35,42,35,.08)}
     .close{position:absolute;top:6px;right:6px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(35,42,35,.62);color:#fff}
     .close svg{width:12px;height:12px}
@@ -106,7 +108,11 @@
     .toast{margin-top:8px;padding:6px 10px;border-radius:8px;background:#eef0ea;color:#4d5a47;font-size:11.5px}
     .saved{margin-top:6px;font-size:10.5px;color:#969f88;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .deck.wide{width:min(var(--answer-w,380px),calc(100vw - 40px))}
-    .card.answering .shot{height:84px}
+    .card.answering .shot{height:84px;flex-shrink:0}
+    .card.answering .body{display:flex;flex-direction:column;max-height:calc(100dvh - 66px)}
+    .answer{display:flex;flex-direction:column;min-height:0}
+    .answer>div{flex-shrink:0}.answer .a-body{flex-shrink:1;min-height:60px}
+    .a-sources ol{max-height:100px;overflow:auto}
     .grip{position:absolute;left:-7px;top:-7px;z-index:7;display:grid;place-items:center;width:20px;height:20px;border:1px solid #d3d8cc;border-radius:50%;background:#fff;color:#6f7c64;cursor:nwse-resize;box-shadow:0 1px 3px rgba(35,42,35,.18);touch-action:none}
     .grip svg{width:11px;height:11px}
     .grip:hover,.grip:focus-visible{color:#2f3c30;border-color:#9fae94}
@@ -154,23 +160,42 @@
     .a-sources a{min-width:0;overflow:hidden;color:#3d6a3d;text-decoration:none;text-overflow:ellipsis;white-space:nowrap}
     .a-sources a:hover{text-decoration:underline}
     .a-sources small{flex:none;color:#969f88;font-size:10.5px}
-    .a-actions{display:flex;align-items:center;gap:6px;margin-top:9px}
+    .a-turn{padding:12px 0;border-bottom:1px solid #e3e6dd}.a-turn:first-child{padding-top:0}
+    .a-question{margin:0 0 10px!important;padding:8px 10px;border-radius:8px;background:#eef1e9;white-space:pre-wrap}
+    .a-followup{display:flex;align-items:flex-end;gap:7px;margin-top:9px}
+    .a-followup textarea{box-sizing:border-box;flex:1;min-width:0;resize:vertical;min-height:58px;max-height:120px;border:1px solid #dfe2d9;border-radius:8px;background:#fff;color:#232a23;padding:9px 10px;font:13px/1.4 ui-sans-serif,-apple-system,sans-serif}
+    .a-followup textarea:focus{outline:2px solid #547254;outline-offset:1px}
+    .a-followup button{width:34px;height:34px;border:0;border-radius:8px;background:#2f3c30;color:#fff;display:grid;place-items:center}
+    .a-followup svg{width:18px;height:18px}.a-followup button:disabled{opacity:.4;cursor:default}
+    .a-chat-error{margin-top:8px;color:#745820;font-size:12px;line-height:1.45}
+    .a-actions button.chat-toggle{width:30px;padding:0}.chat-toggle[aria-expanded="true"]{background:#eef1e9}
+    .a-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-top:9px}
     .a-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:0;height:30px;padding:0 10px;border:1px solid #dfe2d9;border-radius:7px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
     .a-actions button:hover:not(:disabled){background:#f1f3ee}
     .a-actions button.primary{border-color:#2f3c30;background:#2f3c30;color:#fff}
     .a-actions button.primary:hover:not(:disabled){background:#465b43;border-color:#465b43}
     .a-actions button.quiet{margin-left:auto;border-color:transparent;background:none;color:#6f7c64}
-    .a-actions svg{width:13px;height:13px}
+    .a-actions > button{flex-shrink:1}.a-actions > button span{overflow:hidden;text-overflow:ellipsis}
+    .a-actions button.chat-toggle{flex:none}
+    .a-actions svg{flex:none;width:13px;height:13px}
     @media (prefers-reduced-motion:reduce){.a-head.busy .a-icon svg,.a-body .caret,.a-body .skeleton i{animation:none}}
+    .share-wrap{position:relative;flex:none;margin-left:auto}
+    .a-actions .share-toggle{width:32px;padding:0}
+    .share-toggle svg{width:18px;height:18px}
+    .share-menu{position:absolute;right:0;bottom:38px;display:grid;grid-template-columns:repeat(5,48px);gap:3px;padding:7px;border:1px solid #dfe2d9;border-radius:10px;background:#fff;box-shadow:0 8px 28px #232a2330;z-index:10}
+    .share-note{grid-column:1/-1;font-size:10px;line-height:1.4;color:#67725f;padding:3px 4px;white-space:normal}
+    .share-menu button{flex-direction:column;gap:4px;width:48px;height:54px;padding:4px;border:0;font-size:10px}
+    .share-menu svg{width:22px;height:22px}
+    .share-status{font-size:12px;line-height:1.45;color:#745820;margin:6px 0 0;overflow-wrap:anywhere}
     [hidden]{display:none!important}
   `;
   // The first-use notice for web chats (settings.js websiteNotice, rebuilt here).
-  const notice = (names, hosts, many, auto, answers = false) => {
+  const notice = (names, hosts, many, auto, answers = false, textOnly = false) => {
     const sent = auto ? ` and will be sent automatically, without you reviewing ${many ? 'them' : 'it'}${answers ? '; the answer then shows here' : ''}. Some services restrict automated use in their terms; turn Send automatically off in Options to review first` : '';
-    return `${names} ${many ? 'are websites' : 'is a website'}. The screenshot and message will go to ${hosts}, not only to this Mac${sent ? `,${sent}` : ''}.`;
+    return `${names} ${many ? 'are websites' : 'is a website'}. The ${textOnly ? 'selected text and prompt' : 'screenshot and message'} will go to ${hosts}, not only to this Mac${sent ? `,${sent}` : ''}.`;
   };
   const bytesOf = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  const ask = (message) => chrome.runtime.sendMessage(message).catch(() => null);
+  const ask = async (message) => { try { return await chrome.runtime.sendMessage(message); } catch { return null; } };
 
   // ---- the answer, from its tree ------------------------------------------
   // Blocks: p, h, ul/ol, pre, quote, hr, table; inside them strings, b, i, s,
@@ -279,7 +304,15 @@
   });
 
   function build(first) {
-    const i = first.icons;
+    // An unpacked extension can load a new card while its older worker is
+    // still alive. Keep the new chat control usable with an older icon payload.
+    const i = { ...first.icons };
+    const refreshIcons = (icons) => {
+      Object.assign(i, icons);
+      i.share ||= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9H5v12h14V9h-2M12 15V2M8 6l4-4 4 4"/></svg>';
+      i.chat ||= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2v-10a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/></svg>';
+    };
+    refreshIcons(first.icons);
     document.getElementById('shot2ai-preview-card')?.remove();
     const host = document.createElement('div');
     host.id = 'shot2ai-preview-card';
@@ -292,7 +325,7 @@
     root.innerHTML = `<div class="deck">
       <div class="peeks"></div>
       <div class="card" role="dialog" aria-label="Shot2AI screenshot preview" tabindex="-1"><button class="grip" aria-label="Resize the answer" title="Drag to resize (or use the arrow keys)" hidden>${i.grip}</button><div class="body">
-        <div class="shot"><canvas aria-label="Captured area"></canvas>
+        <div class="shot"><canvas aria-label="Captured area"></canvas><div class="text-preview" role="region" aria-label="Selected text" tabindex="0" hidden></div>
           <div class="nav" hidden><button class="prev" aria-label="Previous capture" title="Previous (←)">‹</button><span class="count" aria-live="polite"></span><button class="next" aria-label="Next capture" title="Next (→)">›</button></div>
           <label class="include" hidden><input type="checkbox" aria-label="Include in Send selected">Include</label>
           <button class="close" aria-label="Close this capture" title="Close this capture">${i.close}</button>
@@ -316,6 +349,8 @@
           <div class="a-body" tabindex="0" role="region"></div>
           <div class="a-sources" hidden><h3>Sources</h3><ol></ol></div>
           <div class="a-note" hidden></div>
+          <div class="a-chat-error" role="alert" hidden></div>
+          <div class="a-followup" hidden><textarea aria-label="Follow-up message" placeholder="Ask a follow-up…" rows="2"></textarea><button type="button" aria-label="Send follow-up" title="Send (Enter)">${i.send}</button></div>
           <div class="a-actions"></div>
         </div>
         <div class="note" role="note" hidden></div>
@@ -328,6 +363,7 @@
     const deck = $('.deck');
     const card = $('.card');
     const input = $('.message');
+    root.addEventListener('pointerdown', e => { if (!e.target.closest?.('.share-wrap')) { const menu = root.querySelector('.share-menu'); if (menu) { menu.hidden = true; menu.previousElementSibling.setAttribute('aria-expanded', 'false'); } } });
     let o = first;               // shared: destinations, main, prompts, icons…
     let entries = [];            // the stack, oldest first
     let current = 0;             // index of the front card
@@ -349,6 +385,11 @@
 
     function drawThumb(entry) {
       const canvas = $('canvas');
+      const isText = entry.kind === 'text';
+      canvas.hidden = isText;
+      $('.text-preview').hidden = !isText;
+      $('.text-preview').textContent = isText ? entry.selectedText : '';
+      if (isText) return;
       const paint = (bitmap) => {
         if (now() !== entry) return;
         const small = card.classList.contains('answering');
@@ -395,13 +436,17 @@
     // The model for a send: the card's choice for this send, else the owner's
     // for this chat; '' is the chat's current model (nothing is switched).
     const modelFor = (d, entry) => (d?.models ? (typeof entry?.model === 'string' ? entry.model : d.models.choice) : '');
+    const effortFor = (d, entry) => (d?.models?.effort ? (typeof entry?.effort === 'string' ? entry.effort : d.models.effort.choice) : '');
     function label() {
       const kind = o.main.kind;
       const svg = { copy: i.copy, save: i.download }[kind] || i.send;
       $('.send').innerHTML = `${svg}<span></span>`;
       // The model this send switches to, if any, and "New chat" from the menu.
       const model = kind === 'chat' ? modelFor(o.main, now()) : '';
-      $('.send span').textContent = `${o.main.label}${model ? ` · ${model}` : ''}${kind === 'chat' && now()?.newChat ? ' (new chat)' : ''}`;
+      const effort = kind === 'chat' ? effortFor(o.main, now()) : '';
+      const effortName = o.main.models?.effort?.options.find(([value]) => value === effort)?.[1];
+      $('.send span').textContent = `${o.main.label}${model ? ` · ${model}` : ''}${effortName ? ` · ${effortName} effort` : ''}${kind === 'chat' && now()?.newChat ? ' (new chat)' : ''}`;
+      $('.send').title = $('.send span').textContent;
     }
 
     function showResult(tone, text, actions = [], lines = null) {
@@ -426,7 +471,7 @@
         for (const [name, run, primary, icon] of actions) {
           const b = document.createElement('button');
           if (primary) b.className = 'primary';
-          b.innerHTML = `${icon ? i[icon] : ''}<span></span>`;
+          b.innerHTML = `${icon ? i[icon] || '' : ''}<span></span>`;
           b.querySelector('span').textContent = name;
           b.addEventListener('click', run);
           row.append(b);
@@ -457,6 +502,7 @@
       $('.include input').checked = !!entry.selected;
       if (document.activeElement !== host || root.activeElement !== input) input.value = entry.message || '';
       $('.meta').textContent = entry.meta || '';
+      $('.meta').title = entry.kind === 'text' ? 'Selected text length; no image attached' : 'Format and size of what is sent to web chats and saved';
       $('.meta').hidden = !entry.meta;
       $('.note').textContent = entry.note || '';
       $('.note').hidden = !entry.note;
@@ -467,13 +513,14 @@
       $('.remember').hidden = !entry.region?.canRemember;
       $('.capture-saved').disabled = !entry.region?.hasSaved;
       $('.region-menu').hidden = true;
+      $('.annotate').hidden = $('.region').hidden = entry.kind === 'text';
       const r = entry.result;
       if (r?.actions === 'retry') showResult(r.tone, r.text, [['Try again', () => void sendTo(o.main), true, 'retry']]);
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
       else if (r?.actions === 'open-chat') {
         const again = (r.retry || r.current) && o.destinations.find((d) => d.id === r.chat.destination);
         // The chosen model could not be had: send with the chat's current one instead.
-        if (r.current && again) showResult(r.tone, r.text, [['Send with current model', () => void sendTo(again, true, { model: '' }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
+        if (r.current && again) showResult(r.tone, r.text, [[r.reason?.startsWith('effort') ? 'Send with current settings' : 'Send with current model', () => void sendTo(again, true, { model: '', effort: '' }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
         else showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [[typeof r.retry === 'string' ? r.retry : 'Try again', () => void sendTo(again), false, 'retry']] : [])]);
       } else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
       else showResult('', '');
@@ -491,7 +538,7 @@
 
     // ---- the answer card ---------------------------------------------------------
 
-    const openChat = (chat) => ask({ type: 'open-chat', tabId: chat.tabId, destination: chat.destination });
+    const openChat = (chat) => ask({ type: 'open-chat', tabId: chat.tabId, destination: chat.destination, url: chat.url });
     const FINAL = ['done', 'timeout', 'unreadable', 'gone', 'lost'];
     // Status, body and actions of the front card when it holds an answer.
     function showAnswer(entry) {
@@ -502,7 +549,7 @@
       $('.grip').hidden = !on;
       $('.answer').hidden = !on;
       for (const part of ['.compose', '.split', '.tools']) $(part).hidden = on;
-      if (!on) { card.setAttribute('aria-label', 'Shot2AI screenshot preview'); return; }
+      if (!on) { card.setAttribute('aria-label', entry.kind === 'text' ? 'Shot2AI selected text preview' : 'Shot2AI screenshot preview'); return; }
       card.setAttribute('aria-label', `Shot2AI: ${a.name}'s answer`);
       for (const part of ['.region-menu', '.result', '.meta', '.note', '.saved', '.sent-badge']) $(part).hidden = true;
       const name = a.name;
@@ -521,7 +568,8 @@
       if ($('.a-status').textContent !== status) $('.a-status').textContent = status;
       $('.a-asked').textContent = entry.asked || '';
       $('.a-asked').title = entry.asked || '';
-      $('.a-asked').hidden = !entry.asked;
+      const history = entry.history || [];
+      $('.a-asked').hidden = !entry.asked || history.length > 0;
       const body = $('.a-body');
       body.setAttribute('aria-label', `${name}'s answer`);
       body.setAttribute('aria-busy', String(!FINAL.includes(a.state)));
@@ -529,8 +577,21 @@
       const atEnd = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
       const content = document.createDocumentFragment();
       const hint = (text) => { const el = document.createElement('p'); el.className = 'hint'; el.textContent = text; content.append(el); };
+      const question = (text, parent) => { if (!text) return; const p = document.createElement('p'); p.className = 'a-question'; p.textContent = text; parent.append(p); };
+      for (const turn of history) {
+        const section = document.createElement('section'); section.className = 'a-turn';
+        section.setAttribute('aria-label', 'Previous exchange');
+        question(turn.asked, section); blocksTo(turn.answer?.blocks || [], section);
+        for (const source of turn.answer?.sources || []) {
+          if (!/^https?:\/\//i.test(source.href || '')) continue;
+          const link = document.createElement('a'); link.href = source.href; link.textContent = source.title || source.href;
+          link.target = '_blank'; link.rel = 'noopener noreferrer nofollow'; section.append(link, document.createElement('br'));
+        }
+        content.append(section);
+      }
+      if (history.length) question(entry.asked, content);
       blocksTo(blocks, content);
-      if (a.state === 'sending') hint(`Shot2AI attaches the screenshot in the ${name} tab and sends it. You can keep working here.`);
+      if (a.state === 'sending') hint(history.length || entry.kind === 'text' ? `Sending your message to ${name}…` : `Shot2AI attaches the screenshot in the ${name} tab and sends it. You can keep working here.`);
       else if (a.state === 'answering' && !blocks.length) { const sk = document.createElement('div'); sk.className = 'skeleton'; sk.append(document.createElement('i'), document.createElement('i'), document.createElement('i')); content.append(sk); }
       else if (a.state === 'answering') { const caret = document.createElement('span'); caret.className = 'caret'; (content.lastElementChild?.matches('p, ul, ol') ? content.lastElementChild.querySelector('li:last-child') || content.lastElementChild : content).append(caret); }
       else if (a.state === 'timeout' || a.state === 'lost') hint(blocks.length ? `Shot2AI stopped waiting. The rest of the answer will be in the ${name} tab.` : `${name} has not answered, or something stopped it (a usage limit, a sign-in). See the ${name} tab.`);
@@ -556,18 +617,26 @@
       $('.a-sources').hidden = !sources.length;
       $('.a-note').textContent = a.truncated ? `The answer is longer than the card shows; see the rest in ${name}.` : '';
       $('.a-note').hidden = !a.truncated;
+      const followup = $('.a-followup textarea');
+      $('.a-followup').hidden = !entry.chatOpen;
+      if (followup.value !== (entry.chatDraft || '')) followup.value = entry.chatDraft || '';
+      followup.disabled = a.state !== 'done';
+      $('.a-followup button').disabled = a.state !== 'done' || !followup.value.trim();
+      $('.a-chat-error').textContent = entry.chatError || '';
+      $('.a-chat-error').hidden = !entry.chatError;
       // Actions.
       const actions = [];
       const button = (text, run, cls = '', icon = '') => {
         const b = document.createElement('button');
         if (cls) b.className = cls;
-        b.innerHTML = `${icon ? i[icon] : ''}<span></span>`;
+        b.innerHTML = `${icon ? i[icon] || '' : ''}<span></span>`;
         b.querySelector('span').textContent = text;
+        if (text) b.title = text;
         b.addEventListener('click', run);
         actions.push(b);
         return b;
       };
-      const chat = { tabId: a.tabId, destination: a.destination, name };
+      const chat = { tabId: a.tabId, destination: a.destination, name, url: a.url };
       if (a.state === 'done') {
         const copyButton = button('Copy answer', async () => {
           let ok = false;
@@ -582,10 +651,90 @@
         button(`Open ${name} tab`, () => openChat(chat), 'primary', 'open');
         if (blocks.length) button('Copy answer', () => navigator.clipboard.writeText(answerText(a)).catch(() => {}), '', 'copy');
       }
-      if (a.state !== 'sending') button('Close', () => removeEntry(entry), 'quiet');
+      if (a.state === 'done' || entry.chatOpen) {
+        const toggle = button('', () => {
+          entry.chatOpen = !entry.chatOpen;
+          persist(entry.id, { chatOpen: entry.chatOpen });
+          showAnswer(entry);
+          if (entry.chatOpen) $('.a-followup textarea').focus({ preventScroll: true });
+        }, 'chat-toggle', 'chat');
+        toggle.setAttribute('aria-label', 'Chat in this card'); toggle.title = 'Chat in this card';
+        toggle.setAttribute('aria-expanded', String(!!entry.chatOpen));
+      }
+      if (FINAL.includes(a.state)) {
+        const wrap = document.createElement('div'); wrap.className = 'share-wrap';
+        const toggle = document.createElement('button'); toggle.className = 'share-toggle';
+        toggle.innerHTML = i.share; toggle.title = 'Share conversation';
+        toggle.setAttribute('aria-label', 'Share conversation'); toggle.setAttribute('aria-expanded', 'false');
+        const menu = document.createElement('div'); menu.className = 'share-menu'; menu.hidden = true;
+        menu.setAttribute('role', 'group'); menu.setAttribute('aria-label', 'Share or export conversation');
+        const close = (focus = false) => { menu.hidden = true; toggle.setAttribute('aria-expanded', 'false'); if (focus) toggle.focus(); };
+        toggle.addEventListener('click', () => { const open = menu.hidden; menu.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button').focus(); });
+        wrap.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && !menu.hidden) { e.preventDefault(); e.stopPropagation(); close(true); }
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !menu.hidden) {
+            e.preventDefault(); e.stopPropagation(); const buttons = [...menu.querySelectorAll('button')];
+            const index = buttons.indexOf(root.activeElement);
+            buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length].focus();
+          }
+        });
+        wrap.addEventListener('focusout', () => setTimeout(() => { if (!wrap.contains(root.activeElement)) close(); }, 0));
+        for (const [format, label, icon] of [['whatsapp', 'WhatsApp', 'whatsapp'], ['facebook', 'Facebook', 'facebook'], ['x', 'X', 'x'], ['pdf', 'PDF', 'pdf'], ['md', 'MD', 'md']]) {
+          const item = document.createElement('button'); item.title = ['pdf', 'md'].includes(format) ? label : `Share a public conversation link on ${label}`;
+          item.setAttribute('aria-label', label === 'MD' ? 'Download Markdown' : label === 'PDF' ? 'Export PDF' : `Share on ${label}`);
+          item.innerHTML = `${i[icon] || i.share}<span></span>`; item.querySelector('span').textContent = { whatsapp: 'WA', facebook: 'FB' }[format] || label;
+          item.addEventListener('click', async () => {
+            root.querySelector('.share-status')?.remove();
+            const buttons = [...menu.querySelectorAll('button')]; buttons.forEach(b => { b.disabled = true; });
+            const note = menu.querySelector('.share-note'); if (note) note.textContent = ['pdf', 'md'].includes(format) ? 'Preparing export…' : 'Creating public link…';
+            let result;
+            try { result = await ask({ type: 'share-conversation', id: entry.id, format }); }
+            catch { result = { ok: false, text: 'Sharing failed. Check your connection and try again.' }; }
+            finally { buttons.forEach(b => { b.disabled = false; }); if (note) note.textContent = 'WA, FB, X: public link for 30 days. PDF, MD: saved on your device.'; }
+            if (result?.ok) close(true);
+            else { const hint = document.createElement('p'); hint.className = 'share-status'; hint.setAttribute('role', 'status'); hint.textContent = result?.text || 'Reload Shot2AI and this page to share the conversation.'; root.querySelector('.share-status')?.remove(); $('.a-actions').after(hint); }
+          });
+          menu.append(item);
+        }
+        const note = document.createElement('span'); note.className = 'share-note'; note.textContent = 'WA, FB, X: public link for 30 days. PDF, MD: saved on your device.'; menu.append(note);
+        wrap.append(toggle, menu); actions.push(wrap);
+      }
       $('.a-actions').replaceChildren(...actions);
       $('.a-actions').hidden = !actions.length;
     }
+    async function followUp() {
+      const entry = now();
+      const text = (entry?.chatDraft || '').trim();
+      if (busy || !text || entry.answer?.state !== 'done') return;
+      const old = { answer: entry.answer, asked: entry.asked, history: entry.history || [] };
+      const turnId = Array.from(crypto.getRandomValues(new Uint32Array(4)), n => n.toString(16)).join('-');
+      entry.history = [...old.history, { asked: old.asked, answer: old.answer }];
+      entry.asked = text; entry.chatError = '';
+      entry.answer = { ...old.answer, state: 'sending', turnId, blocks: [], sources: [] };
+      setBusy(true); showAnswer(entry);
+      $('.a-body').scrollTop = $('.a-body').scrollHeight;
+      const r = await ask({ type: 'card-followup', id: entry.id, text, turnId });
+      setBusy(false);
+      if (r?.watching) {
+        entry.chatDraft = '';
+        if (entry.answer?.state === 'sending') entry.answer = r.answer;
+        watch(entry);
+      } else {
+        Object.assign(entry, old);
+        entry.chatError = r?.text || (!r || !Object.keys(r).length ? 'Reload Shot2AI in your browser’s Extensions page, then refresh this page. Copy your draft before refreshing; the running extension could not receive the follow-up.' : 'The message could not be confirmed. Check the chat tab before trying again.');
+      }
+      if (entry === now()) { showAnswer(entry); if (!r?.watching) $('.a-followup textarea').focus({ preventScroll: true }); }
+    }
+    $('.a-followup button').addEventListener('click', () => void followUp());
+    $('.a-followup textarea').addEventListener('input', (e) => {
+      const entry = now(); if (!entry) return;
+      entry.chatDraft = e.target.value;
+      $('.a-followup button').disabled = entry.answer?.state !== 'done' || !entry.chatDraft.trim();
+      persist(entry.id, { chatDraft: entry.chatDraft });
+    });
+    $('.a-followup textarea').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); void followUp(); }
+    });
     // Without a word from the service worker for a while, the card stops waiting.
     function watch(entry) {
       clearTimeout(watchdogs.get(entry.id));
@@ -676,23 +825,40 @@
     card.addEventListener('mouseleave', () => { hovered = false; scheduleHide(); });
     input.addEventListener('focus', () => clearTimeout(hideTimer));
     input.addEventListener('blur', () => setTimeout(scheduleHide, 0));
+    input.addEventListener('click', () => {
+      // Only the automatic prefill is disposable. A chosen prompt or the
+      // owner's text remains editable, even if it equals the default.
+      if (!now()?.messageDefault) return;
+      input.value = '';
+      input.dispatchEvent(new Event('input'));
+    });
     input.addEventListener('input', () => {
       clearTimeout(hideTimer);
       const entry = now();
       entry.message = input.value;
+      entry.messageDefault = false;
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => persist(entry.id, { message: entry.message }), 300);
+      saveTimer = setTimeout(() => persist(entry.id, { message: entry.message, messageDefault: false }), 300);
     });
+    // X's Mousetrap shortcuts also listen to keypress and keyup. Outside our
+    // closed shadow root their target is the host DIV, not the input, so the
+    // site's editable-field guard cannot recognize typing here. Contain all
+    // three events, without cancelling native editing/copy/paste defaults.
+    for (const type of ['keypress', 'keyup']) root.addEventListener(type, (e) => e.stopPropagation());
     // Keys typed in the card stay in the card; ← → flip when not typing.
     card.addEventListener('keydown', (e) => {
       e.stopPropagation();
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter' && e.target === input) { e.preventDefault(); void sendTo(o.main); return; }
-      if (e.target === input || e.target.tagName === 'SELECT' || e.target === grip || e.target.closest?.('.a-body')) return;
+      if (e.target === input || ['SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.target === grip || e.target.closest?.('.a-body')) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1, -1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1, 1); }
     });
     const onKey = (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key !== 'Escape') return;
+      const sharing = root.querySelector('.share-menu:not([hidden])');
+      if (sharing) { e.preventDefault(); e.stopPropagation(); sharing.hidden = true; const toggle = sharing.previousElementSibling; toggle.setAttribute('aria-expanded', 'false'); toggle.focus(); return; }
       if (!$('.menu').hidden) { $('.menu').hidden = true; return; }
       e.preventDefault(); e.stopPropagation(); dismiss();
     };
@@ -709,6 +875,10 @@
       return pngs.get(entry.id);
     }
     async function copy(entry, withText) {
+      if (entry.kind === 'text') {
+        const prompt = withText ? (entry.message || o.prompts?.[0]?.text || '').trim() : '';
+        try { await navigator.clipboard.writeText([prompt, entry.selectedText].filter(Boolean).join('\n\n')); return true; } catch { return false; }
+      }
       const png = await fullPng(entry);
       if (!png) return false;
       const items = { 'image/png': png };
@@ -718,7 +888,7 @@
     }
     async function save(entry) {
       const r = await ask({ type: 'save', id: entry.id });
-      entry.saved = r?.text || 'The screenshot could not be saved.';
+      entry.saved = r?.text || 'The capture could not be saved.';
       persist(entry.id, { saved: entry.saved });
       if (entry === now()) render();
     }
@@ -735,7 +905,7 @@
       scheduleHide();
     }
 
-    async function sendTo(destination, confirmed = false, { model: forced } = {}) {
+    async function sendTo(destination, confirmed = false, { model: forced, effort: forcedEffort } = {}) {
       const entry = now();
       if (busy || !entry) return;
       $('.menu').hidden = true;
@@ -745,7 +915,7 @@
       if (destination.kind === 'chat') {
         // A web chat is a website: say so once, before anything goes there.
         if (!confirmed && !o.acknowledged[destination.origin]) {
-          showResult('warn', notice(destination.name, destination.host, false, destination.auto, destination.answers),
+          showResult('warn', notice(destination.name, destination.host, false, destination.auto, destination.answers, entry.kind === 'text'),
             [['Continue', () => { o.acknowledged[destination.origin] = true; void sendTo(destination, true); }, true, 'send'], ['Cancel', () => showResult('', '')]]);
           return;
         }
@@ -767,12 +937,15 @@
         // The card's model for this send (the menu's, or "Send with current
         // model"); otherwise the service worker uses the owner's choice.
         const model = typeof forced === 'string' ? forced : typeof entry.model === 'string' && destination.id === o.main.id ? entry.model : undefined;
+        const effort = typeof forcedEffort === 'string' ? forcedEffort : typeof entry.effort === 'string' && destination.id === o.main.id ? entry.effort : undefined;
         entry.model = null;
-        persist(entry.id, { model: null, newChat: false });
-        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model });
+        entry.effort = null;
+        persist(entry.id, { model: null, effort: null, newChat: false });
+        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model, effort });
         setBusy(false);
         chat.tabId = r?.tabId;
         if (r?.watching) {
+          entry.asked = r.sentText ?? text;
           // The service worker may have sent the first words already.
           if (!entry.answer || entry.answer.state === 'sending') entry.answer = { state: 'answering', name: destination.name, destination: destination.id, tabId: r.tabId, blocks: [] };
           watch(entry);
@@ -784,8 +957,8 @@
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
         const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
         if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }
-        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, retry: r.retry || false, current: !!r.current, ...(r.open ? open : {}) }); return; }
-        setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The screenshot could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
+        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, reason: r.reason, retry: r.retry || false, current: !!r.current, ...(r.open ? open : {}) }); return; }
+        setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The ${entry.kind === 'text' ? 'text' : 'screenshot'} could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
         return;
       }
       setBusy(true);
@@ -806,7 +979,7 @@
       const unknown = chats.filter((d) => !o.acknowledged[d.origin]);
       // One notice for every web chat in the set that has not been told yet.
       if (!confirmed && unknown.length) {
-        showResult('warn', notice(unknown.map((d) => d.name).join(', '), unknown.map((d) => d.host).join(', '), unknown.length > 1, unknown.some((d) => d.auto)),
+        showResult('warn', notice(unknown.map((d) => d.name).join(', '), unknown.map((d) => d.host).join(', '), unknown.length > 1, unknown.some((d) => d.auto), false, entry.kind === 'text'),
           [['Continue', () => { for (const d of unknown) o.acknowledged[d.origin] = true; void sendToMany(true); }, true, 'send'], ['Cancel', () => showResult('', '')]]);
         return;
       }
@@ -911,7 +1084,7 @@
         const names = [...view.names];
         if (view.choice && !names.includes(view.choice)) names.push(view.choice);
         const rows = [];
-        for (const [value, text] of [['', "Chat's current model"], ...names.map((n) => [n, n])]) {
+        for (const [value, text] of [['', "Use selected model in chat"], ...names.map((n) => [n, n])]) {
           const b = document.createElement('button');
           b.className = 'model';
           b.setAttribute('role', 'menuitemradio');
@@ -933,6 +1106,34 @@
         const hint = document.createElement('div');
         hint.className = 'hint';
         hint.textContent = view.live ? `Names from ${o.main.name}'s own list.` : view.note ? `${o.main.name}: ${view.note}.` : `Typical names; keep ${o.main.name} open in a tab to read its own list.`;
+        menu.append(hint);
+      }
+      if (view?.effort) {
+        const entry = now();
+        menu.insertAdjacentHTML('beforeend', '<div class="head later">Thinking effort for this send</div>');
+        const rows = [];
+        for (const [value, text] of [['', "Use selected effort in chat"], ...view.effort.options]) {
+          const b = document.createElement('button');
+          b.className = 'model effort';
+          b.setAttribute('role', 'menuitemradio');
+          b.innerHTML = '<span class="dot" aria-hidden="true"></span><span></span><small></small>';
+          b.querySelector('span:nth-child(2)').textContent = text;
+          b.querySelector('small').textContent = value === view.effort.choice ? 'usual' : '';
+          b.dataset.value = value;
+          b.setAttribute('aria-checked', String(value === effortFor(o.main, entry)));
+          b.addEventListener('click', () => {
+            if (!entry) return;
+            entry.effort = value;
+            persist(entry.id, { effort: value });
+            for (const row of rows) row.setAttribute('aria-checked', String(row.dataset.value === value));
+            label();
+          });
+          rows.push(b);
+          menu.append(b);
+        }
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.textContent = "Position on ChatGPT's effort slider; levels depend on the model.";
         menu.append(hint);
       }
       const add = (text, run, cls = 'strong') => {
@@ -977,7 +1178,7 @@
     $('.annotate').addEventListener('click', () => { const e = now(); ask({ type: 'annotate', id: e.id, text: (e.message || '').trim() }); dismiss(); });
     $('.copy').addEventListener('click', async () => chip((await copy(now(), false)) ? 'Copied' : ''));
     $('.save').addEventListener('click', () => void save(now()));
-    // A remembered region is per site; Alt+Shift+R and the right-click menu capture it too.
+    // A remembered region is per site; its assigned shortcut and the right-click menu capture it too.
     $('.region').addEventListener('click', () => { $('.region-menu').hidden = !$('.region-menu').hidden; });
     $('.remember').addEventListener('click', async () => {
       const e = now();
@@ -1002,11 +1203,12 @@
       // A new capture, a restore after navigation, or the popup's "Show".
       update(p) {
         o = p;
+        refreshIcons(p.icons);
         chosenDestinations = [...(p.multi || [])];
         // An answer on its way here is newer than the one kept in storage.
         for (const e of p.entries) {
           const mine = entries.find((x) => x.id === e.id);
-          if (mine?.answer && !FINAL.includes(e.answer?.state)) { e.answer = mine.answer; e.asked = e.asked || mine.asked; }
+          if (mine?.answer && !FINAL.includes(mine.answer.state) && (!e.answer?.turnId || e.answer.turnId === mine.answer.turnId)) { e.answer = mine.answer; e.asked = mine.asked; e.history = mine.history; e.chatOpen = mine.chatOpen; e.chatDraft = mine.chatDraft; }
         }
         entries = p.entries;
         for (const e of entries) watch(e);
@@ -1016,12 +1218,14 @@
         picker.options[0].disabled = true;
         for (const x of p.prompts || []) picker.append(new Option(x.name, x.text));
         picker.hidden = !(p.prompts || []).length;
+        input.placeholder = p.prompts?.length ? `Default: ${p.prompts[0].name}` : 'Add a message (optional)';
         clearTimeout(leaving);
         deck.classList.remove('out');
         window.removeEventListener('keydown', onKey, true);
         window.addEventListener('keydown', onKey, true);
         render(0);
         if (p.dropped) toast(`The oldest ${p.dropped > 1 ? `${p.dropped} captures were` : 'capture was'} removed: a tab keeps ${p.cap} at most.`);
+        if (p.focusMessage) input.focus({ preventScroll: true });
         if (p.fresh) {
           const entry = now();
           pngs.set(entry.id, new Blob([bytesOf(p.fresh)], { type: 'image/png' }));
@@ -1035,8 +1239,13 @@
       // The chat's answer, from the service worker.
       answer(id, answer) {
         const entry = entries.find((e) => e.id === id);
+        // A follow-up may have been submitted while the source page was
+        // navigating. Restore its persisted history before accepting its stream.
+        if (entry && answer?.turnId && answer.turnId !== entry.answer?.turnId && FINAL.includes(entry.answer?.state)) {
+          ask({ type: 'show-stack' }); return;
+        }
         // A final answer stays; only the card's own "lost" gives way to news.
-        if (!entry || !answer || (entry.answer?.state !== 'lost' && FINAL.includes(entry.answer?.state))) return;
+        if (!entry || !answer || (entry.answer?.turnId && answer.turnId !== entry.answer.turnId) || (entry.answer?.state !== 'lost' && FINAL.includes(entry.answer?.state))) return;
         entry.answer = { ...answer, tabId: answer.tabId ?? entry.answer?.tabId };
         watch(entry);
         if (entry === now()) { if (card.classList.contains('answering')) showAnswer(entry); else render(); }

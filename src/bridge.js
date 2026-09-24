@@ -92,6 +92,8 @@ export async function blobToBase64(blob) {
 // in its status; an app that does not say takes one); the rest wait.
 // Returns { ok, project, count, total } | { reason } | { unpaired } | { tooLarge } | { offline }.
 export async function sendToApp(text, png) {
+  // The current Mac bridge validates at least one PNG before accepting text.
+  if (Array.isArray(png) && !png.length) return { reason: 'html2wp currently requires an image. Choose a web chat from More destinations to send selected text without an image.' };
   const found = await connect();
   if (!found) return { offline: true };
   const { status } = found;

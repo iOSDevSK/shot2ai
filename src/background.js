@@ -1,21 +1,24 @@
+import { acceptShareAuthorization } from './share-auth.js';
 // Shot2AI's service worker: the toolbar button, shortcuts, right-click menu
 // and the preview card's requests all arrive here. The card's actions run
 // here, since a content script cannot reach 127.0.0.1 or other tabs.
 import { deleteCapture, getCapture, updateCapture, putCapture } from './captures.js';
 import { startCapture, cropSelection, captureSavedRegion, captureVisible } from './capture.js';
 import { syncToolbar } from './toolbar-setup.js';
-import { showCard, showStack, sendCaptures, openEditor, cardSend, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
+import { showCard, showStack, selectedTextCard, sendCaptures, openEditor, cardSend, cardFollowup, cardSendMany, rememberRegion, fullPageCard, flagError } from './flow.js';
 import { stackFor, clearStack, hideStack, stackHidden } from './stack.js';
 import { cancelFullPage } from './fullpage.js';
 import { rebuildMenu, onMenuClick } from './menu.js';
-import { saveImage, savedText } from './save.js';
+import { saveImage, saveText, savedText } from './save.js';
 import { stopAnswer, stopAnswersFor } from './answer.js';
 import { openChatTab, readModels } from './webchat.js';
+import { shareConversation } from './share.js';
+import { syncIntegrations, approvedIntegration } from './integrations.js';
 import { choices, PRESETS, origin } from './settings.js';
 
 chrome.runtime.onInstalled.addListener((details) => {
   rebuildMenu();
-  syncToolbar().catch(() => {});
+  syncToolbar().catch(() => {}); syncIntegrations().catch(() => {});
   // Up from 0.3 or older, where ChatGPT and Claude only pasted: the first send
   // to each known chat says once more that it now goes automatically.
   if (details.reason === 'update' && /^0\.[0-3]\./.test(details.previousVersion || '')) {
@@ -25,23 +28,27 @@ chrome.runtime.onInstalled.addListener((details) => {
     }).catch(() => {});
   }
 });
-chrome.runtime.onStartup.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); });
+chrome.runtime.onStartup.addListener(() => { rebuildMenu(); syncToolbar().catch(() => {}); syncIntegrations().catch(() => {}); });
 // All-site access taken away in Chrome's settings: the toolbar goes too.
-chrome.permissions.onRemoved.addListener(() => { syncToolbar().catch(() => {}); });
+chrome.permissions.onRemoved.addListener(() => { syncToolbar().catch(() => {}); syncIntegrations().catch(() => {}); });
 chrome.storage.onChanged.addListener((changes) => {
   if (['defaultDestination', 'presets', 'customChats', 'prompts'].some((k) => k in changes)) rebuildMenu();
 });
+chrome.permissions.onAdded.addListener(() => { syncIntegrations().catch(() => {}); });
+chrome.storage.onChanged.addListener(changes => { if ('websiteIntegrations' in changes) syncIntegrations().catch(() => {}); });
 // Keys changed at chrome://extensions/shortcuts: the menu titles follow.
 chrome.commands.onChanged?.addListener(() => rebuildMenu());
 chrome.contextMenus.onClicked.addListener((info, tab) => { onMenuClick(info, tab).catch(flagError); });
 
-chrome.commands.onCommand.addListener((command, tab) => {
-  if (command === 'capture-area') startCapture(tab?.id).catch(flagError);
-  if (command === 'capture-saved' && tab) savedRegionCard(tab).catch(flagError);
-  if (command === 'capture-full' && tab) fullPageCard(tab).catch(flagError);
-  if (command === 'capture-visible' && tab) captureVisible(tab).then(({ id, capture }) => showCard(tab.id, id, capture)).catch(flagError);
-  if (command === 'show-stack' && tab) showStack(tab.id).catch(flagError);
-});
+chrome.commands.onCommand.addListener((command, tab) => { onCommand(command, tab).catch(flagError); });
+export async function onCommand(command, tab) {
+  if (command === 'capture-area') return startCapture(tab?.id);
+  if (command === 'capture-saved' && tab) return savedRegionCard(tab);
+  if (command === 'capture-full' && tab) return fullPageCard(tab);
+  if (command === 'capture-visible' && tab) { const { id, capture } = await captureVisible(tab); return showCard(tab.id, id, capture); }
+  if (command === 'show-stack' && tab) return showStack(tab.id);
+  if (command === 'send-text' && tab) return selectedTextCard(tab);
+}
 
 async function savedRegionCard(tab) {
   const result = await captureSavedRegion(tab);
@@ -63,10 +70,27 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 });
 chrome.tabs.onRemoved.addListener((tabId) => { stopAnswersFor(tabId); clearStack(tabId).catch(() => {}); });
 
+const integrationOpening = new Set();
 const handlers = {
+  'share-conversation': shareConversation,
+  'integration-sync': async () => ({ enabled: await syncIntegrations() }),
+  'integration-check': async (m, sender) => ({ ok: !!await approvedIntegration(m, sender) }),
+  'integration-open': async (m, sender) => {
+    const approved = await approvedIntegration(m, sender);
+    if (!approved) return { ok: false, text: 'This website tag is not approved for this page, or website integrations are disabled.' };
+    const { entry, tab, url } = approved;
+    const key = `${tab.id}:${entry.tag}:${url}`;
+    if (integrationOpening.has(key)) return { ok: true };
+    integrationOpening.add(key);
+    try {
+      const existing = (await stackFor(tab.id)).find(c => (!c.sent || c.answer) && c.integration?.tag === entry.tag && c.integration?.url === url);
+      if (existing) { await showStack(tab.id, { currentId: existing.id }); return { ok: true }; }
+      return await selectedTextCard(tab, { selectionText: url, prompt: entry.prompt, autoSend: true, integration: { tag: entry.tag, url } });
+    } finally { integrationOpening.delete(key); }
+  },
   // The card keeps each capture's message, result and state here.
   'stack-update': async (m) => {
-    const allowed = ['message', 'result', 'sent', 'selected', 'saved', 'model', 'newChat'];
+    const allowed = ['message', 'messageDefault', 'result', 'sent', 'selected', 'saved', 'model', 'effort', 'newChat', 'chatOpen', 'chatDraft'];
     await updateCapture(m.id, Object.fromEntries(Object.entries(m.patch || {}).filter(([k]) => allowed.includes(k))));
     return { ok: true };
   },
@@ -74,7 +98,7 @@ const handlers = {
   'stack-clear': async (m, sender) => { if (sender.tab) { stopAnswersFor(sender.tab.id); await clearStack(sender.tab.id); } return { ok: true }; },
   'stack-hide': async (m, sender) => { if (sender.tab) hideStack(sender.tab.id); return { ok: true }; },
   'stack-png': async (m) => { const c = await getCapture(m.id); return c?.png ? { png: await png64(c.png) } : {}; },
-  'show-stack': async (m) => ({ ok: await showStack(m.tabId) }),
+  'show-stack': async (m, sender) => ({ ok: await showStack(m.tabId ?? sender?.tab?.id) }),
   'stack-count': async (m) => ({ count: (await stackFor(m.tabId)).filter((c) => !c.sent || c.answer).length }),
   'send-captures': sendCaptures,
   // A pasted image (from the popup) joins the tab's stack like a capture.
@@ -111,11 +135,14 @@ const handlers = {
   },
   'capture-saved': async (m, sender) => { await savedRegionCard(sender.tab); return { ok: true }; },
   capture: (m) => startCapture(m.tabId).then((id) => ({ ok: true, id }), (e) => ({ error: e.message })),
+  'send-text': async (m, sender) => selectedTextCard(m.tabId ? await chrome.tabs.get(m.tabId) : sender.tab),
   'card-send': cardSend,
+  'card-followup': cardFollowup,
   'card-send-many': cardSendMany,
   annotate: async (m, sender) => { await openEditor(m.id, sender.tab?.id, m.text); return { ok: true }; },
   save: async (m) => {
     const capture = await getCapture(m.id);
+    if (capture?.kind === 'text') return saveText(capture.selectedText, capture.url).then(r => ({ ok: true, text: savedText(r), ...r }));
     if (!capture?.png) return { text: 'This screenshot is no longer available.' };
     return saveImage(capture.png, capture.url).then((r) => ({ ok: true, text: savedText(r), ...r }), () => ({ text: 'The screenshot could not be saved.' }));
   },
@@ -123,7 +150,7 @@ const handlers = {
   // "Open Claude tab", "Continue in Claude".
   // The popup asks for a chat's own list of models (read in its kept tab).
   'read-models': async (m) => readModels((await choices()).find((d) => d.id === m.destination)),
-  'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination)); return { ok: true }; },
+  'open-chat': async (m) => { await openChatTab(m.tabId, (await choices()).find((d) => d.id === m.destination), m.url); return { ok: true }; },
 };
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
@@ -137,5 +164,13 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   const handle = handlers[message?.type];
   if (!handle) return false;
   Promise.resolve(handle(message, sender)).then(reply, (e) => reply({ failed: true, text: e?.message || 'Something went wrong.' }));
+  return true;
+});
+
+chrome.runtime.onMessageExternal.addListener((message, sender, reply) => {
+  acceptShareAuthorization(message, sender).then(result => {
+    reply(result);
+    if (result.ok) chrome.tabs.remove(sender.tab.id).catch(() => {});
+  }, () => reply({ ok: false }));
   return true;
 });

@@ -12,6 +12,7 @@
 // timeouts and the relay stay in one place.
 import { updateCapture, getCapture } from './captures.js';
 import { rememberConversation } from './webchat.js';
+import { controlBackgroundFrames } from './background-frames.js';
 
 // poll: between reads. settle: an answer that stopped changing, with no stop
 // button, is finished after this (longer when no stop button was ever seen).
@@ -38,7 +39,7 @@ export function readAnswer(sel, baseline) {
   const asked = mine.length > baseline.user ? mine[mine.length - 1] : null;
   const answer = asked ? messages.filter((m) => asked.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)
     : messages.length > baseline.answers ? [messages[messages.length - 1]] : [];
-  const out = { started: answer.length > 0, stop, streaming, blocks: [], sources: [], truncated: false, url: location.href };
+  const out = { question: (asked?.innerText || asked?.textContent || '').replace(/\s+/g, ' ').trim(), started: answer.length > 0, stop, streaming, blocks: [], sources: [], truncated: false, url: location.href };
   if (!answer.length) return out;
   // Sources the chat lists with its answer (Perplexity): links to other sites,
   // from the answer's own entry on the page, eight at most.
@@ -145,6 +146,11 @@ export function readAnswer(sel, baseline) {
   return out;
 }
 
+export const answerSelectors = (destination) => ({
+  answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [],
+  user: destination.userSelectors || [], sources: destination.sourceSelectors || [], entry: destination.entrySelectors || [],
+});
+
 const jobs = new Map();
 
 function relay(job, answer) {
@@ -152,30 +158,33 @@ function relay(job, answer) {
   chrome.tabs.sendMessage(job.originTabId, { type: 'shot2ai-answer', id: job.captureId, answer }, { frameId: 0 }).catch(() => { /* the card is not there now; it shows what is kept */ });
 }
 function snapshot(job, state, blocks = job.blocks, truncated = job.truncated) {
-  return { state, name: job.name, destination: job.destination, tabId: job.chatTabId, blocks, sources: job.sources, truncated: !!truncated };
+  return { state, turnId: job.turnId, url: job.url, name: job.name, destination: job.destination, tabId: job.chatTabId, blocks, sources: job.sources, truncated: !!truncated };
 }
 async function finish(job, state) {
+  if (jobs.get(job.captureId) !== job) return;
   jobs.delete(job.captureId);
   clearTimeout(job.timer);
+  await controlBackgroundFrames(job.chatTabId, job.frameToken, 'stop').catch(() => {});
   const answer = snapshot(job, state);
-  relay(job, answer);
   // Where this conversation is now (a new chat gets its own address once it starts).
   if (job.url) await rememberConversation(job.site, job.url).catch(() => {});
   if (await getCapture(job.captureId).catch(() => null)) await updateCapture(job.captureId, { answer }).catch(() => {});
+  relay(job, answer);
 }
 
 async function tick(job) {
-  if (!jobs.has(job.captureId)) return;
+  if (jobs.get(job.captureId) !== job) return;
   const now = Date.now();
   let snap;
   try {
+    await controlBackgroundFrames(job.chatTabId, job.frameToken, 'pulse');
     [{ result: snap }] = await chrome.scripting.executeScript({ target: { tabId: job.chatTabId }, func: readAnswer, args: [job.selectors, job.baseline] });
   } catch {
     // The chat's tab was closed, or went where Shot2AI may not read.
     await finish(job, 'gone');
     return;
   }
-  if (!jobs.has(job.captureId)) return;
+  if (jobs.get(job.captureId) !== job) return;
   if (!snap) { job.timer = setTimeout(() => void tick(job), TIMING.poll); return; }
   if (snap.url) job.url = snap.url;
   const key = JSON.stringify([snap.blocks, snap.sources]);
@@ -194,15 +203,12 @@ async function tick(job) {
 }
 
 // Starts reading the answer to a capture just sent.
-export function watchAnswer({ captureId, originTabId, chatTabId, destination, baseline }) {
+export function watchAnswer({ captureId, originTabId, chatTabId, destination, baseline, frameToken = null, turnId = null, url = null }) {
   stopAnswer(captureId);
   const now = Date.now();
   const job = {
-    captureId, originTabId, chatTabId, name: destination.name, destination: destination.id, site: destination, url: null, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
-    selectors: {
-      answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [],
-      user: destination.userSelectors || [], sources: destination.sourceSelectors || [], entry: destination.entrySelectors || [],
-    },
+    captureId, originTabId, chatTabId, frameToken, name: destination.name, destination: destination.id, site: destination, turnId, url, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
+    selectors: answerSelectors(destination),
     startedAt: now, changedAt: now, activeAt: now, sentAt: 0, key: '[[],[]]', relayedKey: null, blocks: [], sources: [], truncated: false, sawStop: false, timer: 0,
   };
   jobs.set(captureId, job);
@@ -214,6 +220,7 @@ export function stopAnswer(captureId) {
   if (!job) return;
   clearTimeout(job.timer);
   jobs.delete(captureId);
+  void controlBackgroundFrames(job.chatTabId, job.frameToken, 'stop').catch(() => {});
 }
 // The owner's tab closed: its answers are no longer wanted.
 export function stopAnswersFor(tabId) {

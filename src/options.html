@@ -34,15 +34,15 @@
   </section>
 
   <section class="section" aria-labelledby="dest-title">
-    <div class="section-head"><div><h2 id="dest-title">Other destinations</h2><p>Send a screenshot into a web chat instead. With <b>Send automatically</b> (on for ChatGPT, Claude, Gemini and Perplexity) the extension sends it in the chat's own tab, which stays in the background, and shows the answer in the card on your page. Turn it off to have the chat's tab come to the front with the screenshot pasted, so you press Enter there.</p></div></div>
+    <div class="section-head"><div><h2 id="dest-title">Other destinations</h2><p>Send a screenshot into a web chat instead. With <b>Send automatically</b> (on for ChatGPT, Claude and Perplexity) the extension sends it in the chat's own tab, which stays in the background, and shows the answer in the card on your page. Turn it off to have the chat's tab come to the front with the screenshot pasted, so you press Enter there.</p></div></div>
     <div id="presets" class="list"></div>
     <div id="custom" class="list"></div>
     <form id="add-chat" class="add">
-      <input id="chat-name" placeholder="Name, e.g. Gemini" aria-label="Chat name" maxlength="40" required>
-      <input id="chat-url" placeholder="https://gemini.google.com/app" aria-label="Chat address" type="url" required>
+      <input id="chat-name" placeholder="Name, e.g. Team chat" aria-label="Chat name" maxlength="40" required>
+      <input id="chat-url" placeholder="https://chat.example.com/" aria-label="Chat address" type="url" required>
       <button class="button" type="submit">Add chat</button>
     </form>
-    <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once. <b>Send automatically</b> presses the chat's send button once the screenshot has uploaded, so the message goes without you reviewing it. It is on for ChatGPT, Claude, Gemini and Perplexity and off for chats you add; it is never used for html2wp. For those four, Shot2AI then reads the answer (and Perplexity's sources) on that chat's page and shows it in the card; it reads nothing else there. Shot2AI uses the chat's tab you keep open, signed in, so each screenshot continues that conversation; if you close it, it opens again on your last conversation. Send to all selected sends to every ticked site.</p>
+    <p class="notice warn privacy-note">A web chat is a website. A screenshot you send there goes to that site and is handled under its terms, not only to this Mac. Chrome asks you to allow each site once. <b>Send automatically</b> presses the chat's send button once the screenshot has uploaded, so the message goes without you reviewing it. It is on for ChatGPT, Claude and Perplexity and off for chats you add; it is never used for html2wp. For those three, Shot2AI then reads the answer (and Perplexity's sources) on that chat's page and shows it in the card; it reads nothing else there. Shot2AI uses the chat's tab you keep open, signed in, so each screenshot continues that conversation; if you close it, it opens again on your last conversation. Send to all selected sends to every ticked site.</p>
     <div id="terms-notice" class="notice warn terms" role="alertdialog" aria-labelledby="terms-text" hidden>
       <p id="terms-text">Auto-submit presses the send button on a third-party website for you. Some services restrict automated use in their terms; you are responsible for using it within them.</p>
       <div class="actions"><button id="terms-ok" class="button primary" type="button">I understand, turn it on</button><button id="terms-cancel" class="button" type="button">Cancel</button></div>
@@ -53,8 +53,8 @@
   <section class="section" aria-labelledby="prompts-title">
     <div class="section-head"><div><h2 id="prompts-title">Prompts</h2><p>Saved messages to send with a screenshot. Pick one in the card or the editor, or right-click → Shot2AI → Send with prompt.</p></div></div>
     <div id="prompt-list" class="list prompts"></div>
-    <div class="row"><button id="add-prompt" class="button" type="button">Add prompt</button><span class="push"></span><label class="row-label short" for="default-prompt">Default prompt</label><select id="default-prompt" class="field"></select></div>
-    <p class="note">The default prompt fills the message of every new capture.</p>
+    <div class="row"><button id="add-prompt" class="button" type="button">Add prompt</button></div>
+    <p class="note">The first prompt is the default. Move a prompt to the top to change it. An empty message uses the default prompt when sent.</p>
   </section>
 
   <section class="section" aria-labelledby="save-title">
@@ -90,23 +90,31 @@
   <section class="section" aria-labelledby="toolbar-title">
     <div class="section-head"><div><h2 id="toolbar-title">Floating toolbar</h2><p>A small Shot2AI bar on every page with Area, Visible, Region and your destination. Drag it by its grip, collapse it to a dot, or hide it on a site from its ⋯ menu.</p></div><span id="toolbar-state" class="status"></span></div>
     <label class="toggle row"><input id="toolbar-on" type="checkbox"><span>Show the toolbar on every page</span></label>
-    <p class="notice warn">To appear on every page, the toolbar needs access to all sites; Chrome asks you when you switch it on. Shot2AI reads nothing on those pages: it only draws the toolbar and captures when you click it. Switching it off gives up the all-site access. It appears on pages you open or reload after switching it on.</p>
+    <p class="notice warn">To appear on every page, the toolbar needs access to all sites; Chrome asks you when you switch it on. Shot2AI reads nothing on those pages: it only draws the toolbar and captures when you click it. Switching it off gives up the all-site access unless Website integrations still uses it. It appears on pages you open or reload after switching it on.</p>
     <div id="toolbar-hidden" class="list"></div>
   </section>
 
+  <section class="section" id="website-integrations" aria-labelledby="website-integrations-title">
+    <div class="section-head"><div><h2 id="website-integrations-title">Website integrations</h2><p>Ask your AI about a mod, product or page from a participating website.</p></div><span id="integrations-state" class="status">Off</span></div>
+    <label class="toggle row"><input id="integrations-on" type="checkbox"><span>Enable Shot2AI buttons on participating websites</span></label>
+    <p class="notice">Chrome asks for website access once. Shot2AI activates only buttons with a tag approved in its public registry. Clicking one sends that page’s URL with its approved prompt to your chosen chat. The answer appears in the card.</p>
+    <p class="note">Reload an open website after enabling this. To add your own website, submit its URL and prompt to <a href="https://github.com/iOSDevSK/shot2ai/tree/main/integrations" target="_blank" rel="noopener">the Shot2AI registry</a>.</p>
+  </section>
+
   <section class="section" id="privacy" aria-labelledby="privacy-title">
-    <div class="section-head"><div><h2 id="privacy-title">Privacy</h2><p>What Shot2AI handles, and where it goes. <a id="privacy-link" href="https://html2wp.dev/shot2ai/privacy" target="_blank" rel="noopener">Full privacy policy</a></p></div></div>
+    <div class="section-head"><div><h2 id="privacy-title">Privacy</h2><p>What Shot2AI handles, and where it goes. <a id="privacy-link" href="https://share.shot2ai.com/privacy" target="_blank" rel="noopener">Full privacy policy</a></p></div></div>
     <ul class="facts">
-      <li><b>Captured:</b> screenshots of the page you are on, only when you ask; the message you type; text you selected for "Send selection"; the page's address and title, to label the capture.</li>
-      <li><b>Sent:</b> only where you send it. html2wp is the app on this computer (127.0.0.1); a web chat is the site you chose, under its own terms. There is no Shot2AI server.</li>
-      <li><b>Read back:</b> after Shot2AI sends a screenshot to ChatGPT, Claude, Gemini or Perplexity for you, it reads that chat's answer on the chat's page and shows it in the card on your page. It keeps the answer with the capture until you close the card (a day at most) and sends it nowhere.</li>
-      <li><b>Stored:</b> settings, prompts and destinations in Chrome's extension storage, with the model you chose for each known chat and the model names read from its picker, and the address of your last conversation with it (so a closed chat tab opens again there); captures and their answers in the extension's IndexedDB (deleted after a day); all on this device.</li>
+      <li><b>Captured:</b> screenshots of the page you are on, only when you ask; the message you type; text you explicitly selected for sending, with your prompt and no image when you choose "Send selected text"; the page's address and title, to label the capture.</li>
+      <li><b>Sent:</b> only where you send it. html2wp is the app on this computer (127.0.0.1); a web chat is the site you chose, under its own terms. Choosing WhatsApp, Facebook or X in Share uploads a public copy to the Shot2AI sharing server for 30 days.</li>
+      <li><b>Read back:</b> after Shot2AI sends a screenshot or selected text to ChatGPT, Claude or Perplexity for you, it reads that chat's answer on the chat's page and shows it in the card on your page. It keeps the answer with the capture until you close the card (a day at most) and uploads it only when you choose social sharing.</li>
+      <li><b>Stored:</b> settings, prompts and destinations in Chrome's extension storage, with the model you chose for each known chat and the model names read from its picker, and the address of your last conversation with it (so a closed chat tab opens again there); captures and their answers in the extension's IndexedDB (deleted after a day); on this device, except public copies you explicitly share.</li>
       <li><b>Never:</b> no analytics, no tracking, no advertising, no sale of data.</li>
     </ul>
     <p class="note">The use of information received from Chrome APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.</p>
+    <p><a href="shared-links.html" target="_blank">Manage or delete public shared links</a></p>
     <div class="row"><button id="clear-all" class="button" type="button">Clear all captures and settings</button></div>
     <div id="clear-confirm" class="notice err" role="alertdialog" aria-labelledby="clear-text" hidden>
-      <p id="clear-text">This deletes every capture, your settings, prompts, destinations, saved regions and the html2wp pairing, and turns the floating toolbar off. It cannot be undone.</p>
+      <p id="clear-text">This deletes every capture, your settings, prompts, destinations, saved regions and the html2wp pairing, and turns the floating toolbar off. Public shared links stay available until they expire; delete them above first if needed. Clearing also removes your ability to delete them early. It cannot be undone.</p>
       <div class="actions"><button id="clear-yes" class="button primary" type="button">Clear everything</button><button id="clear-no" class="button" type="button">Cancel</button></div>
     </div>
   </section>
@@ -117,9 +125,9 @@
   </section>
 </main>
 <footer class="foot">
-  <p><span id="version">Shot2AI</span> · <a id="whats-new" href="https://github.com/iOSDevSK/shot2ai/releases" target="_blank" rel="noopener">What's new</a> · <a href="https://html2wp.dev/shot2ai/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></p>
+  <p><span id="version">Shot2AI</span> · <a id="whats-new" href="https://github.com/iOSDevSK/shot2ai/releases" target="_blank" rel="noopener">What's new</a> · <a href="https://share.shot2ai.com/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://html2wp.dev/" target="_blank" rel="noopener">html2wp — convert any website to WordPress</a></p>
   <p id="publisher" class="disclaimer">Shot2AI is made by BELNEM s.r.o., Beckovska 5, Bratislava, Slovakia · hello@html2wp.dev</p>
-  <p id="disclaimer" class="disclaimer">ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Gemini is a trademark of Google LLC. Perplexity is a trademark of Perplexity AI, Inc. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI, Anthropic, Google or Perplexity AI.</p>
+  <p id="disclaimer" class="disclaimer">ChatGPT is a trademark of OpenAI. Claude is a trademark of Anthropic. Perplexity is a trademark of Perplexity AI, Inc. Shot2AI is an independent product and is not affiliated with, endorsed by or sponsored by OpenAI, Anthropic or Perplexity AI.</p>
 </footer>
 <script type="module" src="options.js"></script>
 </body>

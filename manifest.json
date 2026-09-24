@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Shot2AI — Screenshot, Annotate & Send to AI",
+  "name": "Shot2AI \u2014 Screenshot, Annotate & Send to AI",
   "short_name": "Shot2AI",
-  "version": "0.5.0",
-  "description": "Capture any part of a page, mark it up and send it in one click to your AI chat (ChatGPT, Claude, …) or the html2wp app.",
+  "version": "0.5.17",
+  "description": "Capture any part of a page, mark it up and send it in one click to your AI chat (ChatGPT, Claude, \u2026) or the html2wp app.",
   "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
@@ -14,7 +14,8 @@
     "clipboardWrite"
   ],
   "host_permissions": [
-    "http://127.0.0.1/*"
+    "http://127.0.0.1/*",
+    "https://share.shot2ai.com/*"
   ],
   "optional_host_permissions": [
     "https://*/*",
@@ -68,14 +69,22 @@
       "description": "Capture full page"
     },
     "capture-saved": {
-      "suggested_key": {
-        "default": "Alt+Shift+R",
-        "mac": "Alt+Shift+R"
-      },
       "description": "Capture saved region"
     },
     "show-stack": {
       "description": "Show this tab's captures"
+    },
+    "send-text": {
+      "suggested_key": {
+        "default": "Alt+Shift+T",
+        "mac": "Alt+Shift+T"
+      },
+      "description": "Send selected text (no image)"
     }
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://share.shot2ai.com/*"
+    ]
   }
 }
