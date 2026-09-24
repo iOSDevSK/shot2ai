@@ -1,10 +1,22 @@
+# Track only the files distributed with the Chrome extension.
+# Development tools, tests, reports, hosting and build outputs stay local.
+/*
+!/.gitignore
+!/manifest.json
+!/src/
+!/icons/
+!/licenses/
+!/README.md
+!/LICENSE
+!/PRIVACY.md
+!/THIRD-PARTY-NOTICES.md
+!/integrations/
+/integrations/*
+!/integrations/README.md
+
+# Never include generated or private files inside distribution directories.
+.DS_Store
 node_modules/
-test-results/
-playwright-report/
-dist/
-share-data/
-.wrangler/
-.astro/
 __pycache__/
 *.py[cod]
 .dev.vars*

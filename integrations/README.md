@@ -4,16 +4,14 @@ A registration contains only a public HTTPS URL (optionally a path prefix) and a
 
 ## Submit and approve
 
-1. Add `integrations/requests/your-site.json` in a pull request:
-   ```json
-   { "url": "https://example.com/mods/", "prompt": "Explain this mod and how to use it." }
-   ```
-2. Run `python3 scripts/integrations.py --validate`. The output includes the stable `s2ai-…` tag. It is derived from the canonical URL, so editing a prompt does not change its tag. A previewed tag is not active until the registration is approved and merged.
-3. The maintainer reviews the domain, scope and prompt, then merges the PR. Use branch protection / required reviews on `main` to make that approval mandatory.
-4. The **Website integrations** GitHub Actions workflow regenerates and commits `integrations/registry.json` and the bundled `src/integration-registry.json`. The repository must permit the workflow's `GITHUB_TOKEN` to push the generated commit to `main`. If branch rules disallow this, generate the two files locally and include them in the approved PR instead; do not weaken branch protection just for the bot.
-5. Copy the tag from the workflow output or generated registry into your website.
+1. Propose a public HTTPS URL and a prompt in a pull request or issue in this repository. A path prefix may limit the integration to part of a site.
+2. After review, the maintainer adds the entry to [`src/integration-registry.json`](../src/integration-registry.json). Each entry contains `url`, `prompt` and `tag`. The URL must be canonical, with a trailing slash and no credentials, query or fragment.
+3. The stable tag is `s2ai-` followed by the first 16 lowercase hexadecimal characters of the SHA-256 hash of the canonical URL. Editing the prompt does not change the tag. The maintainer supplies the tag after approving the registration.
+4. Merge the approved registry change into `main`, then embed that tag on the website. A proposed tag is not active until its entry is published.
 
-The extension checks the public registry at most once every 15 minutes when a tagged button is encountered. Offline it uses the last valid list, or the list bundled in its release. New entries therefore do not require a new extension build. Registry entries are configuration, not executable code. Removing a tag takes effect after refresh; an offline browser can keep its last valid list until it reconnects.
+The registry is distributed with the extension and fetched from the same `src/integration-registry.json` path on GitHub. There is no GitHub Actions tag-generation workflow in this distribution-only repository; maintainers prepare and validate registrations with their local tooling.
+
+The extension checks the public registry at most once every 15 minutes when a tagged button is encountered. Offline it uses the last valid list, or the bundled list. Registry entries are configuration, not executable code. Removing a tag takes effect after refresh; an offline browser can keep its last valid list until it reconnects.
 
 ## Add the installation hook and button
 
@@ -35,7 +33,6 @@ Both the source page and the target URL must be inside the approved origin/path.
 
 - Scope: `https://agentmods.dev/`
 - Assigned tag: `s2ai-86b27adc1b21ccfd`
-- Prompt: `requests/agentmods.json`
-- Local site component: `web/src/components/Shot2AI.astro` in the Agentmods repository, included on each mod detail page.
+- Prompt: the Agentmods entry in [`src/integration-registry.json`](../src/integration-registry.json)
 
 The registry is published in this repository and bundled with Shot2AI releases. Publish the Agentmods website component separately before visitors can use its button; packaging the extension does not deploy the Agentmods website.

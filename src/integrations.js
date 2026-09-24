@@ -1,5 +1,5 @@
 // Reviewed configuration only. Never execute code or accept prompts from a page.
-export const REGISTRY_URL = 'https://raw.githubusercontent.com/iOSDevSK/shot2ai/main/integrations/registry.json';
+export const REGISTRY_URL = 'https://raw.githubusercontent.com/iOSDevSK/shot2ai/main/src/integration-registry.json';
 const CACHE_MS = 15 * 60 * 1000;
 const SCRIPT_ID = 'shot2ai-integrations';
 const ALL_SITES = { origins: ['<all_urls>'] };
