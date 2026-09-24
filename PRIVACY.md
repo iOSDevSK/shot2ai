@@ -34,6 +34,7 @@ Everything is stored locally in your browser:
 
 - **Settings, prompts and destinations** are in Chrome's extension storage (`chrome.storage.local`).
 - **Captures** waiting in the preview card (the capture stack) or the editor are in the extension's IndexedDB. They are deleted when you send, close or clear them, when their tab is closed, and at the latest a day later.
+- **The model you chose** for each of ChatGPT, Claude, Gemini and Perplexity, and **the model names** last read from that chat's model picker, are kept in extension storage, so the popup and the card can offer them. Reading the list opens the chat's model picker in its tab and closes it again; Shot2AI clicks nothing else there.
 - **The address of your last conversation** with each of ChatGPT, Claude, Gemini and Perplexity is kept in extension storage, so a closed chat tab opens again on it. While Chrome runs, Shot2AI also remembers which tab it uses for each of them (session storage, cleared when Chrome quits).
 - **A chat's answer** is kept with its capture in the same IndexedDB, so the answer card can come back after you navigate within the tab. It is deleted when you close that card, when its tab is closed, and at the latest a day later.
 - **The pairing token for html2wp** is in extension storage.

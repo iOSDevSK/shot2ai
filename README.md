@@ -60,6 +60,15 @@ Sending to a web chat attaches the screenshot through the chat's own file input 
 
 Chrome asks you once per site to let the extension use it. The extension holds no permission for any site until you allow it.
 
+## Model
+
+For ChatGPT, Claude, Gemini and Perplexity you can choose the model. The popup has a **Model** list under **Screenshots go to**; its first entry, **Chat's current model**, is the default and switches nothing. The choice is kept per chat. The card's menu (the chevron) has the same list under **Model for this send**, for one send only, and the main button names the model: **Send to Claude · Opus 4.1**.
+
+- **The list** is the chat's own: Shot2AI reads it from the model picker in the tab you keep open (it opens the picker, reads the names, closes it, and clicks nothing else), at most every 10 minutes when you open the popup, and whenever it switches a model. It keeps the list per chat. Until it has read one, the popup shows a few typical names, labelled **Typical names (may be out of date)**, and a line saying to keep that chat open. It never reads a tab you are looking at, or one that is answering. Perplexity offers a model choice with Perplexity Pro only, so it has no typical names.
+- **Switching**: before attaching anything, Shot2AI opens the chat's model picker in its background tab, chooses the model (a name the chat shows; a short name such as "Opus" matches "Opus 4.1" when only one model fits, and looks in one "More models" submenu), and checks the chat now shows it. With **Chat's current model**, the picker is not touched at all.
+- **If it cannot switch, nothing is sent**, and the card says why, in the chat's words when it has some: the model is not in the chat's list any more (the card lists what is), the name fits several models, the model needs another plan ("Claude: “Opus 4.1 is available on Max”"), the chat did not switch, or there is no picker (for Perplexity: choosing a model needs Perplexity Pro). The card offers **Send with current model** and **Open <chat> tab**. Shot2AI never changes the model without saying so.
+- Each chat's picker is described in its own adapter (`src/sites/<chat>.js`, `model`), and the picker is driven by `src/picker.js`.
+
 ## Capture stack
 
 Every capture in a tab stays in the card's corner as a stack of cards. The newest is on top, and older ones peek out behind it: up to five layers, then a **+N** badge. **‹ ›** (or **← →** when the card has focus) flip through them, with a counter such as **2 / 5**. Clicking a card behind brings it to the front. Each card keeps its own message and its own result, for example "Sent to Claude".
@@ -141,6 +150,7 @@ Options → **Saving**:
 - **A web chat** (ChatGPT, Claude, or one you added) **is a website**. A screenshot you send there goes to that site and is handled under its terms. The card and the editor say this the first time you send to each chat, and the Options page says it next to the destinations.
 - **Send automatically** (on for ChatGPT and Claude) and **Send to all selected** send to web chats too: with Send automatically on, the message goes to that site without you reviewing it first.
 - **The answer card** reads the chat's answer to your screenshot from that chat's page (the text it shows, and Perplexity's source links, nothing else) and shows it on the page you sent from. The answer is kept with the capture in the extension's storage until you close the card, a day at most, and goes nowhere else.
+- **The model**: the model you chose for each known chat, and the names last read from its model picker, are kept in extension storage on this device.
 - **The chat's tab and conversation**: while Chrome runs, Shot2AI remembers which tab it uses for each known chat (session storage, gone when Chrome quits). It keeps the address of your last conversation with each known chat on this device, so a closed tab opens again there. **Clear all captures and settings** removes it.
 - **Sign-in pages** are never read, filled in or clicked: Shot2AI only notices that the chat shows one.
 - The **floating toolbar** needs access to all sites while it is on. It reads nothing on those pages: it draws itself and captures only when you click it.
@@ -153,7 +163,7 @@ npm install
 npm test
 ```
 
-The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on a free 127.0.0.1 port), a mock web chat page on another port, and stand-ins for chatgpt.com, claude.ai, gemini.google.com and perplexity.ai (`tests/mock-ai.mjs`), each on its own site: a composer (ProseMirror-like, a Quill-like editor without a file input, or a textarea), an upload to the mock server, a send button that waits for it, a stop button, a streamed answer and, for Perplexity, sources; a sign-in page on another site. The test copy points the four adapters in `src/sites/` at the stand-ins, so the real sites are never loaded. The stand-ins are built to exercise Shot2AI's paths, not to copy the real pages. They cover:
+The tests run the unpacked extension in Chromium against a mock of the app's bridge (`tests/mock-bridge.mjs`, on a free 127.0.0.1 port), a mock web chat page on another port, and stand-ins for chatgpt.com, claude.ai, gemini.google.com and perplexity.ai (`tests/mock-ai.mjs`), each on its own site: a composer (ProseMirror-like, a Quill-like editor without a file input, or a textarea), a model picker (opening on pointerdown or on click, with locked models, an upgrade dialog, a submenu), an upload to the mock server, a send button that waits for it, a stop button, a streamed answer and, for Perplexity, sources; a sign-in page on another site. The test copy points the four adapters in `src/sites/` at the stand-ins, so the real sites are never loaded. The stand-ins are built to exercise Shot2AI's paths, not to copy the real pages. They cover:
 
 - out of the box: ChatGPT is the default, the popup's list shows ChatGPT (and **Allow ChatGPT** when the site is not allowed), and there is no html2wp status
 - the popup's destination list: the same destinations and order as Options, a change saved at once and followed by an open Options page (and the other way round), the focus ring, html2wp's status under it, and a declined site permission (the choice is kept, **Needs permission** and **Allow Claude** shown)
@@ -165,6 +175,9 @@ The tests run the unpacked extension in Chromium against a mock of the app's bri
 - the chat's own tab: the owner's open tab is used and the conversation continues without a reload; **New chat** starts a new conversation in the same tab, for one send; a closed tab opens again, behind the page, on the last conversation
 - signed out: a sign-in page is left alone (its email field untouched), the card asks to log in once, **Send again** works after signing in; a tab sent to a sign-in page on another site is reused, not doubled
 - Perplexity refusing the upload for a plan ("Upgrade to Pro", in its words) or a sign-in, with its send button left on for the text alone: nothing is sent
+- the model: the popup shows typical names until a chat's tab is open, then reads the list from its picker (opened once, closed, nothing chosen) and keeps it after the tab is closed; the choice is kept per chat
+- sending with a chosen model switches it first and the chat gets the message with that model; the card's menu chooses another model for one send (the usual one stays); **Chat's current model** never opens the picker; each chat's picker switches, including Claude's "More models" submenu
+- a model that cannot be had sends nothing and says why: not in the list (with the list), several matches, a disabled model with the site's words, an upgrade dialog with its words, a switch that did not take, no picker (Perplexity without Pro); **Send with current model** then sends with the chat's own model
 - the right-click menu: its items and contexts, **Capture visible page**, **Send selection with a screenshot**, and **Send to ▸ Claude** changing the default. Playwright cannot open Chrome's context menu, so the test copy records the items the extension creates and calls the click handler directly. It also cannot check that a real menu click grants activeTab.
 - switching the default to html2wp brings up html2wp's status, then pairing
 - choosing ChatGPT, then a custom chat, as the default in Options

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Shot2AI — Screenshot, Annotate & Send to AI",
   "short_name": "Shot2AI",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Capture any part of a page, mark it up and send it in one click to your AI chat (ChatGPT, Claude, …) or the html2wp app.",
   "minimum_chrome_version": "116",
   "permissions": [
