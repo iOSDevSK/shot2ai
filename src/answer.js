@@ -21,9 +21,10 @@ import { controlBackgroundFrames } from './background-frames.js';
 export const TIMING = { poll: 800, settle: 1600, settleUnsure: 5000, quiet: 45000, total: 360000, heartbeat: 5000 };
 
 // Runs in the chat's page: the answer to the owner's newest message, as
-// blocks. That is every answer element after the owner's message once it is
-// there (more of the owner's messages than at `baseline`), else the newest
-// answer once there are more than at `baseline`. Only these kinds survive:
+// blocks. Match the sent question and its message identity: virtualized chats
+// can remove older turns, so message counts need not increase. Stop at the
+// next user message. Older captures/providers retain their count fallback.
+// Only these kinds survive:
 // p, h (1–6), ul/ol (items of blocks), pre (text), quote (blocks), hr, table
 // (rows of cells); inside a block, text, b, i, s, code, br and links to
 // http(s) addresses. Images, scripts, buttons, styles and hidden parts are
@@ -36,10 +37,36 @@ export function readAnswer(sel, baseline) {
   // Nested matches (a wrapper and its message both matching) count once.
   const messages = all(sel.answers).filter((el, i, list) => !list.some((other, j) => j !== i && other.contains(el) && other !== el));
   const mine = all(sel.user);
-  const asked = mine.length > baseline.user ? mine[mine.length - 1] : null;
-  const answer = asked ? messages.filter((m) => asked.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)
-    : messages.length > baseline.answers ? [messages[messages.length - 1]] : [];
-  const out = { question: (asked?.innerText || asked?.textContent || '').replace(/\s+/g, ' ').trim(), started: answer.length > 0, stop, streaming, blocks: [], sources: [], truncated: false, url: location.href };
+  const normalize = value => String(value || '').replace(/\s+/g, ' ').trim();
+  const identity = (el) => {
+    for (const attr of sel.identity || []) {
+      const value = el.closest(`[${attr}]`)?.getAttribute(attr)?.trim();
+      if (value) return `${attr}:${value}`;
+    }
+    return '';
+  };
+  let asked = null;
+  const tracked = !!baseline.question && !!sel.identity?.length;
+  if (tracked) {
+    const matching = mine.filter(el => normalize(el.innerText || el.textContent) === baseline.question);
+    asked = baseline.sentUser ? matching.find(el => identity(el) === baseline.sentUser) : null;
+    if (!asked) {
+      const fresh = matching.filter(el => {
+        const id = identity(el);
+        return id ? !(baseline.userKeys || []).includes(id) : mine.indexOf(el) >= baseline.user;
+      });
+      // Ambiguous repeated questions must never return a different turn.
+      if (fresh.length === 1) asked = fresh[0];
+    }
+    // Older/provider layouts can include attachment labels in the user text
+    // and expose no stable identity. Keep their count-based turn boundary.
+    if (!asked && !mine.some(el => identity(el))) asked = mine[baseline.user] || null;
+  } else if (mine.length > baseline.user) asked = mine[mine.length - 1];
+  const next = asked && mine[mine.indexOf(asked) + 1];
+  const answer = asked ? messages.filter(m => (asked.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)
+    && (!next || (m.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING)))
+    : !tracked && messages.length > baseline.answers ? [messages[messages.length - 1]] : [];
+  const out = { question: normalize(asked?.innerText || asked?.textContent), userKey: asked ? identity(asked) : '', started: answer.length > 0, stop, streaming, blocks: [], sources: [], truncated: false, url: location.href };
   if (!answer.length) return out;
   // Sources the chat lists with its answer (Perplexity): links to other sites,
   // from the answer's own entry on the page, eight at most.
@@ -149,6 +176,7 @@ export function readAnswer(sel, baseline) {
 export const answerSelectors = (destination) => ({
   answers: destination.answerSelectors || [], content: destination.contentSelectors || [], stop: destination.stopSelectors || [], streaming: destination.streamingSelectors || [],
   user: destination.userSelectors || [], sources: destination.sourceSelectors || [], entry: destination.entrySelectors || [],
+  identity: destination.messageIdentity || [],
 });
 
 const jobs = new Map();
@@ -186,6 +214,7 @@ async function tick(job) {
   }
   if (jobs.get(job.captureId) !== job) return;
   if (!snap) { job.timer = setTimeout(() => void tick(job), TIMING.poll); return; }
+  if (snap.userKey) job.baseline.sentUser = snap.userKey;
   if (snap.url) job.url = snap.url;
   const key = JSON.stringify([snap.blocks, snap.sources]);
   const started = snap.started && snap.blocks.length > 0;
@@ -207,7 +236,8 @@ export function watchAnswer({ captureId, originTabId, chatTabId, destination, ba
   stopAnswer(captureId);
   const now = Date.now();
   const job = {
-    captureId, originTabId, chatTabId, frameToken, name: destination.name, destination: destination.id, site: destination, turnId, url, baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0 },
+    captureId, originTabId, chatTabId, frameToken, name: destination.name, destination: destination.id, site: destination, turnId, url,
+    baseline: { answers: baseline?.answers || 0, user: baseline?.user || 0, question: baseline?.question || '', userKeys: baseline?.userKeys || [], sentUser: baseline?.sentUser || '' },
     selectors: answerSelectors(destination),
     startedAt: now, changedAt: now, activeAt: now, sentAt: 0, key: '[[],[]]', relayedKey: null, blocks: [], sources: [], truncated: false, sawStop: false, timer: 0,
   };

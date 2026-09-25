@@ -15,6 +15,7 @@ export default {
   sendSelectors: ['button[data-testid="send-button"]', '#composer-submit-button', 'button[aria-label="Send prompt"]'],
   stopSelectors: ['button[data-testid="stop-button"]', 'button[aria-label="Stop streaming"]', 'button[aria-label^="Stop" i]'],
   userSelectors: ['[data-message-author-role="user"]', '[data-user-message-bubble="true"]'],
+  messageIdentity: ['data-chatgpt-search-message-ids', 'data-message-id', 'data-content-search-unit-key'],
   answerSelectors: ['[data-message-author-role="assistant"]', '[data-content-search-unit-key]:has(> [data-conversation-role="assistant"])'],
   contentSelectors: ['[data-markdown-text-style="assistant-message"]', '.markdown'],
   backgroundFrames: true,

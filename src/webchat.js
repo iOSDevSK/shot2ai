@@ -127,7 +127,17 @@ async function pasteInPage(files, text, selectors, submit) {
     if (!composer) return { ok: false, reason: 'noComposer' };
   }
   if (submit.conversationUrl && location.href !== submit.conversationUrl) return { ok: false, reason: 'conversationChanged' };
-  const baseline = { answers: count(submit.answers), user: count(submit.user), url: location.href };
+  const identity = (el) => {
+    for (const attr of submit.messageIdentity || []) {
+      const value = el.closest(`[${attr}]`)?.getAttribute(attr)?.trim();
+      if (value) return `${attr}:${value}`;
+    }
+    return '';
+  };
+  const userMessages = () => { for (const s of submit.user) { const found = [...document.querySelectorAll(s)]; if (found.length) return found; } return []; };
+  const normalize = value => String(value || '').replace(/\s+/g, ' ').trim();
+  const baseline = { answers: count(submit.answers), user: count(submit.user), url: location.href,
+    question: normalize(text), userKeys: userMessages().map(identity).filter(Boolean) };
   composer.focus();
   const makeFiles = () => files.map((f) => new File([Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))], f.name, { type: f.type }));
   // The attachment area, where attached images show up as previews: the
@@ -437,6 +447,7 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
       conversationUrl: continuation?.url || null,
       on: autoSubmit, selectors: destination.sendSelectors || [], stop: destination.stopSelectors || [],
       user: destination.userSelectors || [], answers: destination.answerSelectors || [], deadline: Date.now() + SEND_LIMIT - 10000,
+      messageIdentity: destination.messageIdentity || [],
       login: { urls: destination.loginUrls || [], selectors: destination.loginSelectors || [] }, area: destination.areaSelectors || [], attachments: destination.attachmentSelectors || [],
       strictComposer: !!destination.strictComposer, composerExclude: destination.composerExclude || '',
       uploadButtons: destination.uploadButtonSelectors || [], uploadErrors: destination.uploadErrorSelectors || [],

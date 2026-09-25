@@ -4,7 +4,7 @@ Shot2AI is a Chrome extension that sends screenshots or selected text to ChatGPT
 
 ## Install or update
 
-1. Download **shot2ai-0.5.23.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
+1. Download **shot2ai-0.5.24.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
 2. Extract the ZIP to a folder you will keep on your computer.
 3. Open `chrome://extensions` and enable **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
@@ -99,7 +99,7 @@ This repository tracks the files distributed in the extension: `manifest.json`, 
 
 Development scripts, tests, test reports, screenshots, dependency manifests, website hosting files and the sharing server are maintained outside Git tracking. They are not required to load the unpacked extension. Public sharing connects to the existing hosted service.
 
-Version **0.5.23** fixes ChatGPT thinking effort selection immediately after reading or changing the model. Shot2AI now lets the shared picker finish closing before reopening its effort view, preventing a false “Thinking effort control was not found” error.
+Version **0.5.24** fixes missing ChatGPT follow-up answers in long conversations. Shot2AI matches the sent question and its message identity even when ChatGPT unloads older turns from the page, and keeps later questions out of that answer.
 
 ## Licence and credits
 
