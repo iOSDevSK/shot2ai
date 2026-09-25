@@ -168,7 +168,7 @@
     .a-followup button{width:34px;height:34px;border:0;border-radius:8px;background:#2f3c30;color:#fff;display:grid;place-items:center}
     .a-followup svg{width:18px;height:18px}.a-followup button:disabled{opacity:.4;cursor:default}
     .a-chat-error{margin-top:8px;color:#745820;font-size:12px;line-height:1.45}
-    .a-actions button.chat-toggle{width:30px;padding:0}.chat-toggle[aria-expanded="true"]{background:#eef1e9}
+    .a-actions button.chat-toggle{display:grid;place-items:center;gap:0;width:30px;padding:0}.chat-toggle[aria-expanded="true"]{background:#eef1e9}
     .a-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-top:9px}
     .a-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:0;height:30px;padding:0 10px;border:1px solid #dfe2d9;border-radius:7px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
     .a-actions button:hover:not(:disabled){background:#f1f3ee}
@@ -178,14 +178,20 @@
     .a-actions > button{flex-shrink:1}.a-actions > button span{overflow:hidden;text-overflow:ellipsis}
     .a-actions button.chat-toggle{flex:none}
     .a-actions svg{flex:none;width:13px;height:13px}
+    .a-actions .chat-toggle svg{width:16px;height:16px}
     @media (prefers-reduced-motion:reduce){.a-head.busy .a-icon svg,.a-body .caret,.a-body .skeleton i{animation:none}}
     .share-wrap{position:relative;flex:none;margin-left:auto}
     .a-actions .share-toggle{width:32px;padding:0}
     .share-toggle svg{width:18px;height:18px}
-    .share-menu{position:absolute;right:0;bottom:38px;display:grid;grid-template-columns:repeat(5,48px);gap:3px;padding:7px;border:1px solid #dfe2d9;border-radius:10px;background:#fff;box-shadow:0 8px 28px #232a2330;z-index:10}
+    .share-menu{position:absolute;right:0;bottom:38px;display:grid;width:min(318px,calc(100vw - 44px));grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;padding:7px;border:1px solid #dfe2d9;border-radius:10px;background:#fff;box-shadow:0 8px 28px #232a2330;z-index:10}
     .share-note{grid-column:1/-1;font-size:10px;line-height:1.4;color:#67725f;padding:3px 4px;white-space:normal}
-    .share-menu button{flex-direction:column;gap:4px;width:48px;height:54px;padding:4px;border:0;font-size:10px}
+    .share-menu button{flex-direction:column;gap:4px;width:100%;height:54px;padding:4px;border:0;font-size:10px}
     .share-menu svg{width:22px;height:22px}
+    .share-link{grid-column:1/-1;display:flex;align-items:center;gap:6px;margin:5px 2px 2px;padding:6px;border:1px solid #dfe2d9;border-radius:8px;background:#f7f8f4}
+    .share-link input{flex:1;min-width:0;width:0;border:0;outline:0;background:transparent;padding:5px 2px;color:#2f3c30;font:11px/1.4 ui-sans-serif,-apple-system,sans-serif;text-overflow:ellipsis}
+    .share-link input:focus-visible{outline:2px solid #547254;border-radius:3px}
+    .share-menu .share-link button{flex:none;flex-direction:row;gap:5px;width:auto;min-width:76px;height:30px;padding:0 8px;border:1px solid #dfe2d9;border-radius:6px;background:#fff;font-size:11px}
+    .share-link button svg{width:14px;height:14px}
     .share-status{font-size:12px;line-height:1.45;color:#745820;margin:6px 0 0;overflow-wrap:anywhere}
     [hidden]{display:none!important}
   `;
@@ -310,6 +316,7 @@
     const refreshIcons = (icons) => {
       Object.assign(i, icons);
       i.share ||= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9H5v12h14V9h-2M12 15V2M8 6l4-4 4 4"/></svg>';
+      i.link ||= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 13 4-4M8 15l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0M16 9l1-1a3.5 3.5 0 0 1 5 5l-4 4a3.5 3.5 0 0 1-5 0"/></svg>';
       i.chat ||= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2v-10a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/></svg>';
     };
     refreshIcons(first.icons);
@@ -661,6 +668,7 @@
           showAnswer(entry);
           if (entry.chatOpen) $('.a-followup textarea').focus({ preventScroll: true });
         }, 'chat-toggle', 'chat');
+        toggle.querySelector('span').remove();
         toggle.setAttribute('aria-label', 'Chat in this card'); toggle.title = 'Chat in this card';
         toggle.setAttribute('aria-expanded', String(!!entry.chatOpen));
       }
@@ -673,33 +681,78 @@
         menu.setAttribute('role', 'group'); menu.setAttribute('aria-label', 'Share or export conversation');
         const close = (focus = false) => { menu.hidden = true; toggle.setAttribute('aria-expanded', 'false'); if (focus) toggle.focus(); };
         toggle.addEventListener('click', () => { const open = menu.hidden; menu.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button').focus(); });
+        let sharing = false;
+        const shareNote = 'WA, FB, X, Link: public for 30 days. PDF, MD: saved on your device.';
+        const linkRow = document.createElement('div'); linkRow.className = 'share-link'; linkRow.hidden = true;
+        const linkInput = document.createElement('input'); linkInput.type = 'text'; linkInput.readOnly = true;
+        linkInput.setAttribute('aria-label', 'Public conversation link'); linkInput.spellcheck = false;
+        linkInput.addEventListener('click', () => linkInput.select());
+        const copyLink = document.createElement('button'); copyLink.disabled = true;
+        copyLink.setAttribute('aria-label', 'Copy conversation link'); copyLink.title = 'Copy conversation link';
+        copyLink.innerHTML = `${i.copy || i.link}<span>Copy</span>`;
+        const hint = text => {
+          root.querySelector('.share-status')?.remove();
+          if (!wrap.isConnected) return;
+          const el = document.createElement('p'); el.className = 'share-status'; el.setAttribute('role', 'status'); el.textContent = text;
+          $('.a-actions').after(el);
+        };
+        copyLink.addEventListener('click', async () => {
+          if (!linkInput.value) return;
+          copyLink.querySelector('span').textContent = 'Copy';
+          try {
+            await navigator.clipboard.writeText(linkInput.value);
+            copyLink.querySelector('span').textContent = 'Copied';
+            setTimeout(() => { copyLink.querySelector('span').textContent = 'Copy'; }, 1600);
+          } catch {
+            linkInput.focus(); linkInput.select();
+            hint(`Could not copy automatically. Press ${o.mod || 'Ctrl+'}C to copy the selected link.`);
+          }
+        });
+        linkRow.append(linkInput, copyLink);
         wrap.addEventListener('keydown', e => {
           if (e.key === 'Escape' && !menu.hidden) { e.preventDefault(); e.stopPropagation(); close(true); }
+          if (e.target === linkInput || e.metaKey || e.ctrlKey || e.altKey) return;
           if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !menu.hidden) {
-            e.preventDefault(); e.stopPropagation(); const buttons = [...menu.querySelectorAll('button')];
+            e.preventDefault(); e.stopPropagation();
+            const buttons = [...menu.querySelectorAll('button')].filter(b => !b.disabled && !b.closest('[hidden]'));
+            if (!buttons.length) return;
             const index = buttons.indexOf(root.activeElement);
             buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length].focus();
           }
         });
-        wrap.addEventListener('focusout', () => setTimeout(() => { if (!wrap.contains(root.activeElement)) close(); }, 0));
-        for (const [format, label, icon] of [['whatsapp', 'WhatsApp', 'whatsapp'], ['facebook', 'Facebook', 'facebook'], ['x', 'X', 'x'], ['pdf', 'PDF', 'pdf'], ['md', 'MD', 'md']]) {
-          const item = document.createElement('button'); item.title = ['pdf', 'md'].includes(format) ? label : `Share a public conversation link on ${label}`;
-          item.setAttribute('aria-label', label === 'MD' ? 'Download Markdown' : label === 'PDF' ? 'Export PDF' : `Share on ${label}`);
+        wrap.addEventListener('focusout', () => setTimeout(() => { if (!sharing && !wrap.contains(root.activeElement)) close(); }, 0));
+        for (const [format, label, icon] of [['whatsapp', 'WhatsApp', 'whatsapp'], ['facebook', 'Facebook', 'facebook'], ['x', 'X', 'x'], ['pdf', 'PDF', 'pdf'], ['md', 'MD', 'md'], ['link', 'Link', 'link']]) {
+          const item = document.createElement('button'); item.title = format === 'link' ? 'Create a public conversation link' : ['pdf', 'md'].includes(format) ? label : `Share a public conversation link on ${label}`;
+          item.setAttribute('aria-label', format === 'link' ? 'Get conversation link' : label === 'MD' ? 'Download Markdown' : label === 'PDF' ? 'Export PDF' : `Share on ${label}`);
           item.innerHTML = `${i[icon] || i.share}<span></span>`; item.querySelector('span').textContent = { whatsapp: 'WA', facebook: 'FB' }[format] || label;
           item.addEventListener('click', async () => {
+            if (sharing) return;
+            sharing = true;
             root.querySelector('.share-status')?.remove();
             const buttons = [...menu.querySelectorAll('button')]; buttons.forEach(b => { b.disabled = true; });
-            const note = menu.querySelector('.share-note'); if (note) note.textContent = ['pdf', 'md'].includes(format) ? 'Preparing export…' : 'Creating public link…';
+            const note = menu.querySelector('.share-note'); note.textContent = ['pdf', 'md'].includes(format) ? 'Preparing export…' : 'Creating public link…';
+            if (format === 'link') {
+              linkRow.hidden = false; linkInput.value = ''; linkInput.placeholder = 'Creating public link…';
+            }
             let result;
             try { result = await ask({ type: 'share-conversation', id: entry.id, format }); }
             catch { result = { ok: false, text: 'Sharing failed. Check your connection and try again.' }; }
-            finally { buttons.forEach(b => { b.disabled = false; }); if (note) note.textContent = 'WA, FB, X: public link for 30 days. PDF, MD: saved on your device.'; }
-            if (result?.ok) close(true);
-            else { const hint = document.createElement('p'); hint.className = 'share-status'; hint.setAttribute('role', 'status'); hint.textContent = result?.text || 'Reload Shot2AI and this page to share the conversation.'; root.querySelector('.share-status')?.remove(); $('.a-actions').after(hint); }
+            finally { sharing = false; buttons.forEach(b => { b.disabled = false; }); note.textContent = shareNote; }
+            if (!wrap.isConnected) return;
+            if (result?.ok && format === 'link' && result.url) {
+              linkInput.value = result.url; linkInput.title = result.url;
+              if (!menu.hidden && document.hasFocus()) { linkInput.focus({ preventScroll: true }); linkInput.select(); }
+            } else if (result?.ok && format !== 'link') close(true);
+            else {
+              if (format === 'link') { linkInput.placeholder = 'Link unavailable — try again'; if (!menu.hidden) item.focus(); }
+              hint(result?.text || 'Reload Shot2AI and this page to share the conversation.');
+            }
+            copyLink.disabled = !linkInput.value;
           });
           menu.append(item);
         }
-        const note = document.createElement('span'); note.className = 'share-note'; note.textContent = 'WA, FB, X: public link for 30 days. PDF, MD: saved on your device.'; menu.append(note);
+        menu.append(linkRow);
+        const note = document.createElement('span'); note.className = 'share-note'; note.textContent = shareNote; menu.append(note);
         wrap.append(toggle, menu); actions.push(wrap);
       }
       $('.a-actions').replaceChildren(...actions);

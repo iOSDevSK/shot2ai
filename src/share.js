@@ -3,13 +3,14 @@ import { putExport } from './share-store.js';
 import { publishCapture, socialURL } from './public-share.js';
 
 export async function shareConversation(message, sender) {
-  if (!['whatsapp', 'facebook', 'x', 'pdf', 'md'].includes(message.format)) return { ok: false, text: 'Unknown export format.' };
+  if (!['whatsapp', 'facebook', 'x', 'link', 'pdf', 'md'].includes(message.format)) return { ok: false, text: 'Unknown export format.' };
   const capture = await getCapture(message.id);
   if (!capture?.answer || !sender?.tab || capture.tabId !== sender.tab.id) return { ok: false, text: 'This conversation is no longer available.' };
   if (['sending', 'answering'].includes(capture.answer.state)) return { ok: false, text: 'Wait for the answer before sharing.' };
-  if (['whatsapp', 'facebook', 'x'].includes(message.format)) {
+  if (['whatsapp', 'facebook', 'x', 'link'].includes(message.format)) {
     try {
       const { url } = await publishCapture(capture);
+      if (message.format === 'link') return { ok: true, url };
       if (message.format === 'whatsapp') {
         // A visible handoff page permits a native-app retry if Chrome blocks the
         // automatic protocol launch, without losing the prefilled public link.

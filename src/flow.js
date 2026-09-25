@@ -124,7 +124,7 @@ export async function showStack(tabId, { currentId = null, fresh = null, autoSen
     return { id: d.id, name: d.name, kind: d.kind, origin: d.origin || null, host: d.url ? new URL(d.url).host : null, url: d.url || null, auto, answers: auto && readsAnswers(d), models: modelView(s, d) };
   };
   const destinationsNow = (await destinations()).map(brief);
-  const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry', 'region', 'open', 'spinner', 'grip', 'chat', 'share', 'whatsapp', 'facebook', 'x', 'pdf', 'md'];
+  const pick = ['close', 'check', 'send', 'chevron', 'annotate', 'copy', 'download', 'retry', 'region', 'open', 'spinner', 'grip', 'chat', 'share', 'link', 'whatsapp', 'facebook', 'x', 'pdf', 'md'];
   await chrome.scripting.executeScript({ target: { tabId }, files: ['src/card.js'] });
   await chrome.scripting.executeScript({
     target: { tabId },
