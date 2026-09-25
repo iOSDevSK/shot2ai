@@ -48,6 +48,9 @@ export default {
     // The intelligence picker switches views inside one menu. The model
     // radios remain mounted but inert until Select model is activated.
     panel: {
+      // The model view resets after the close animation, even when the menu
+      // DOM is already gone. Reopening sooner keeps the effort slider inert.
+      settleMs: 400,
       root: '[data-testid="composer-intelligence-picker-content"], [data-model-picker-view]',
       toggle: '[role="menuitem"][aria-label="Select model"]',
       models: '[data-testid="composer-model-picker-slider-advanced-view"], [data-model-picker-view] [role="menuitemradio"]',

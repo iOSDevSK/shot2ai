@@ -9,7 +9,7 @@
 // timer is only the deadline. Names are the ones the chat shows: the sites
 // rename their models, so Shot2AI never assumes a list of its own.
 (() => {
-  if (window.__shot2aiPicker?.revision === 5) return;
+  if (window.__shot2aiPicker?.revision === 6) return;
   const rendered = (el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && getComputedStyle(el).visibility !== 'hidden'; };
   // Radix keeps closed popovers mounted until their exit animation ends.
   // In a background tab that animation may stall, so geometry alone cannot
@@ -239,16 +239,23 @@
   async function close(model, trigger, menus) {
     const open = () => menus.some((m) => m.isConnected && visible(m));
     if (!open()) return;
-    const closer = trigger?.isConnected ? trigger : button(model);
-    if (model.closeWithTrigger && closer) {
-      closer.click();
+    try {
+      const closer = trigger?.isConnected ? trigger : button(model);
+      if (model.closeWithTrigger && closer) {
+        closer.click();
+        if (await until(() => !open(), 800)) return;
+      }
+      for (const m of menus) if (m.isConnected) key(m, 'Escape');
+      key(document, 'Escape');
       if (await until(() => !open(), 800)) return;
+      if (trigger?.isConnected) press(trigger);
+      await until(() => !open(), 800);
+    } finally {
+      // A shared model/effort picker can unmount before its close transition
+      // resets the selected view. Let the site's reset finish before the next
+      // operation reopens it; DOM disappearance alone is not sufficient.
+      if (!open() && model.panel?.settleMs) await new Promise(resolve => setTimeout(resolve, model.panel.settleMs));
     }
-    for (const m of menus) if (m.isConnected) key(m, 'Escape');
-    key(document, 'Escape');
-    if (await until(() => !open(), 800)) return;
-    if (trigger?.isConnected) press(trigger);
-    await until(() => !open(), 800);
   }
   const shows = (model, name, trigger) => {
     const candidates = [trigger, button(model), ...(model.panel ? all([`:is(${model.panel.root}) ${model.panel.toggle}`]) : [])];
@@ -384,5 +391,5 @@
 
   const read = (model) => withModelButton(model, (trigger) => readFrom(model, trigger));
   const choose = (model, want) => withModelButton(model, (trigger) => chooseFrom(model, want, trigger));
-  window.__shot2aiPicker = { revision: 5, read, choose, chooseEffort };
+  window.__shot2aiPicker = { revision: 6, read, choose, chooseEffort };
 })();
