@@ -1,6 +1,6 @@
 import { connect, pair } from './bridge.js';
 import { paint } from './icons.js';
-import { isMac, settings, choices, FIRST_DEFAULT, update, defaultPatch, sitePattern, cleanSubfolder, modelView } from './settings.js';
+import { isMac, settings, choices, FIRST_DEFAULT, update, defaultPatch, sitePattern, cleanSubfolder, modelView, origin } from './settings.js';
 import { acceptPastedImages } from './paste.js';
 import { shortcuts } from './shortcuts.js';
 
@@ -75,6 +75,14 @@ function renderModels(d) {
     : view.note ? `${d.name}: ${view.note}. Keep ${d.name} open in a tab to read its list.`
     : `Typical names. Keep ${d.name} open in a tab, signed in, to read its own list.`;
   if (!view.choice) $('model-note').textContent += ' The model already selected in your chat will be used.';
+  // Check all windows even when the cached model list is still fresh.
+  chrome.tabs.query({}).then(tabs => {
+    if ($('dest-select').value !== d.id) return;
+    const matches = tabs.filter(t => t.url && origin(t.url) === d.origin);
+    if (matches.length < 2) return;
+    const windows = new Set(matches.map(t => t.windowId)).size;
+    $('model-note').textContent = `${matches.length} ${d.name} tabs are open in ${windows} ${windows === 1 ? 'window' : 'windows'}. Choose the target tab when sending from your capture card.`;
+  }).catch(() => {});
   // Read again from the chat's own picker (in the tab kept open), now and then.
   if (Date.now() - view.at > READ_EVERY && !asked.has(d.id)) {
     asked.add(d.id);

@@ -98,6 +98,10 @@
     .result.err{border-color:#eed8d0;background:#fbefeb;color:#6f3f33}
     .result .actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
     .result .actions button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border:1px solid #dfe2d9;border-radius:6px;background:#fff;color:#2f3c30;font-size:11.5px;font-weight:600;white-space:nowrap}
+    .result.choose-chat .actions{display:grid;max-height:180px;overflow-y:auto}
+    .result.choose-chat .actions button{min-width:0;max-width:100%;justify-content:flex-start}
+    .result.choose-chat .actions button span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .result.choose-chat .actions svg{flex-shrink:0}
     .result .actions button.primary{border-color:#2f3c30;background:#2f3c30;color:#fff}
     .result .actions svg{width:13px;height:13px}
     .result ul{margin:0;padding:0;list-style:none}
@@ -526,6 +530,11 @@
       $('.annotate').hidden = $('.region').hidden = entry.kind === 'text';
       const r = entry.result;
       if (r?.actions === 'retry') showResult(r.tone, r.text, [['Try again', () => void sendTo(o.main), true, 'retry']]);
+      else if (r?.actions === 'choose-chat') {
+        const destination = o.destinations.find(d => d.id === r.destination);
+        showResult(r.tone, r.text, destination ? r.tabs.map(t => [`Window ${t.window} · Tab ${t.index} — ${t.title}`, () => void sendTo(destination, true, { ...r.settings, targetTabId: t.id }), false, 'send']) : []);
+        $('.result').classList.add('choose-chat');
+      }
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
       else if (r?.actions === 'open-chat') {
         const again = (r.retry || r.current) && o.destinations.find((d) => d.id === r.chat.destination);
@@ -961,7 +970,7 @@
       scheduleHide();
     }
 
-    async function sendTo(destination, confirmed = false, { model: forced, effort: forcedEffort } = {}) {
+    async function sendTo(destination, confirmed = false, { model: forced, effort: forcedEffort, targetTabId } = {}) {
       const entry = now();
       if (busy || !entry) return;
       $('.menu').hidden = true;
@@ -997,7 +1006,7 @@
         entry.model = null;
         entry.effort = null;
         persist(entry.id, { model: null, effort: null, newChat: false });
-        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model, effort });
+        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model, effort, targetTabId });
         setBusy(false);
         chat.tabId = r?.tabId;
         if (r?.watching) {
@@ -1010,6 +1019,14 @@
         }
         entry.answer = null;
         if (r?.submitted || (r?.ok && !r.autoSubmit)) { markSent(entry, { tone: 'ok', text: r.text, ...(r.submitted && r.tabId ? { actions: 'open-chat', chat } : {}) }); return; }
+        if (r?.reason === 'multipleTabs') {
+          entry.newChat = newChat;
+          entry.model = model;
+          entry.effort = effort;
+          setResult(entry, { tone: 'warn', text: r.text, actions: 'choose-chat', destination: destination.id, tabs: r.tabs, settings: { model, effort }, persist: false });
+          return;
+        }
+        if (r?.reason === 'chatTabGone') { setResult(entry, { tone: 'warn', text: r.text, actions: 'retry', persist: false }); return; }
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
         const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
         if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }

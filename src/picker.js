@@ -9,7 +9,7 @@
 // timer is only the deadline. Names are the ones the chat shows: the sites
 // rename their models, so Shot2AI never assumes a list of its own.
 (() => {
-  if (window.__shot2aiPicker?.revision === 3) return;
+  if (window.__shot2aiPicker?.revision === 4) return;
   const rendered = (el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && getComputedStyle(el).visibility !== 'hidden'; };
   // Radix keeps closed popovers mounted until their exit animation ends.
   // In a background tab that animation may stall, so geometry alone cannot
@@ -203,11 +203,11 @@
   // the end of the page, away from the button).
   async function prepareMenu(model, menu) {
     const config = model.panel;
-    const root = config && menu.querySelector(config.root);
+    const root = config && (menu.matches(config.root) ? menu : menu.querySelector(config.root));
     if (!root) return menu;
     const ready = () => {
-      const view = root.querySelector(config.models);
-      return view && visible(view) && items(model, view).length ? menu : null;
+      const views = [...root.querySelectorAll(config.models)];
+      return views.some(view => visible(view) && (view.matches(model.items.join(',')) || items(model, view).length)) ? menu : null;
     };
     if (ready()) return menu;
     const toggle = await until(() => {
@@ -251,7 +251,7 @@
     await until(() => !open(), 800);
   }
   const shows = (model, name, trigger) => {
-    const candidates = [trigger, button(model), ...(model.panel ? all([`${model.panel.root} ${model.panel.toggle}`]) : [])];
+    const candidates = [trigger, button(model), ...(model.panel ? all([`:is(${model.panel.root}) ${model.panel.toggle}`]) : [])];
     return candidates.some((el) => el?.isConnected && visible(el) && ` ${modelNorm(model, el.innerText || el.textContent)} `.includes(` ${modelNorm(model, name)} `));
   };
 
@@ -384,5 +384,5 @@
 
   const read = (model) => withModelButton(model, (trigger) => readFrom(model, trigger));
   const choose = (model, want) => withModelButton(model, (trigger) => chooseFrom(model, want, trigger));
-  window.__shot2aiPicker = { revision: 3, read, choose, chooseEffort };
+  window.__shot2aiPicker = { revision: 4, read, choose, chooseEffort };
 })();

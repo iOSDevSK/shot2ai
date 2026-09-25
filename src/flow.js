@@ -248,7 +248,7 @@ async function cardSendNow(message, sender) {
   // The model: the card's choice for this send ('' for the chat's current
   // one), else the owner's choice for this chat.
   const model = typeof message.model === 'string' ? message.model : s.modelChoice?.[destination.id] || '';
-  const r = await pasteIntoChat(destination, blob || [], message.text, blob ? fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]) : [], { newChat: !!message.newChat, model: model || null, effort: message.effort, backgroundAnswer: readsAnswers(destination) && !!sender?.tab });
+  const r = await pasteIntoChat(destination, blob || [], message.text, blob ? fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]) : [], { targetTabId: message.targetTabId, newChat: !!message.newChat, model: model || null, effort: message.effort, backgroundAnswer: readsAnswers(destination) && !!sender?.tab });
   const outcome = chatOutcome(destination.name, r, capture.kind === 'text');
   // Sent to a chat whose answer Shot2AI reads (sites/): the card turns into the answer card.
   if (r.submitted && readsAnswers(destination) && sender?.tab && await getCapture(message.id)) {

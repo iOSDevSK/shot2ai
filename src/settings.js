@@ -105,13 +105,15 @@ export function chatOutcome(name, r, textOnly = false) {
     case 'effortUnsupported': return { tone: 'warn', open: true, current: true, text: `${name}'s Thinking effort control could not be adjusted reliably. Nothing was sent.` };
     case 'effortNotSet': return { tone: 'warn', open: true, current: true, text: `${name} did not confirm the chosen Thinking effort. Nothing was sent.` };
     case 'modelPicker': return { tone: 'warn', open: true, current: true, text: r.pickerNote ? `${name}: ${r.pickerNote}. Nothing was sent.` : `${name}'s model picker was not found, so ${r.model} could not be chosen. Nothing was sent.` };
-    case 'modelMissing': return { tone: 'warn', open: true, current: true, text: `${name} has no model called “${r.model}” now.${lists} Nothing was sent.` };
+    case 'modelMissing': return { tone: 'warn', open: true, current: true, text: `${name}’s picker in this tab did not list “${r.model}”.${lists} Nothing was sent.` };
     case 'modelAmbiguous': return { tone: 'warn', open: true, current: true, text: `“${r.model}” matches several of ${name}'s models (${r.detail}); choose one in the popup. Nothing was sent.` };
     case 'modelPlan': return { tone: 'warn', open: true, current: true, text: r.detail ? `${name}: “${r.detail.replace(/[\s.!]+$/, '')}”. Nothing was sent.` : `${name} did not switch to ${r.model}; it may need a paid plan. Nothing was sent.` };
     case 'modelNotSwitched': return { tone: 'warn', open: true, current: true, text: `${name} did not switch to ${r.model}. Nothing was sent.` };
     default: break;
   }
   switch (r.reason) {
+    case 'multipleTabs': return { tone: 'warn', text: `${r.tabs.length} ${name} tabs are open in ${r.windows} ${r.windows === 1 ? 'window' : 'windows'}. Choose a tab in the capture card, or close the extra tabs. Nothing was sent.` };
+    case 'chatTabGone': return { tone: 'warn', retry: true, text: `The selected ${name} tab was closed or changed. Send again to choose a chat.` };
     case 'login': return { tone: 'warn', open: true, retry: 'Send again', text: `Log in to ${name} once, then keep the tab open. Your ${textOnly ? 'selected text' : 'screenshot'} waits here; nothing was sent.` };
     case 'plan': return { tone: 'warn', open: true, text: `${name} did not take the screenshot${r.detail ? `: “${r.detail.replace(/[\s.!]+$/, '')}”` : ''}. It may need a sign-in or a paid plan. Nothing was sent.` };
     case 'noComposer': return { tone: 'warn', open: true, text: `${name}'s message box was not found, so nothing was sent. Are you signed in there?` };

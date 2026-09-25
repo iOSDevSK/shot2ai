@@ -4,7 +4,7 @@ Shot2AI is a Chrome extension that sends screenshots or selected text to ChatGPT
 
 ## Install or update
 
-1. Download **shot2ai-0.5.20.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
+1. Download **shot2ai-0.5.21.zip** from the [latest release](https://github.com/iOSDevSK/shot2ai/releases/latest).
 2. Extract the ZIP to a folder you will keep on your computer.
 3. Open `chrome://extensions` and enable **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
@@ -28,9 +28,9 @@ Click **Annotate** to add arrows, boxes, text, highlights or blur. Click **Use i
 
 ## Destinations, models and effort
 
-**ChatGPT** is the default destination. Change it in the popup or Settings. Chrome asks for access to each chat site when needed. Sign in to the service yourself, then keep its tab open; Shot2AI reuses that conversation. **New chat** starts another conversation for the next send.
+**ChatGPT** is the default destination. Change it in the popup or Settings. Chrome asks for access to each chat site when needed. Sign in to the service yourself, then keep its tab open; Shot2AI reuses that conversation. **New chat** starts another conversation for the next send. If several tabs of the same chat service are open, including in different windows, the popup warns you and the capture card asks which tab to use before sending. Follow-up questions stay in the chosen conversation. Other send methods require a single target tab.
 
-For supported interfaces, select a model and thinking effort in Shot2AI. Available models are read from your chat's menu. **Use selected model in chat** and **Use selected effort in chat** preserve the chat's current settings. If a requested setting cannot be confirmed, Shot2AI keeps the capture and explains the problem before sending.
+For supported interfaces, select a model and thinking effort in Shot2AI. Available models are read from your chat's menu, including ChatGPT's nested model list behind its thinking effort control. **Use selected model in chat** and **Use selected effort in chat** preserve the chat's current settings. If a requested setting cannot be confirmed, Shot2AI keeps the capture and explains the problem before sending.
 
 **Send automatically** is enabled for the built-in chat destinations. With it disabled, Shot2AI prepares the message in the chat tab for you to send. A custom web chat can be added in Settings; its interface must support image attachment and a message composer.
 
@@ -97,7 +97,7 @@ This repository tracks the files distributed in the extension: `manifest.json`, 
 
 Development scripts, tests, test reports, screenshots, dependency manifests, website hosting files and the sharing server are maintained outside Git tracking. They are not required to load the unpacked extension. Public sharing connects to the existing hosted service.
 
-Version **0.5.20** centers the chat icon and adds **Link** to the Share menu, with an expandable public URL and **Copy** button beneath the sharing icons.
+Version **0.5.21** supports ChatGPT’s updated composer, nested model picker and answer markup. It avoids treating editable answers as unsent drafts, detects multiple chat tabs across windows, and lets you choose the destination tab before sending.
 
 ## Licence and credits
 

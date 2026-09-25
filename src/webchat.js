@@ -72,7 +72,9 @@ async function pasteInPage(files, text, selectors, submit) {
   const anyVisible = (list) => list.some((s) => [...document.querySelectorAll(s)].some(visible));
   const count = (list) => { for (const s of list) { const n = document.querySelectorAll(s).length; if (n) return n; } return 0; };
   const find = () => {
-    for (const s of selectors) { const el = [...document.querySelectorAll(s)].find(visible); if (el) return el; }
+    const eligible = el => visible(el) && !el.closest('[inert], [aria-hidden="true"]') && !(submit.composerExclude && el.closest(submit.composerExclude)) && !el.disabled && !el.readOnly;
+    for (const s of selectors) { const el = [...document.querySelectorAll(s)].find(eligible); if (el) return el; }
+    if (submit.strictComposer) return null;
     const all = [...document.querySelectorAll('textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]')].filter((el) => visible(el) && !el.disabled && !el.readOnly);
     return all.sort((a, b) => { const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect(); return rb.width * rb.height - ra.width * ra.height; })[0] || null;
   };
@@ -309,11 +311,13 @@ export async function rememberConversation(destination, url) {
 // went there to sign in.
 export async function findTab(destination) {
   const kept = await remembered(destination);
-  if (kept && (onSite(kept.tab, destination) || kept.signIn)) return kept;
   const tabs = (await chrome.tabs.query({})).filter((t) => onSite(t, destination));
   const onAddress = (t) => (!destination.preset && t.url.startsWith(destination.url) ? 1 : 0);
   tabs.sort((a, b) => onAddress(b) - onAddress(a) || (b.lastAccessed || 0) - (a.lastAccessed || 0));
-  return tabs[0] ? { tab: tabs[0], signIn: false } : null;
+  const windows = [...new Set(tabs.map(t => t.windowId))];
+  const candidates = tabs.map(t => ({ id: t.id, window: windows.indexOf(t.windowId) + 1, index: t.index + 1, title: (t.title || destination.name).slice(0, 100) }));
+  if (kept && (onSite(kept.tab, destination) || kept.signIn)) return { ...kept, candidates };
+  return tabs[0] ? { tab: tabs[0], signIn: false, candidates } : null;
 }
 
 // One screenshot or several (`blob` and `name` may be arrays). `newChat`
@@ -321,7 +325,7 @@ export async function findTab(destination) {
 // `model` is the name of the model to switch to first (none: the chat's
 // current model, and its picker is not touched).
 // Returns { ok, submitted, autoSubmit, tabId, baseline, reason, modelUsed } | { needsPermission } | { failed, reason, detail, names, tabId }.
-export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null, effort, backgroundAnswer = false, continuation = null } = {}) {
+export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null, effort, backgroundAnswer = false, continuation = null, targetTabId = null } = {}) {
   const blobs = Array.isArray(blob) ? blob : [blob];
   const names = Array.isArray(name) ? name : [name];
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { needsPermission: true };
@@ -331,9 +335,20 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
   const want = model && destination.model ? model : null;
   const effortWant = !continuation && destination.model?.effort ? (typeof effort === 'string' ? effort : saved.effortChoice?.[destination.id] || '') : '';
   const found = continuation ? { tab: await chrome.tabs.get(continuation.tabId).catch(() => null) } : await findTab(destination);
-  if (continuation && found.tab?.url !== continuation.url) found.tab = (await chrome.tabs.query({})).find(t => t.url === continuation.url) || null;
+  if (continuation && found.tab?.url !== continuation.url) {
+    const matches = (await chrome.tabs.query({})).filter(t => t.url === continuation.url);
+    found.tab = matches.length === 1 ? matches[0] : null;
+  }
   if (continuation && (!found.tab || !onSite(found.tab, destination) || !continuation.url || found.tab.url !== continuation.url)) {
     return { failed: true, reason: 'conversationChanged' };
+  }
+  if (!continuation && targetTabId != null) {
+    const chosen = Number.isInteger(targetTabId) && await chrome.tabs.get(targetTabId).catch(() => null);
+    if (!chosen || !onSite(chosen, destination)) return { failed: true, reason: 'chatTabGone' };
+    if (!found) return { failed: true, reason: 'chatTabGone' };
+    found.tab = chosen;
+  } else if (!continuation && found?.candidates?.length > 1) {
+    return { failed: true, reason: 'multipleTabs', tabs: found.candidates, windows: new Set(found.candidates.map(t => t.window)).size };
   }
   let tab = found?.tab || null;
   // Loaded by Shot2AI just now: a page elsewhere means a sign-in page.
@@ -383,6 +398,7 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
       on: autoSubmit, selectors: destination.sendSelectors || [], stop: destination.stopSelectors || [],
       user: destination.userSelectors || [], answers: destination.answerSelectors || [], deadline: Date.now() + SEND_LIMIT - 10000,
       login: { urls: destination.loginUrls || [], selectors: destination.loginSelectors || [] }, area: destination.areaSelectors || [], attachments: destination.attachmentSelectors || [],
+      strictComposer: !!destination.strictComposer, composerExclude: destination.composerExclude || '',
       uploadButtons: destination.uploadButtonSelectors || [], uploadErrors: destination.uploadErrorSelectors || [],
       // A page that is already there shows its message box at once.
       wait: loadedNow ? 20000 : 6000,
@@ -442,7 +458,9 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
 export async function readModels(destination) {
   if (!destination?.model) return { skipped: 'noPicker' };
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { skipped: 'permission' };
-  const tab = (await findTab(destination))?.tab;
+  const found = await findTab(destination);
+  if (found?.candidates?.length > 1) return { skipped: 'multipleTabs', count: found.candidates.length, windows: new Set(found.candidates.map(t => t.window)).size };
+  const tab = found?.tab;
   if (!tab || !onSite(tab, destination) || tab.discarded || tab.status !== 'complete') return { skipped: 'noTab' };
   if (tab.active && (await chrome.windows.get(tab.windowId).catch(() => null))?.focused) return { skipped: 'inUse' };
   try {
