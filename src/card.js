@@ -166,6 +166,7 @@
     .a-sources small{flex:none;color:#969f88;font-size:10.5px}
     .a-turn{padding:12px 0;border-bottom:1px solid #e3e6dd}.a-turn:first-child{padding-top:0}
     .a-question{margin:0 0 10px!important;padding:8px 10px;border-radius:8px;background:#eef1e9;white-space:pre-wrap}
+    .a-clear-draft{display:block;margin-top:7px;padding:8px 12px;border-radius:8px;background:#2f3c30;color:#fff;font-weight:600}
     .a-followup{display:flex;align-items:flex-end;gap:7px;margin-top:9px}
     .a-followup textarea{box-sizing:border-box;flex:1;min-width:0;resize:vertical;min-height:58px;max-height:120px;border:1px solid #dfe2d9;border-radius:8px;background:#fff;color:#232a23;padding:9px 10px;font:13px/1.4 ui-sans-serif,-apple-system,sans-serif}
     .a-followup textarea:focus{outline:2px solid #547254;outline-offset:1px}
@@ -537,9 +538,10 @@
       }
       else if (r?.actions === 'options') showResult(r.tone, r.text, [['Open Options', () => ask({ type: 'open-options' }), true]]);
       else if (r?.actions === 'open-chat') {
-        const again = (r.retry || r.current) && o.destinations.find((d) => d.id === r.chat.destination);
+        const again = (r.retry || r.current || r.clear) && o.destinations.find((d) => d.id === r.chat.destination);
         // The chosen model could not be had: send with the chat's current one instead.
-        if (r.current && again) showResult(r.tone, r.text, [[r.reason?.startsWith('effort') ? 'Send with current settings' : 'Send with current model', () => void sendTo(again, true, { model: '', effort: '' }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
+        if (r.clear && again) showResult(r.tone, r.text, [['Clear draft and send', () => void sendTo(again, true, { ...r.settings, clearDraft: true, draftUrl: r.draftUrl, targetTabId: r.chat.tabId }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
+        else if (r.current && again) showResult(r.tone, r.text, [[r.reason?.startsWith('effort') ? 'Send with current settings' : 'Send with current model', () => void sendTo(again, true, { model: '', effort: '' }), true, 'send'], [`Open ${r.chat.name} tab`, () => openChat(r.chat), false, 'open']]);
         else showResult(r.tone, r.text, [[`Open ${r.chat.name} tab`, () => openChat(r.chat), true, 'open'], ...(again ? [[typeof r.retry === 'string' ? r.retry : 'Try again', () => void sendTo(again), false, 'retry']] : [])]);
       } else if (r) showResult(r.tone, r.text || '', [], r.lines || null);
       else showResult('', '');
@@ -643,6 +645,12 @@
       $('.a-followup button').disabled = a.state !== 'done' || !followup.value.trim();
       $('.a-chat-error').textContent = entry.chatError || '';
       $('.a-chat-error').hidden = !entry.chatError;
+      if (entry.clearDraftUrl && a.state === 'done') {
+        const clear = document.createElement('button'); clear.className = 'a-clear-draft';
+        clear.textContent = 'Clear draft and send';
+        clear.addEventListener('click', () => void followUp(true));
+        $('.a-chat-error').append(clear);
+      }
       // Actions.
       const actions = [];
       const button = (text, run, cls = '', icon = '') => {
@@ -767,18 +775,20 @@
       $('.a-actions').replaceChildren(...actions);
       $('.a-actions').hidden = !actions.length;
     }
-    async function followUp() {
+    async function followUp(clearDraft = false) {
       const entry = now();
       const text = (entry?.chatDraft || '').trim();
       if (busy || !text || entry.answer?.state !== 'done') return;
       const old = { answer: entry.answer, asked: entry.asked, history: entry.history || [] };
       const turnId = Array.from(crypto.getRandomValues(new Uint32Array(4)), n => n.toString(16)).join('-');
       entry.history = [...old.history, { asked: old.asked, answer: old.answer }];
+      const draftUrl = clearDraft ? entry.clearDraftUrl : null;
+      entry.clearDraftUrl = null;
       entry.asked = text; entry.chatError = '';
       entry.answer = { ...old.answer, state: 'sending', turnId, blocks: [], sources: [] };
       setBusy(true); showAnswer(entry);
       $('.a-body').scrollTop = $('.a-body').scrollHeight;
-      const r = await ask({ type: 'card-followup', id: entry.id, text, turnId });
+      const r = await ask({ type: 'card-followup', id: entry.id, text, turnId, clearDraft, draftUrl });
       setBusy(false);
       if (r?.watching) {
         entry.chatDraft = '';
@@ -786,6 +796,7 @@
         watch(entry);
       } else {
         Object.assign(entry, old);
+        entry.clearDraftUrl = r?.clear ? r.draftUrl : null;
         entry.chatError = r?.text || (!r || !Object.keys(r).length ? 'Reload Shot2AI in your browser’s Extensions page, then refresh this page. Copy your draft before refreshing; the running extension could not receive the follow-up.' : 'The message could not be confirmed. Check the chat tab before trying again.');
       }
       if (entry === now()) { showAnswer(entry); if (!r?.watching) $('.a-followup textarea').focus({ preventScroll: true }); }
@@ -970,7 +981,7 @@
       scheduleHide();
     }
 
-    async function sendTo(destination, confirmed = false, { model: forced, effort: forcedEffort, targetTabId } = {}) {
+    async function sendTo(destination, confirmed = false, { model: forced, effort: forcedEffort, targetTabId, clearDraft = false, draftUrl } = {}) {
       const entry = now();
       if (busy || !entry) return;
       $('.menu').hidden = true;
@@ -1006,7 +1017,7 @@
         entry.model = null;
         entry.effort = null;
         persist(entry.id, { model: null, effort: null, newChat: false });
-        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model, effort, targetTabId });
+        const r = await ask({ type: 'card-send', id: entry.id, destination: destination.id, text, acknowledge: destination.origin, newChat, model, effort, targetTabId, clearDraft, draftUrl });
         setBusy(false);
         chat.tabId = r?.tabId;
         if (r?.watching) {
@@ -1030,7 +1041,7 @@
         if (r?.needsPermission) { setResult(entry, { tone: 'warn', text: `Allow the extension to use ${destination.host} in Options first.`, actions: 'options', persist: false }); return; }
         const open = r?.tabId ? { actions: 'open-chat', chat, persist: false } : {};
         if (r?.notAttached) { setResult(entry, { tone: 'warn', text: copied ? `${destination.name} did not take the image, so nothing was sent. It is on your clipboard: click the message box there and press ${o.mod}V.` : `${destination.name} did not take the image, so nothing was sent. Use Copy, then paste it there.`, ...open }); return; }
-        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, reason: r.reason, retry: r.retry || false, current: !!r.current, ...(r.open ? open : {}) }); return; }
+        if (r?.text) { setResult(entry, { tone: r.tone || 'warn', text: r.text, reason: r.reason, retry: r.retry || false, current: !!r.current, clear: !!r.clear, draftUrl: r.draftUrl, settings: { model, effort }, ...(r.open ? open : {}) }); return; }
         setResult(entry, { tone: copied ? 'warn' : 'err', text: copied ? `Copied. Paste with ${o.mod}V in ${destination.name}.` : `The ${entry.kind === 'text' ? 'text' : 'screenshot'} could not be pasted into ${destination.name}. Use Copy, then paste it there.`, ...open });
         return;
       }

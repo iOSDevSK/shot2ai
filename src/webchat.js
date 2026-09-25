@@ -10,7 +10,7 @@
 // is the tab Shot2AI uses, so each screenshot continues the same conversation
 // unless the owner asks for a new chat. A closed tab opens again, in the
 // background, on the last conversation. Shot2AI never touches a sign-in page.
-import { sitePattern, settings, update, autoSubmitOn, origin, cacheModels } from './settings.js';
+import { sitePattern, settings, update, autoSubmitOn, origin, cacheModels, legacyModelEffort } from './settings.js';
 import { controlBackgroundFrames } from './background-frames.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,6 +58,7 @@ function navigate(tabId, url, timeout = 20000) {
 // late (up to a minute apart), so every wait here ends on a change to the
 // page, watched with a MutationObserver; its timer is only the deadline.
 async function pasteInPage(files, text, selectors, submit) {
+  if (submit.clearDraft && (!submit.draftUrl || location.href !== submit.draftUrl)) return { ok: false, reason: 'draftChanged' };
   const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 20 && r.height > 10 && getComputedStyle(el).visibility !== 'hidden'; };
   const until = (check, ms) => new Promise((resolve) => {
     let observer = null;
@@ -141,9 +142,47 @@ async function pasteInPage(files, text, selectors, submit) {
     ? { ok: false, reason: 'uploadFailed' } : null;
   // An earlier failed upload also disables Gemini's Send control. Leave it
   // visible for the owner; do not append another file to a failed draft.
-  if (attachmentError()) return { ok: false, reason: 'uploadBlocked' };
+  if (attachmentError() && !submit.clearDraft) return { ok: false, reason: 'uploadBlocked', url: location.href };
   const alerts = () => [...area().querySelectorAll('[role="alert"], [data-testid*="error" i]')].filter((el) => visible(el) && el.textContent.trim()).length;
-  if (!files.length && (String(composer.value ?? composer.innerText ?? '').trim() || previews())) return { ok: false, reason: 'draft' };
+  const draftText = () => String(composer.value ?? composer.innerText ?? '').trim();
+  if (draftText() || previews() || attachmentError()) {
+    if (!submit.clearDraft) return { ok: false, reason: 'draft', url: location.href };
+    // Only the explicitly confirmed composer is cleared, using the site's
+    // own attachment controls so its internal upload state changes too.
+    if (area() === document.body || !area().contains(composer)
+      || [...submit.user, ...submit.answers].some(selector => area().querySelector(selector))) return { ok: false, reason: 'draftNotCleared', url: location.href };
+    for (let attempt = 0; previews() && attempt < 40; attempt++) {
+      if (location.href !== submit.draftUrl) return { ok: false, reason: 'draftChanged' };
+      const before = previews();
+      const remove = [...area().querySelectorAll('button, [role="button"]')].find(el => {
+        const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''}`.trim();
+        const test = el.getAttribute('data-testid') || '';
+        return !el.disabled && el.getAttribute('aria-disabled') !== 'true'
+          && (/^(remove|delete|discard)(?:\s|$)/i.test(label) || /(?:remove|delete).*(?:file|image|attachment)|(?:file|image|attachment).*(?:remove|delete)/i.test(test));
+      });
+      if (!remove) return { ok: false, reason: 'draftNotCleared', url: location.href };
+      remove.click();
+      if (!await until(() => previews() < before, 1500)) return { ok: false, reason: 'draftNotCleared', url: location.href };
+      composer = find();
+      if (!composer) return { ok: false, reason: 'noComposer' };
+    }
+    if (previews()) return { ok: false, reason: 'draftNotCleared', url: location.href };
+    composer.focus();
+    if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
+      const proto = composer instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(composer, '');
+      composer.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (draftText()) {
+      const range = document.createRange(); range.selectNodeContents(composer);
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      document.execCommand('delete');
+    }
+    for (const input of area().querySelectorAll('input[type="file"]')) input.value = '';
+    await new Promise(resolve => setTimeout(resolve, 100));
+    composer = find();
+    if (location.href !== submit.draftUrl) return { ok: false, reason: 'draftChanged' };
+    if (!composer || draftText() || previews() || attachmentError()) return { ok: false, reason: 'draftNotCleared', url: location.href };
+  }
   const before = previews();
   const alertsBefore = alerts();
   const attached = () => until(() => blocker() || attachmentError() || previews() > before, 6000);
@@ -325,15 +364,15 @@ export async function findTab(destination) {
 // `model` is the name of the model to switch to first (none: the chat's
 // current model, and its picker is not touched).
 // Returns { ok, submitted, autoSubmit, tabId, baseline, reason, modelUsed } | { needsPermission } | { failed, reason, detail, names, tabId }.
-export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null, effort, backgroundAnswer = false, continuation = null, targetTabId = null } = {}) {
+export async function pasteIntoChat(destination, blob, text, name, { newChat = false, model = null, effort, backgroundAnswer = false, continuation = null, targetTabId = null, clearDraft = false, draftUrl = null } = {}) {
   const blobs = Array.isArray(blob) ? blob : [blob];
   const names = Array.isArray(name) ? name : [name];
   if (!(await chrome.permissions.contains({ origins: [sitePattern(destination.url)] }))) return { needsPermission: true };
   // Never for html2wp: only web chats reach this function.
   const saved = await settings();
-  const autoSubmit = !!continuation || autoSubmitOn(saved, destination.id);
-  const want = model && destination.model ? model : null;
-  const effortWant = !continuation && destination.model?.effort ? (typeof effort === 'string' ? effort : saved.effortChoice?.[destination.id] || '') : '';
+  const autoSubmit = !!continuation || !!clearDraft || autoSubmitOn(saved, destination.id);
+  let want = model && destination.model ? model : null;
+  let effortWant = !continuation && destination.model?.effort ? (typeof effort === 'string' ? effort : saved.effortChoice?.[destination.id] || '') : '';
   const found = continuation ? { tab: await chrome.tabs.get(continuation.tabId).catch(() => null) } : await findTab(destination);
   if (continuation && found.tab?.url !== continuation.url) {
     const matches = (await chrome.tabs.query({})).filter(t => t.url === continuation.url);
@@ -394,6 +433,7 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
   const run = async (tabId, loadedNow) => {
     await controlBackgroundFrames(tabId, frameToken, 'start');
     const submit = {
+      clearDraft: !!clearDraft, draftUrl,
       conversationUrl: continuation?.url || null,
       on: autoSubmit, selectors: destination.sendSelectors || [], stop: destination.stopSelectors || [],
       user: destination.userSelectors || [], answers: destination.answerSelectors || [], deadline: Date.now() + SEND_LIMIT - 10000,
@@ -429,6 +469,17 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
   };
   try {
     let result = await run(tab.id, fresh || tab.status !== 'complete');
+    // An old card can still carry Instant after settings were migrated.
+    // modelMissing returns before editing the composer or attaching files;
+    // retry once with the current model and a verified effort selection.
+    const legacyEffort = !continuation && result?.reason === 'modelMissing'
+      ? legacyModelEffort(destination, want, result.names) : null;
+    if (legacyEffort !== null) {
+      await cacheModels(destination, result.names);
+      want = null;
+      effortWant = effortWant || legacyEffort;
+      result = await run(tab.id, false);
+    }
     // A page of the chat without a message box (its settings, a list of
     // chats): the tab goes to the conversation, or a new chat, and tries again.
     if (!continuation && result?.reason === 'noComposer' && !fresh && destination.preset) {
@@ -442,7 +493,7 @@ export async function pasteIntoChat(destination, blob, text, name, { newChat = f
     // Whatever the picker showed on the way is the chat's list now.
     await cacheModels(destination, result?.model?.names || result?.names).catch(() => {});
     const about = { model: want, names: result?.names || null, pickerNote: destination.model?.noPicker || null };
-    if (!result?.ok) return { failed: true, reason: result?.reason || 'failed', detail: result?.detail || null, notAttached: result?.reason === 'notAttached', tabId: tab.id, ...about };
+    if (!result?.ok) return { failed: true, reason: result?.reason || 'failed', detail: result?.detail || null, notAttached: result?.reason === 'notAttached', draftUrl: result?.url || null, tabId: tab.id, ...about };
     keepFrames = backgroundAnswer && !!result.submitted;
     return { ok: true, submitted: !!result.submitted, autoSubmit, reason: result.reason || null, baseline: result.baseline || null, url: result.url || tab.url, tabId: tab.id, frameToken: keepFrames ? frameToken : null, modelUsed: result.model?.name || null, effortUsed: result.model?.effort || null, ...about };
   } catch {

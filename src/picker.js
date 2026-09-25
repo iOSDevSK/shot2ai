@@ -9,7 +9,7 @@
 // timer is only the deadline. Names are the ones the chat shows: the sites
 // rename their models, so Shot2AI never assumes a list of its own.
 (() => {
-  if (window.__shot2aiPicker?.revision === 4) return;
+  if (window.__shot2aiPicker?.revision === 5) return;
   const rendered = (el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && getComputedStyle(el).visibility !== 'hidden'; };
   // Radix keeps closed popovers mounted until their exit animation ends.
   // In a background tab that animation may stall, so geometry alone cannot
@@ -70,7 +70,7 @@
       const found = all([selector]).find(eligible);
       if (found) return found;
     }
-    const names = new Set([...(model.typical || []), ...(model.panel ? model.effort?.names || [] : [])].map(norm));
+    const names = new Set([...(model.typical || []), ...(model.buttonNames || []), ...(model.panel ? model.effort?.names || [] : [])].map(norm));
     const pattern = model.buttonNamePattern ? new RegExp(model.buttonNamePattern) : null;
     const candidates = all(model.buttonFallback || []).filter((el) => {
       const name = norm(el.innerText || el.textContent);
@@ -384,5 +384,5 @@
 
   const read = (model) => withModelButton(model, (trigger) => readFrom(model, trigger));
   const choose = (model, want) => withModelButton(model, (trigger) => chooseFrom(model, want, trigger));
-  window.__shot2aiPicker = { revision: 4, read, choose, chooseEffort };
+  window.__shot2aiPicker = { revision: 5, read, choose, chooseEffort };
 })();

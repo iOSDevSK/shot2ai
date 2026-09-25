@@ -73,7 +73,7 @@ function renderModels(d) {
   $('model-select').value = view.choice;
   $('model-note').textContent = view.live ? `Read from your ${d.name} tab ${ago(view.at)}.`
     : view.note ? `${d.name}: ${view.note}. Keep ${d.name} open in a tab to read its list.`
-    : `Typical names. Keep ${d.name} open in a tab, signed in, to read its own list.`;
+    : `${view.names.length ? 'Typical names. ' : ''}Keep ${d.name} open in a tab, signed in, to read its own list.`;
   if (!view.choice) $('model-note').textContent += ' The model already selected in your chat will be used.';
   // Check all windows even when the cached model list is still fresh.
   chrome.tabs.query({}).then(tabs => {

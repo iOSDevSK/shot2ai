@@ -248,7 +248,7 @@ async function cardSendNow(message, sender) {
   // The model: the card's choice for this send ('' for the chat's current
   // one), else the owner's choice for this chat.
   const model = typeof message.model === 'string' ? message.model : s.modelChoice?.[destination.id] || '';
-  const r = await pasteIntoChat(destination, blob || [], message.text, blob ? fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]) : [], { targetTabId: message.targetTabId, newChat: !!message.newChat, model: model || null, effort: message.effort, backgroundAnswer: readsAnswers(destination) && !!sender?.tab });
+  const r = await pasteIntoChat(destination, blob || [], message.text, blob ? fileName(s.filenamePattern, capture.url, new Date(), EXTENSIONS[blob.type]) : [], { clearDraft: !!message.clearDraft, draftUrl: message.draftUrl, targetTabId: message.targetTabId, newChat: !!message.newChat, model: model || null, effort: message.effort, backgroundAnswer: readsAnswers(destination) && !!sender?.tab });
   const outcome = chatOutcome(destination.name, r, capture.kind === 'text');
   // Sent to a chat whose answer Shot2AI reads (sites/): the card turns into the answer card.
   if (r.submitted && readsAnswers(destination) && sender?.tab && await getCapture(message.id)) {
@@ -296,15 +296,15 @@ export async function cardFollowup(message, sender) {
     if (followingChats.has(key)) return { failed: true, text: 'Another message is being sent to this conversation. Wait for it to finish.' };
     conversationKey = key; followingChats.add(key);
     const r = await pasteIntoChat(destination, [], text, [], {
-      continuation: { tabId: a.tabId, url: a.url }, backgroundAnswer: true, effort: '',
+      continuation: { tabId: a.tabId, url: a.url }, backgroundAnswer: true, effort: '', clearDraft: !!message.clearDraft, draftUrl: message.draftUrl,
     });
     if (!r.submitted) {
       const errors = {
         conversationChanged: 'The original chat was closed or changed. Open it with Continue, then try again.',
-        draft: 'There is an unsent message or attachment in the chat. Send or clear it there first.',
         busy: `${destination.name} is still answering. Wait for it to finish.`,
         login: `Sign in to ${destination.name} in its tab first.`,
       };
+      if (['draft', 'uploadBlocked', 'draftNotCleared', 'draftChanged'].includes(r.reason)) return { ...r, ...chatOutcome(destination.name, r, true) };
       return { failed: true, text: errors[r.reason] || `The message could not be confirmed. Check the ${destination.name} tab before trying again.`, reason: r.reason };
     }
     const history = [...(capture.history || []), { asked: capture.asked || '', answer: a }];

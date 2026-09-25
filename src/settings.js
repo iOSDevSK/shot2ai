@@ -81,12 +81,26 @@ export function modelView(s, d) {
   return { choice: s.modelChoice?.[d.id] || '', names: live ? read.names : d.model.typical || [], live, at: live ? read.at : 0, note: d.model.noPicker || null,
     effort: d.model.effort ? { choice: s.effortChoice?.[d.id] || '', options: d.model.effort.options || EFFORTS } : null };
 }
+// Instant was offered as a model by the old ChatGPT UI. Only migrate after
+// its live picker actually lists the new versioned models instead.
+export function legacyModelEffort(d, choice, names = []) {
+  return d?.id === 'chatgpt' && choice === 'Instant' && !names.includes('Instant')
+    && names.includes('Latest') && names.some(n => /^GPT[- ]\d/i.test(n)) ? '0' : null;
+}
+
 // Names read from a chat's picker, kept for the popup and the card.
 export async function cacheModels(d, names) {
   const list = [...new Set((names || []).map((n) => String(n).trim()).filter(Boolean))].slice(0, 40);
   if (!d?.model || !list.length) return;
-  const { modelLists = {} } = await chrome.storage.local.get('modelLists');
-  await update({ modelLists: { ...modelLists, [d.id]: { names: list, at: Date.now(), version: chrome.runtime.getManifest().version } } });
+  const { modelLists = {}, modelChoice = {}, effortChoice = {} } = await chrome.storage.local.get(['modelLists', 'modelChoice', 'effortChoice']);
+  const legacyEffort = legacyModelEffort(d, modelChoice[d.id], list);
+  await update({
+    modelLists: { ...modelLists, [d.id]: { names: list, at: Date.now(), version: chrome.runtime.getManifest().version } },
+    ...(legacyEffort !== null ? {
+      modelChoice: { ...modelChoice, [d.id]: '' },
+      effortChoice: { ...effortChoice, [d.id]: effortChoice[d.id] || legacyEffort },
+    } : {}),
+  });
 }
 
 // What the card or the editor says after a web-chat send, and whether it
@@ -118,9 +132,11 @@ export function chatOutcome(name, r, textOnly = false) {
     case 'plan': return { tone: 'warn', open: true, text: `${name} did not take the screenshot${r.detail ? `: “${r.detail.replace(/[\s.!]+$/, '')}”` : ''}. It may need a sign-in or a paid plan. Nothing was sent.` };
     case 'noComposer': return { tone: 'warn', open: true, text: `${name}'s message box was not found, so nothing was sent. Are you signed in there?` };
     case 'busy': return { tone: 'warn', open: true, retry: true, text: `${name} is still answering in its tab, so nothing was sent. Send again when it finishes.` };
-    case 'draft': return { tone: 'warn', open: true, text: 'There is an unsent message or attachment in the chat. Send or clear it there first.' };
+    case 'draft': return { tone: 'warn', open: true, clear: true, text: 'There is an unsent message or attachment in the chat. Clear its text, images and files, then send this capture?' };
+    case 'draftNotCleared': return { tone: 'warn', open: true, text: 'The draft could not be completely cleared. Nothing new was sent. Remove the remaining text or attachments in the chat and try again.' };
+    case 'draftChanged': return { tone: 'warn', open: true, text: 'The chat changed after confirmation. Sending was stopped. Check the chat, then try again from your capture card.' };
     case 'noText': return { tone: 'warn', open: true, text: `${name} ${textOnly ? 'did not take your message' : 'took the screenshot but not your message'}, so nothing was sent. Finish it in the ${name} tab.` };
-    case 'uploadBlocked': return { tone: 'warn', open: true, text: `Remove the failed attachment in ${name}, then send again. Nothing was sent.` };
+    case 'uploadBlocked': return { tone: 'warn', open: true, clear: true, text: `Remove the failed attachment in ${name}, then send again. Nothing was sent.` };
     case 'uploadFailed': return { tone: 'warn', open: true, text: `The screenshot did not upload to ${name}, so nothing was sent. See the ${name} tab.` };
     case 'noSendButton': return { tone: 'warn', open: true, text: `Pasted into ${name}. Its send button was not found; press Enter there.` };
     case 'notConfirmed': return { tone: 'warn', open: true, text: `Shot2AI pressed Send in ${name} but could not confirm it went. Check the ${name} tab.` };

@@ -43,7 +43,7 @@ export default {
       names: ['Thinking effort', 'Instant', 'Medium', 'High', 'Extra High', 'Pro'],
       sliders: ['input[type="range"]', '[role="slider"]'],
       keyboardTarget: '[role="menuitem"][aria-label="Power"]',
-      valueLabel: '[aria-label="Select model"] [data-max-effort]',
+      valueLabel: '[aria-label="Select model"] [data-max-effort], [data-model-picker-view-toggle] [data-effort-only]',
     },
     // The intelligence picker switches views inside one menu. The model
     // radios remain mounted but inert until Select model is activated.
@@ -56,6 +56,8 @@ export default {
     menu: ['[role="menu"]', '[role="listbox"]'],
     items: ['[role="menuitemradio"]', '[role="menuitem"]', '[role="option"]'],
     label: [],
-    typical: ['Auto', 'Instant', 'Thinking', 'Pro'],
+    // Old mode names remain valid trigger labels, but are not offered as models.
+    buttonNames: ['Auto', 'Instant', 'Thinking', 'Pro'],
+    typical: [],
   },
 };
